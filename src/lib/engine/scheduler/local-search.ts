@@ -200,6 +200,57 @@ function computeSwapDeltaPenalty(
 }
 
 /**
+ * Compute the net penalty delta of replacing `old` with `replacement` (same shift,
+ * different staffId) without committing. Temporarily mutates `state`, scores the
+ * affected set, then restores.
+ *
+ * Returns (newPenalty − oldPenalty). Negative = improvement.
+ */
+function computeReplacementDeltaPenalty(
+  old: AssignmentDraft,
+  replacement: AssignmentDraft,
+  state: SchedulerState,
+  context: SchedulerContext,
+  weights: WeightProfile
+): number {
+  // Build minimal affected set (mirrors buildAffectedSet logic for a single replacement):
+  //  1. All coworkers on the shift (skill mix, charge clustering)
+  //  2. Old staff's same-week assignments (OT delta when they're removed)
+  //  3. New staff's same-week assignments (OT delta when they gain a shift)
+  const seen = new Set<string>();
+  const affected: AssignmentDraft[] = [];
+  const addToAffected = (x: AssignmentDraft) => {
+    const k = `${x.staffId}:${x.shiftId}`;
+    if (!seen.has(k)) { seen.add(k); affected.push(x); }
+  };
+
+  for (const x of state.getShiftAssignments(old.shiftId)) addToAffected(x);
+  const week = getWeekStart(old.date);
+  for (const x of state.getStaffAssignments(old.staffId)) {
+    if (getWeekStart(x.date) === week) addToAffected(x);
+  }
+  for (const x of state.getStaffAssignments(replacement.staffId)) {
+    if (getWeekStart(x.date) === week) addToAffected(x);
+  }
+
+  const oldScore = scoreSubset(affected, state, context, weights);
+
+  state.removeAssignment(old);
+  state.addAssignment(replacement);
+
+  const newAffected = affected.map((x) =>
+    x.staffId === old.staffId && x.shiftId === old.shiftId ? replacement : x
+  );
+  const newScore = scoreSubset(newAffected, state, context, weights);
+
+  // Restore
+  state.removeAssignment(replacement);
+  state.addAssignment(old);
+
+  return newScore - oldScore;
+}
+
+/**
  * Quick hard-rule check for a proposed swap.
  * Temporarily removes the two assignments from `currentState` in-place,
  * checks hard rules, then restores — no clone required.
@@ -507,6 +558,72 @@ export function overtimeReductionSweep(
         }
       }
     }
+
+    // ── Pass 2: Replacement pass ──────────────────────────────────────────────
+    // Only runs when the swap pass finds nothing (madeProgress still false).
+    // For each OT assignment, tries replacing it with an unassigned eligible
+    // non-OT staff member from context.staffList — something the swap pass
+    // cannot do because it only rearranges existing assignments.
+    if (!madeProgress) {
+      replacementOuter: for (const otIdx of otIndices) {
+        const a = assignments[otIdx];
+        const shiftA = context.shiftMap.get(a.shiftId)!;
+
+        // Quick lookup: staff already on this specific shift (to skip them)
+        const staffOnShift = new Set(
+          state.getShiftAssignments(a.shiftId).map((x) => x.staffId)
+        );
+
+        for (const staffInfo of context.staffList) {
+          if (staffOnShift.has(staffInfo.id)) continue;
+
+          // If this is a charge slot, replacement must be charge-qualified
+          if (
+            a.isChargeNurse &&
+            (!staffInfo.isChargeNurseQualified || staffInfo.icuCompetencyLevel < 4)
+          ) continue;
+
+          // Replacement must not push this staff into OT in shiftA's week
+          if (
+            state.getWeeklyHours(staffInfo.id, shiftA.date) + shiftA.durationHours > 40
+          ) continue;
+
+          // Check hard rules — temporarily remove OT assignment so overlap/rest
+          // checks reflect the state after the original is gone.
+          state.removeAssignment(a);
+          let hardOk = false;
+          try {
+            hardOk = passesHardRules(staffInfo, shiftA, state, context);
+          } finally {
+            state.addAssignment(a);
+          }
+          if (!hardOk) continue;
+
+          const replacement: AssignmentDraft = {
+            ...a,
+            staffId: staffInfo.id,
+            isFloat: !!(staffInfo.homeUnit && staffInfo.homeUnit !== shiftA.unit),
+            floatFromUnit:
+              staffInfo.homeUnit && staffInfo.homeUnit !== shiftA.unit
+                ? (staffInfo.homeUnit ?? null)
+                : null,
+            isOvertime: false,
+          };
+
+          const delta = computeReplacementDeltaPenalty(
+            a, replacement, state, context, weights
+          );
+          if (delta < 0) {
+            state.removeAssignment(a);
+            state.addAssignment(replacement);
+            assignments[otIdx] = replacement;
+            currentPenalty += delta;
+            madeProgress = true;
+            break replacementOuter;
+          }
+        }
+      }
+    }
   }
 
   console.log(`[scheduler] overtimeReductionSweep: ${sweepIter} iterations`);
@@ -595,6 +712,24 @@ export function weekendRedistributionSweep(
         const shiftB = context.shiftMap.get(b.shiftId)!;
         const staffA = context.staffMap.get(a.staffId)!;
         const staffB = context.staffMap.get(b.staffId)!;
+
+        // OT guard: unconditionally reject swaps that would push either staff member
+        // over 40h in the week they're gaining a shift. The penalty weight alone cannot
+        // always block this — when weekend equity improves for multiple staff, the
+        // combined delta can still be negative even with a high OT weight. Without this
+        // guard, weekendRedistributionSweep undoes OT gains from overtimeReductionSweep,
+        // causing all three variants to converge to the same OT count.
+        const sameWeek = getWeekStart(shiftA.date) === getWeekStart(shiftB.date);
+        const staffANewHoursInWeekB =
+          state.getWeeklyHours(staffA.id, shiftB.date) -
+          (sameWeek ? shiftA.durationHours : 0) +
+          shiftB.durationHours;
+        if (staffANewHoursInWeekB > 40) continue;
+        const staffBNewHoursInWeekA =
+          state.getWeeklyHours(staffB.id, shiftA.date) -
+          (sameWeek ? shiftB.durationHours : 0) +
+          shiftA.durationHours;
+        if (staffBNewHoursInWeekA > 40) continue;
 
         const newA: AssignmentDraft = {
           ...a,

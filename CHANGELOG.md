@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.6.12] - 2026-03-16
+
+### Fixed
+
+- **Cost-Optimized variant now achieves meaningfully lower overtime than Balanced** (`src/lib/engine/scheduler/local-search.ts`): Two issues caused all three schedule variants to converge to identical overtime counts.
+
+  1. *OT guard in `weekendRedistributionSweep`*: The weekend redistribution sweep runs after the overtime reduction sweep and could undo its improvements. When multiple staff members received better weekend equity from a swap, the combined improvement sometimes outweighed the overtime penalty even at Cost-Optimized's weight of 3.0, leaving the affected staff member in overtime. The sweep now unconditionally rejects any swap that would push either participant above 40 hours in the relevant week, regardless of penalty weights. This makes the OT floor set by `overtimeReductionSweep` a guaranteed lower bound for the final schedule.
+
+  2. *Replacement pass in `overtimeReductionSweep`*: The sweep was swap-only — it could only rearrange existing assignments, so it could not fix OT caused by a shift that had no suitable swap partner among currently-assigned staff. Unassigned eligible non-OT staff visible in the assignment dialog were never considered. A second pass now runs after the swap pass stalls: for each remaining OT assignment it scans `context.staffList` for an unassigned staff member who (a) is not already on that shift, (b) would not enter OT by taking the shift, (c) passes all hard rules with the original OT assignment removed, and (d) produces a net penalty improvement. If found, the OT assignment is replaced in-place. The replacement pass re-runs in alternation with the swap pass until neither finds an improvement.
+
+### Files Modified
+
+- `src/lib/engine/scheduler/local-search.ts` — `computeReplacementDeltaPenalty` helper added; OT guard added to `weekendRedistributionSweep`; replacement pass added to `overtimeReductionSweep`
+
+---
+
 ## [1.6.11] - 2026-03-15
 
 ### Fixed
