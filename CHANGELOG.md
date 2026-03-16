@@ -6,6 +6,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.0] - 2026-03-16
+
+### Added
+
+- **Analytics dashboard** (`src/app/analytics/page.tsx`, `src/app/api/analytics/route.ts`): New comprehensive analytics page accessible from the System section of the sidebar. Provides 8 key visualizations: (1) Fill Rate Trends showing scheduled vs required staffing over time, (2) Overtime Analysis with staff-level breakdown and weekly totals, (3) Callout Frequency heatmap by staff and shift type, (4) Weekend Distribution showing fairness across staff members, (5) Holiday Balance tracking annual assignments, (6) Cost Breakdown comparing base pay, overtime, float, and agency costs, (7) Staff Workload heatmap showing assignment distribution across the schedule period, and (8) Compliance Metrics tracking hard rule violations and soft rule penalties. All charts use the new blue color scheme and are built with three new reusable chart components: `<LineChart>`, `<BarChart>`, and `<Heatmap>` (`src/components/ui/`).
+
+### Changed
+
+- **Blue color scheme migration** (`src/app/globals.css`, all component files): The entire application design system has been migrated from teal (OKLCH hue 200) to blue (OKLCH hue 255) to match the brand identity at simplescheduleai.com. All OKLCH color values, gradient definitions (`gradient-primary`, `gradient-hero`, `gradient-success`, etc.), and hardcoded color references have been updated. The primary action color is now `oklch(0.58 0.26 255)` and all gradients use blue-based hues (255–265). This affects buttons, cards, badges, charts, and all accent colors throughout the interface.
+
+- **Inter Variable font for premium typography** (`src/app/layout.tsx`, `src/app/globals.css`): Replaced the default Geist font with Inter Variable from Google Fonts to provide a more premium, professional appearance matching the brand website. Added advanced typography enhancements including kerning (`"kern" 1`), ligatures (`"liga" 1`), contextual alternates (`"calt" 1`), tighter letter spacing for headings (`letter-spacing: -0.025em`), and optimized font rendering with `-webkit-font-smoothing: antialiased`. The Inter Variable font provides better weight distribution and improved readability across all interface elements.
+
+- **NEEDS ATTENTION section redesign** (`src/app/dashboard/page.tsx`): Completely redesigned the dashboard alert section for better visual hierarchy and clarity. When no alerts exist, displays a green gradient "All Clear" card with checkmark icon. When alerts are present, shows an orange/amber gradient card with individual alert items rendered as large, button-like cards with solid colored icon badges (red for urgent, blue for info, yellow for warnings), enhanced borders, strong shadows, and hover effects including scale and translation. Each alert card includes a colored arrow badge on the right that scales on hover to reinforce clickability. This replaces the previous simple list design with a more engaging, action-oriented interface that makes critical issues immediately visible and interactive.
+
+- **Button visibility improvements** (`src/app/dashboard/page.tsx`, `src/app/schedule/[id]/page.tsx`): Fixed button visibility issues on blue gradient backgrounds. Dashboard header buttons ("Open Schedule Builder", "Create Schedule") now use white backgrounds with the `variant="secondary"` pattern and `!important` modifiers to prevent gradient bleed-through. Schedule detail page buttons use semi-transparent white borders (`border-white/20`) with white text and subtle hover effects (`hover:bg-white/10`) to maintain visibility on gradient headers while preserving the premium aesthetic.
+
+- **Analytics placement in navigation** (`src/components/layout/sidebar.tsx`): Moved the Analytics page to the System section of the sidebar, positioned above Audit Trail. This groups it with other administrative and reporting tools (Import/Export, Audit Trail) rather than operational features.
+
+### Files Modified
+
+- `src/app/layout.tsx` — Inter Variable font integration replacing Geist
+- `src/app/globals.css` — OKLCH blue values (hue 200 → 255), gradient definitions, typography enhancements with font features
+- `src/app/dashboard/page.tsx` — NEEDS ATTENTION section complete redesign with button-like cards; header button visibility fixes with white backgrounds
+- `src/app/schedule/[id]/page.tsx` — header button styling with semi-transparent borders for visibility on gradients
+- `src/components/layout/sidebar.tsx` — Analytics moved to System section above Audit Trail
+- `src/components/ui/avatar.tsx` — updated blue color references
+- `src/components/ui/confetti.tsx` — blue particle colors in celebration animations
+
+### Files Created
+
+- `src/app/analytics/page.tsx` — Analytics dashboard page with 8 visualization sections
+- `src/app/api/analytics/route.ts` — Analytics API endpoint aggregating schedule, staff, callout, and cost data
+- `src/components/ui/line-chart.tsx` — Reusable line chart component with hover tooltips
+- `src/components/ui/bar-chart.tsx` — Reusable bar chart component with value labels
+- `src/components/ui/heatmap.tsx` — Reusable heatmap component with gradient intensity scale
+
+---
+
 ## [1.6.11] - 2026-03-15
 
 ### Fixed
