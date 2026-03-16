@@ -55,19 +55,26 @@ interface JobStatus {
 function ScoreBar({ label, score }: { label: string; score: number | null }) {
   if (score === null) return null;
   const pct = Math.round((1 - score) * 100);
-  const color =
-    pct >= 80 ? "bg-green-500" : pct >= 60 ? "bg-yellow-500" : "bg-red-500";
+  const gradient =
+    pct >= 80
+      ? "linear-gradient(90deg, #10b981 0%, #059669 100%)"
+      : pct >= 60
+      ? "linear-gradient(90deg, #f59e0b 0%, #d97706 100%)"
+      : "linear-gradient(90deg, #ef4444 0%, #dc2626 100%)";
 
   return (
     <div className="flex items-center gap-2">
-      <span className="w-20 text-xs text-muted-foreground">{label}</span>
-      <div className="flex-1 h-2 rounded-full bg-muted">
+      <span className="w-20 text-xs font-medium text-muted-foreground">{label}</span>
+      <div className="flex-1 h-3 rounded-full bg-muted overflow-hidden shadow-inner">
         <div
-          className={`h-2 rounded-full ${color}`}
-          style={{ width: `${pct}%` }}
+          className="h-3 rounded-full transition-all duration-500 shadow-sm"
+          style={{
+            width: `${pct}%`,
+            background: gradient
+          }}
         />
       </div>
-      <span className="w-10 text-xs text-right">{pct}%</span>
+      <span className="w-10 text-xs text-right font-semibold">{pct}%</span>
     </div>
   );
 }
@@ -220,11 +227,13 @@ function ScenariosPageContent() {
             </span>
             <span className="text-sm text-muted-foreground">{jobStatus.progress}%</span>
           </div>
-          <div className="h-2 w-full rounded-full bg-muted">
+          <div className="h-3 w-full rounded-full bg-muted overflow-hidden shadow-inner">
             <div
-              className="h-2 rounded-full bg-primary transition-all duration-500"
+              className="h-3 rounded-full gradient-primary transition-all duration-500 shadow-sm relative overflow-hidden"
               style={{ width: `${jobStatus.progress}%` }}
-            />
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse-slow" />
+            </div>
           </div>
           {/* Step tracker — shows which variant is currently being built */}
           <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
@@ -238,16 +247,28 @@ function ScenariosPageContent() {
               return (
                 <div
                   key={label}
-                  className={`rounded px-2 py-1 text-center transition-colors ${
+                  className={`rounded-lg px-3 py-2 text-center transition-all duration-300 ${
                     complete
-                      ? "bg-green-100 text-green-700"
+                      ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300 shadow-sm"
                       : active
-                      ? "bg-primary/10 text-primary font-medium"
-                      : "text-muted-foreground"
+                      ? "gradient-primary text-white font-medium shadow-md animate-pulse"
+                      : "bg-muted/50 text-muted-foreground"
                   }`}
                 >
-                  {complete ? "✓ " : active ? "→ " : ""}{label}
-                  <div className="mt-0.5 font-normal opacity-75">{sub}</div>
+                  <div className="flex items-center justify-center gap-1">
+                    {complete && (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 6 9 17l-5-5"/>
+                      </svg>
+                    )}
+                    {active && (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin">
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                      </svg>
+                    )}
+                    <span>{label}</span>
+                  </div>
+                  <div className="mt-1 text-[10px] font-normal opacity-75">{sub}</div>
                 </div>
               );
             })}
@@ -289,9 +310,17 @@ function ScenariosPageContent() {
       {loading ? (
         <p className="text-muted-foreground">Loading scenarios…</p>
       ) : scenarios.length === 0 && !isGenerating ? (
-        <p className="text-muted-foreground">
-          No scenarios yet. Select a schedule and click Generate Schedule.
-        </p>
+        <div className="rounded-lg border-2 border-dashed border-muted p-12 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+              <line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>
+            </svg>
+          </div>
+          <p className="text-lg font-medium">No schedule variants yet</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Select a schedule above and click Generate Schedule to create three optimized variants
+          </p>
+        </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {scenarios.map((s) => {
@@ -303,13 +332,13 @@ function ScenariosPageContent() {
             return (
             <Card
               key={s.id}
-              className={
+              className={`transition-all duration-300 ${
                 s.status === "selected"
-                  ? "border-green-400"
+                  ? "border-primary shadow-xl ring-2 ring-primary/20 animate-scale-in"
                   : s.status === "rejected"
                   ? "border-red-200 opacity-60"
-                  : ""
-              }
+                  : "hover:shadow-lg hover:-translate-y-1"
+              }`}
             >
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
