@@ -192,7 +192,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <Link href={`/schedule/${data.scheduleInfo.id}`}>
-                  <Button className="bg-white text-primary hover:bg-white/90 shadow-xl hover:shadow-2xl hover:scale-105">
+                  <Button variant="secondary" className="!bg-white !text-primary hover:!bg-white/90 shadow-xl hover:shadow-2xl hover:scale-105 transition-all">
                     Open Schedule Builder →
                   </Button>
                 </Link>
@@ -209,7 +209,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 <Link href="/schedule">
-                  <Button className="bg-white text-primary hover:bg-white/90 shadow-xl hover:shadow-2xl hover:scale-105">
+                  <Button variant="secondary" className="!bg-white !text-primary hover:!bg-white/90 shadow-xl hover:shadow-2xl hover:scale-105 transition-all">
                     Create Schedule →
                   </Button>
                 </Link>
@@ -220,44 +220,108 @@ export default function DashboardPage() {
       </Card>
 
       {/* Needs Attention */}
-      <Card className="mb-6">
-        <CardContent className="pt-5 pb-4">
-          <div className="mb-3 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500">
-              <circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>
-            </svg>
-            <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Needs Attention
-            </p>
-          </div>
-          {attentionItems.length === 0 ? (
-            <p className="text-sm font-medium text-green-600">Everything looks good.</p>
-          ) : (
-            <ul className="space-y-2">
+      {attentionItems.length === 0 ? (
+        <Card className="mb-6 border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 animate-fade-in">
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/10">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-600">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>
+                </svg>
+              </div>
+              <div>
+                <p className="font-semibold text-green-900 dark:text-green-200">All Clear</p>
+                <p className="text-sm text-green-700 dark:text-green-300">Everything looks good — no action needed.</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="mb-6 border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 animate-fade-in">
+          <CardContent className="pt-5 pb-4">
+            <div className="mb-4 flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-500/10">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-600">
+                  <circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-bold uppercase tracking-wide text-orange-900 dark:text-orange-200">
+                  Needs Attention
+                </p>
+                <p className="text-xs text-orange-700 dark:text-orange-300">
+                  {attentionItems.length} item{attentionItems.length > 1 ? "s" : ""} require{attentionItems.length === 1 ? "s" : ""} action
+                </p>
+              </div>
+            </div>
+            <div className="space-y-3">
               {attentionItems.map((item, i) => (
-                <li key={i}>
-                  <Link
-                    href={item.href}
-                    className={`flex items-center justify-between rounded-md px-3 py-2 text-sm transition-all hover:bg-accent hover:shadow-sm ${
+                <Link
+                  key={i}
+                  href={item.href}
+                  className={`group relative flex items-center gap-3 rounded-xl border-2 bg-white dark:bg-gray-900 px-4 py-3.5 transition-all duration-200 shadow-sm hover:shadow-lg hover:-translate-y-1 cursor-pointer ${
+                    item.urgent
+                      ? "border-red-300 hover:border-red-400 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/30 shadow-red-100"
+                      : item.info
+                      ? "border-blue-300 hover:border-blue-400 hover:bg-blue-50 dark:border-blue-800 dark:hover:bg-blue-950/30 shadow-blue-100"
+                      : "border-yellow-300 hover:border-yellow-400 hover:bg-yellow-50 dark:border-yellow-800 dark:hover:bg-yellow-950/30 shadow-yellow-100"
+                  }`}
+                >
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+                    item.urgent
+                      ? "bg-red-500 text-white"
+                      : item.info
+                      ? "bg-blue-500 text-white"
+                      : "bg-yellow-500 text-white"
+                  }`}>
+                    {item.urgent ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>
+                      </svg>
+                    ) : item.info ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>
+                      </svg>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-semibold ${
                       item.urgent
-                        ? "text-orange-700 dark:text-orange-400"
+                        ? "text-red-900 dark:text-red-100"
                         : item.info
-                        ? "text-blue-700 dark:text-blue-400"
-                        : "text-yellow-700 dark:text-yellow-400"
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span className={`h-2 w-2 rounded-full ${item.urgent ? "bg-orange-500 animate-pulse" : item.info ? "bg-blue-500" : "bg-yellow-500"}`} />
+                        ? "text-blue-900 dark:text-blue-100"
+                        : "text-yellow-900 dark:text-yellow-100"
+                    }`}>
                       {item.text}
-                    </span>
-                    <span className="text-xs text-muted-foreground">→</span>
-                  </Link>
-                </li>
+                    </p>
+                  </div>
+                  <div className={`flex items-center justify-center h-8 w-8 rounded-lg transition-all group-hover:scale-110 ${
+                    item.urgent
+                      ? "bg-red-100 dark:bg-red-900/30"
+                      : item.info
+                      ? "bg-blue-100 dark:bg-blue-900/30"
+                      : "bg-yellow-100 dark:bg-yellow-900/30"
+                  }`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform group-hover:translate-x-0.5 ${
+                      item.urgent
+                        ? "text-red-600 dark:text-red-400"
+                        : item.info
+                        ? "text-blue-600 dark:text-blue-400"
+                        : "text-yellow-600 dark:text-yellow-400"
+                    }`}>
+                      <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+                    </svg>
+                  </div>
+                </Link>
               ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Alert cards */}
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
@@ -270,7 +334,7 @@ export default function DashboardPage() {
                 data={sparklineData.staff}
                 width={60}
                 height={24}
-                color="#14b8a6"
+                color="#3B82F6"
                 showArea
               />
             </div>

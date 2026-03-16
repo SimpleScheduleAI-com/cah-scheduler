@@ -34,7 +34,7 @@ export function Confetti({ active, onComplete }: ConfettiProps) {
     canvas.height = window.innerHeight
 
     const colors = [
-      "#14b8a6", // teal
+      "#3B82F6", // teal
       "#06b6d4", // cyan
       "#3b82f6", // blue
       "#8b5cf6", // purple
