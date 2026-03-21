@@ -149,16 +149,19 @@ function setupFloatCandidate({
   }
   mockGet.mockReturnValueOnce(undefined); // break out of consecutive loop
 
-  // .all() sequence — weekendRows comes RIGHT AFTER adjacentAssignments (inside findFloat)
+  // .all() sequence — shift date 2026-03-10 is a Tuesday (not weekend),
+  // so the monthly on-call weekend query does NOT run.
   mockAll
     .mockReturnValueOnce([floatStaff])      // 1. floatStaff
     .mockReturnValueOnce([])               // 2. leaveRecords
     .mockReturnValueOnce([])               // 3. existingAssignments (same-day)
     .mockReturnValueOnce(weeklyAssignments)// 4. weekAssignments
-    .mockReturnValueOnce([])               // 5. adjacentAssignments
-    .mockReturnValueOnce(weekendRows)      // 6. weekendRows (countWeekendsInSchedulePeriod)
-    .mockReturnValueOnce([])               // 7. prnStaff
-    .mockReturnValueOnce([]);              // 8. regularStaff
+    .mockReturnValueOnce([])               // 5. onCallThisWeek (on-call limit check)
+    .mockReturnValueOnce([])               // 6. adjacentAssignments
+    .mockReturnValueOnce([])               // 7. calloutReplacementsThisWeek
+    .mockReturnValueOnce(weekendRows)      // 8. weekendRows (countWeekendsInSchedulePeriod)
+    .mockReturnValueOnce([])               // 9. prnStaff
+    .mockReturnValueOnce([]);              // 10. regularStaff
 }
 
 /**
@@ -343,7 +346,9 @@ describe("findCandidatesForShift — overtime tier: OT reasons removed", () => {
       .mockReturnValueOnce([])             // leaveRecords
       .mockReturnValueOnce([])             // existingAssignments
       .mockReturnValueOnce(weeklyAssignments) // weekAssignments
+      .mockReturnValueOnce([])             // onCallThisWeek (on-call limit check)
       .mockReturnValueOnce([])             // adjacentAssignments
+      .mockReturnValueOnce([])             // calloutReplacementsThisWeek
       .mockReturnValueOnce(weekendRows);   // weekendRows
   }
 

@@ -333,8 +333,19 @@ function parseUnitsSheet(
     const description = String(row["Description"] ?? row["description"] ?? "").trim() || null;
     const minStaffDay = parseNumber(row["Min Staff Day"] ?? row["MinStaffDay"] ?? row["min_staff_day"], 0);
     const minStaffNight = parseNumber(row["Min Staff Night"] ?? row["MinStaffNight"] ?? row["min_staff_night"], 0);
-    const weekendShiftsRequired = parseNumber(row["Weekend Shifts Required"] ?? row["WeekendShiftsRequired"], 3, 0);
-    const holidayShiftsRequired = parseNumber(row["Holiday Shifts Required"] ?? row["HolidayShiftsRequired"], 1, 0);
+    const weekendShiftsRequired = parseNumber(
+      row["Target Weekends Per Nurse Per Schedule"] ??
+      row["Min Weekends Per Nurse Per Schedule"] ??
+      row["Weekend Shifts Required"] ??
+      row["WeekendShiftsRequired"],
+      3, 0
+    );
+    const holidayShiftsRequired = parseNumber(
+      row["Min Holidays Per Nurse Per Year"] ??
+      row["Holiday Shifts Required"] ??
+      row["HolidayShiftsRequired"],
+      1, 0
+    );
 
     // Validate required fields
     if (!name) {
@@ -660,13 +671,17 @@ export function generateTemplate(): ArrayBuffer {
   XLSX.utils.book_append_sheet(workbook, staffSheet, "Staff");
 
   // Units sheet
+  // Note: "Target Weekends Per Nurse Per Schedule" is a per-nurse fairness target (how many
+  // weekends each nurse should work per 6-week schedule period), not a per-shift minimum.
+  // Excess assignments beyond this target generate soft violations; shortfall does not.
+  // "Min Holidays Per Nurse Per Year" is the annual holiday fairness target per nurse.
   const unitsHeaders = [
     "Name",
     "Description",
     "Min Staff Day",
     "Min Staff Night",
-    "Weekend Shifts Required",
-    "Holiday Shifts Required",
+    "Target Weekends Per Nurse Per Schedule",
+    "Min Holidays Per Nurse Per Year",
   ];
   const unitsExample = [
     "ICU",

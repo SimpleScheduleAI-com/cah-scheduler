@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { localSearch, mulberry32 } from "@/lib/engine/scheduler/local-search";
+import { localSearch, mulberry32, weekendRedistributionSweep } from "@/lib/engine/scheduler/local-search";
 import { greedyConstruct } from "@/lib/engine/scheduler/greedy";
 import { BALANCED, FAIR } from "@/lib/engine/scheduler/weight-profiles";
 import { SchedulerState } from "@/lib/engine/scheduler/state";
@@ -60,8 +60,8 @@ const defaultUnitConfig: UnitConfig = {
   maxOnCallPerWeek: 1,
   maxOnCallWeekendsPerMonth: 1,
   maxConsecutiveWeekends: 2,
-  acuityYellowExtraStaff: 1,
-  acuityRedExtraStaff: 2,
+  minStaffDay: 3,
+  minStaffNight: 2,
 };
 
 function makeContext(
@@ -277,5 +277,119 @@ describe("mulberry32", () => {
       expect(v).toBeGreaterThanOrEqual(0);
       expect(v).toBeLessThan(1);
     }
+  });
+});
+
+// ─── weekendRedistributionSweep ───────────────────────────────────────────────
+// Regression tests for v1.7.7: the sweep previously restricted swap partners to
+// deficit nurses only, preventing consecutive-streak repair when no deficit
+// partner was available. These tests also cover basic redistribution behaviour.
+describe("weekendRedistributionSweep", () => {
+  // Consecutive Saturdays in Jan–Feb 2026 (Jan 3, 2026 is a Saturday)
+  const SATS = [
+    "2026-01-03", "2026-01-10", "2026-01-17",
+    "2026-01-24", "2026-01-31",
+  ];
+
+  function makeSweepDraft(
+    shiftId: string,
+    staffId: string,
+    date: string,
+    unit = "Med-Surg"
+  ): AssignmentDraft {
+    return {
+      shiftId,
+      staffId,
+      date,
+      startTime: "07:00",
+      durationHours: 12,
+      unit,
+      shiftType: "day",
+      isChargeNurse: false,
+      isFloat: false,
+      floatFromUnit: null,
+      isOvertime: false,
+    };
+  }
+
+  // Compute the longest consecutive-weekend streak for a staff member
+  function maxConsecWeekendStreak(assignments: AssignmentDraft[], staffId: string): number {
+    const satIds = [
+      ...new Set(
+        assignments
+          .filter((a) => {
+            if (a.staffId !== staffId) return false;
+            const day = new Date(a.date + "T00:00:00Z").getUTCDay();
+            return day === 0 || day === 6;
+          })
+          .map((a) => {
+            const d = new Date(a.date + "T00:00:00Z");
+            if (d.getUTCDay() === 0) d.setUTCDate(d.getUTCDate() - 1);
+            return d.toISOString().slice(0, 10);
+          })
+      ),
+    ].sort();
+    if (!satIds.length) return 0;
+    let max = 1;
+    let cur = 1;
+    for (let i = 1; i < satIds.length; i++) {
+      const gap =
+        (new Date(satIds[i]).getTime() - new Date(satIds[i - 1]).getTime()) /
+        604800000; // ms per week
+      if (Math.abs(gap - 1) < 0.01) {
+        cur++;
+        if (cur > max) max = cur;
+      } else {
+        cur = 1;
+      }
+    }
+    return max;
+  }
+
+  // Shared scenario: staffA has 5 consecutive Saturday assignments, staffB has 1 weekday
+  function makeScenario() {
+    const staffA = makeStaff("staff-a");
+    const staffB = makeStaff("staff-b");
+    const shifts = [
+      ...SATS.map((d, i) => makeShift(`sat-${i}`, d, { unit: "Med-Surg", staffRequired: 1 })),
+      makeShift("mon", "2026-01-05", { unit: "Med-Surg", staffRequired: 1 }),
+    ];
+    const assignments: AssignmentDraft[] = [
+      ...SATS.map((d, i) => makeSweepDraft(`sat-${i}`, "staff-a", d)),
+      makeSweepDraft("mon", "staff-b", "2026-01-05"),
+    ];
+    const ctx = makeContext(shifts, [staffA, staffB]);
+    return { assignments, ctx };
+  }
+
+  it("preserves total assignment count", () => {
+    const { assignments, ctx } = makeScenario();
+    const result = weekendRedistributionSweep(assignments, ctx, FAIR);
+    expect(result.length).toBe(assignments.length);
+  });
+
+  it("moves weekend shifts from excess-count nurse to deficit-count nurse", () => {
+    const { assignments, ctx } = makeScenario();
+    // Before: staffA has 5 weekends, staffB has 0 (mean = 2.5 → A is excess, B is deficit)
+    const result = weekendRedistributionSweep(assignments, ctx, FAIR);
+
+    const aAfter = result.filter(
+      (a) => a.staffId === "staff-a" && [0, 6].includes(new Date(a.date + "T00:00:00Z").getUTCDay())
+    ).length;
+    const bAfter = result.filter(
+      (a) => a.staffId === "staff-b" && [0, 6].includes(new Date(a.date + "T00:00:00Z").getUTCDay())
+    ).length;
+    expect(aAfter).toBeLessThan(5);
+    expect(bAfter).toBeGreaterThan(0);
+  });
+
+  it("reduces a 5-consecutive-weekend streak to at most maxConsecutiveWeekends (2)", () => {
+    // v1.7.9: staffConsecWeekendDelta is now added to computeSwapDeltaPenalty, making
+    // consecutive-weekend improvements directly visible to the delta calculation.
+    // The sweep can now detect and accept swaps that break streaks even when the
+    // equity signal alone would not produce a negative delta.
+    const { assignments, ctx } = makeScenario();
+    const result = weekendRedistributionSweep(assignments, ctx, FAIR);
+    expect(maxConsecWeekendStreak(result, "staff-a")).toBeLessThanOrEqual(2);
   });
 });

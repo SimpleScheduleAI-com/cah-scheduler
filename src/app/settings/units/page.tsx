@@ -28,13 +28,13 @@ interface UnitConfig {
   schedulePeriodWeeks: number;
   holidayShiftsRequired: number;
   escalationSequence: string[];
-  acuityYellowExtraStaff: number;
-  acuityRedExtraStaff: number;
   lowCensusOrder: string[];
   otApprovalThreshold: number;
   maxOnCallPerWeek: number;
   maxOnCallWeekendsPerMonth: number;
   maxConsecutiveWeekends: number;
+  minStaffDay: number;
+  minStaffNight: number;
   isActive: boolean;
 }
 
@@ -46,13 +46,13 @@ interface FormState {
   schedulePeriodWeeks: number;
   holidayShiftsRequired: number;
   escalationSequence: string[];
-  acuityYellowExtraStaff: number;
-  acuityRedExtraStaff: number;
   lowCensusOrder: string[];
   otApprovalThreshold: number;
   maxOnCallPerWeek: number;
   maxOnCallWeekendsPerMonth: number;
   maxConsecutiveWeekends: number;
+  minStaffDay: number;
+  minStaffNight: number;
 }
 
 const defaultForm: FormState = {
@@ -63,13 +63,13 @@ const defaultForm: FormState = {
   schedulePeriodWeeks: 6,
   holidayShiftsRequired: 1,
   escalationSequence: ["float", "per_diem", "overtime", "agency"],
-  acuityYellowExtraStaff: 1,
-  acuityRedExtraStaff: 2,
   lowCensusOrder: ["voluntary", "overtime", "per_diem", "full_time"],
   otApprovalThreshold: 4,
   maxOnCallPerWeek: 1,
   maxOnCallWeekendsPerMonth: 1,
   maxConsecutiveWeekends: 2,
+  minStaffDay: 3,
+  minStaffNight: 2,
 };
 
 export default function UnitsPage() {
@@ -106,13 +106,13 @@ export default function UnitsPage() {
       schedulePeriodWeeks: unit.schedulePeriodWeeks,
       holidayShiftsRequired: unit.holidayShiftsRequired,
       escalationSequence: unit.escalationSequence,
-      acuityYellowExtraStaff: unit.acuityYellowExtraStaff,
-      acuityRedExtraStaff: unit.acuityRedExtraStaff,
       lowCensusOrder: unit.lowCensusOrder,
       otApprovalThreshold: unit.otApprovalThreshold,
       maxOnCallPerWeek: unit.maxOnCallPerWeek,
       maxOnCallWeekendsPerMonth: unit.maxOnCallWeekendsPerMonth,
       maxConsecutiveWeekends: unit.maxConsecutiveWeekends,
+      minStaffDay: unit.minStaffDay,
+      minStaffNight: unit.minStaffNight,
     });
     setDialogOpen(true);
   }
@@ -213,12 +213,12 @@ export default function UnitsPage() {
                     <p className="font-medium">{unit.lowCensusOrder.join(" → ")}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Acuity Yellow</p>
-                    <p className="font-medium">+{unit.acuityYellowExtraStaff} staff</p>
+                    <p className="text-muted-foreground">Min Staff (Day)</p>
+                    <p className="font-medium">{unit.minStaffDay}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Acuity Red</p>
-                    <p className="font-medium">+{unit.acuityRedExtraStaff} staff</p>
+                    <p className="text-muted-foreground">Min Staff (Night)</p>
+                    <p className="font-medium">{unit.minStaffNight}</p>
                   </div>
                 </div>
               </CardContent>
@@ -350,24 +350,29 @@ export default function UnitsPage() {
             </div>
 
             <div className="border-t pt-4">
-              <h3 className="font-medium mb-3">Acuity Staffing</h3>
+              <h3 className="font-medium mb-3">Minimum Staffing Floor</h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                Absolute minimum staff per shift regardless of census level. The effective
+                requirement will be <strong>max(census-based, this floor)</strong>. Applies
+                as a hard rule — shifts cannot be saved below this count.
+              </p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Yellow Acuity Extra Staff</Label>
+                  <Label>Min Staff — Day Shift</Label>
                   <Input
                     type="number"
-                    min={0}
-                    value={form.acuityYellowExtraStaff}
-                    onChange={(e) => setForm({ ...form, acuityYellowExtraStaff: parseInt(e.target.value) })}
+                    min={1}
+                    value={form.minStaffDay}
+                    onChange={(e) => setForm({ ...form, minStaffDay: parseInt(e.target.value) })}
                   />
                 </div>
                 <div>
-                  <Label>Red Acuity Extra Staff</Label>
+                  <Label>Min Staff — Night / Evening Shift</Label>
                   <Input
                     type="number"
-                    min={0}
-                    value={form.acuityRedExtraStaff}
-                    onChange={(e) => setForm({ ...form, acuityRedExtraStaff: parseInt(e.target.value) })}
+                    min={1}
+                    value={form.minStaffNight}
+                    onChange={(e) => setForm({ ...form, minStaffNight: parseInt(e.target.value) })}
                   />
                 </div>
               </div>

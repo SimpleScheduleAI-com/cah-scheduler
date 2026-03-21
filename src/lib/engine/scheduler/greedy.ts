@@ -86,7 +86,8 @@ function pickBest(
       staffMap,
       isChargeCandidate,
       context.unitConfig,
-      context.historicalWeekendCounts ?? new Map()
+      context.historicalWeekendCounts ?? new Map(),
+      context.publicHolidays.map((h) => h.date)
     );
     const bestScore = softPenalty(
       best,
@@ -97,7 +98,8 @@ function pickBest(
       staffMap,
       isChargeCandidate,
       context.unitConfig,
-      context.historicalWeekendCounts ?? new Map()
+      context.historicalWeekendCounts ?? new Map(),
+      context.publicHolidays.map((h) => h.date)
     );
     return score < bestScore ? candidate : best;
   });
@@ -315,8 +317,23 @@ export function greedyConstruct(
         break; // no point checking further slots
       }
 
+      // Charge-distribution preference: once a charge-qualified nurse is already on
+      // this shift, prefer non-charge-qualified nurses for all remaining regular slots.
+      // Only falls back to the charge-qualified pool if no non-charge alternative is
+      // eligible. Mirrors the non-OT preference above — a hard tier rather than a soft
+      // penalty, so the 0.8-pt chargeClustering score cannot be outweighed by other
+      // scoring factors (preference match, weekend quota, skill mix) that would otherwise
+      // cause a 3rd+ charge-qualified nurse to be placed on the same shift.
+      const hasChargeAlready = currentSlotAssignments.some(
+        (a) => context.staffMap.get(a.staffId)?.isChargeNurseQualified
+      );
+      const nonChargePool = hasChargeAlready
+        ? eligible.filter((s) => !s.isChargeNurseQualified)
+        : eligible;
+      const chargeFilteredEligible = nonChargePool.length > 0 ? nonChargePool : eligible;
+
       const best = pickBest(
-        eligible,
+        chargeFilteredEligible,
         shift,
         state,
         weights,

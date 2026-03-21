@@ -52,6 +52,9 @@ export const unit = sqliteTable(
     maxOnCallWeekendsPerMonth: integer("max_on_call_weekends_per_month").notNull().default(1),
     // Consecutive weekend penalty threshold
     maxConsecutiveWeekends: integer("max_consecutive_weekends").notNull().default(2),
+    // Absolute staffing floor regardless of census level
+    minStaffDay: integer("min_staff_day").notNull().default(3),
+    minStaffNight: integer("min_staff_night").notNull().default(2),
     isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
     createdAt: text("created_at")
       .notNull()

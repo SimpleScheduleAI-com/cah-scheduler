@@ -35,6 +35,15 @@ export const minStaffRule: RuleEvaluator = {
         }
       }
 
+      // Apply unit-level absolute floor: effective = max(censusRequired, unitMinimum).
+      // on_call shifts don't count toward staffing, so no floor applies.
+      if (context.unitConfig && shift.shiftType !== "on_call") {
+        const unitMin = shift.shiftType === "day"
+          ? context.unitConfig.minStaffDay
+          : context.unitConfig.minStaffNight;
+        requiredCount = Math.max(requiredCount, unitMin);
+      }
+
       if (shiftAssignments.length < requiredCount) {
         violations.push({
           ruleId: "min-staff",

@@ -37,8 +37,8 @@ const unitConfig: UnitConfig = {
   maxOnCallPerWeek: 1,
   maxOnCallWeekendsPerMonth: 1,
   maxConsecutiveWeekends: 2,
-  acuityYellowExtraStaff: 1,
-  acuityRedExtraStaff: 2,
+  minStaffDay: 3,
+  minStaffNight: 2,
 };
 
 /** Build a realistic staff roster similar to what Excel import produces */

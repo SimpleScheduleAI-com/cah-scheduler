@@ -91,9 +91,15 @@ export default function SwapsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "denied">("all");
 
-  // Violation error dialog
-  const [violationDialogOpen, setViolationDialogOpen] = useState(false);
-  const [swapViolations, setSwapViolations] = useState<SwapViolation[]>([]);
+  // Two-step approve: pre-validation confirmation dialog
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [confirmSwapId, setConfirmSwapId] = useState<string | null>(null);
+  const [confirmValidating, setConfirmValidating] = useState(false);
+  const [confirmViolations, setConfirmViolations] = useState<SwapViolation[]>([]);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [confirmValid, setConfirmValid] = useState(false);
+  const [confirmOpenRequest, setConfirmOpenRequest] = useState(false);
+  const [confirmApproving, setConfirmApproving] = useState(false);
 
   // Log swap dialog state
   const [logDialogOpen, setLogDialogOpen] = useState(false);
@@ -118,20 +124,75 @@ export default function SwapsPage() {
     fetchData();
   }, [fetchData]);
 
-  async function handleStatusChange(id: string, status: "approved" | "denied") {
-    const res = await fetch(`/api/swap-requests/${id}`, {
+  // Step 1: Approve clicked — run pre-validation and open confirmation dialog
+  async function handleApproveClick(id: string) {
+    setConfirmSwapId(id);
+    setConfirmViolations([]);
+    setConfirmError(null);
+    setConfirmValid(false);
+    setConfirmOpenRequest(false);
+    setConfirmValidating(true);
+    setConfirmDialogOpen(true);
+
+    const res = await fetch(`/api/swap-requests/${id}/validate`);
+    const data = await res.json();
+    setConfirmValidating(false);
+
+    if (!res.ok) {
+      setConfirmError(data.error ?? "An unexpected error occurred during validation.");
+      return;
+    }
+
+    setConfirmValid(data.valid);
+    setConfirmViolations(data.violations ?? []);
+    setConfirmOpenRequest(data.openRequest ?? false);
+    if (!data.valid && data.error) {
+      setConfirmError(data.error);
+    }
+  }
+
+  // Step 2: Manager confirmed — execute the actual approval
+  async function handleConfirmApprove() {
+    if (!confirmSwapId) return;
+    setConfirmApproving(true);
+    const res = await fetch(`/api/swap-requests/${confirmSwapId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status: "approved" }),
     });
+    setConfirmApproving(false);
+    setConfirmDialogOpen(false);
+    // Safety net: if the PUT still returns violations (edge case), surface them
     if (!res.ok) {
       const data = await res.json();
       if (res.status === 422 && data.violations) {
-        setSwapViolations(data.violations);
-        setViolationDialogOpen(true);
-        return; // do not refresh — swap was NOT performed
+        setConfirmViolations(data.violations);
+        setConfirmValid(false);
+        setConfirmDialogOpen(true);
       }
+      return;
     }
+    fetchData();
+  }
+
+  async function handleDeny(id: string) {
+    let validationNotes: string | undefined;
+    try {
+      const vRes = await fetch(`/api/swap-requests/${id}/validate`);
+      const vData = await vRes.json();
+      if (Array.isArray(vData.violations) && vData.violations.length > 0) {
+        validationNotes = vData.violations
+          .map((v: { description: string }) => v.description)
+          .join("; ");
+      }
+    } catch {
+      // validation failure does not block the denial
+    }
+    await fetch(`/api/swap-requests/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "denied", validationNotes }),
+    });
     fetchData();
   }
 
@@ -275,14 +336,14 @@ export default function SwapsPage() {
                           <Button
                             size="sm"
                             variant="default"
-                            onClick={() => handleStatusChange(req.id, "approved")}
+                            onClick={() => handleApproveClick(req.id)}
                           >
                             Approve
                           </Button>
                           <Button
                             size="sm"
                             variant="destructive"
-                            onClick={() => handleStatusChange(req.id, "denied")}
+                            onClick={() => handleDeny(req.id)}
                           >
                             Deny
                           </Button>
@@ -434,28 +495,65 @@ export default function SwapsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Swap Violation Dialog */}
-      <Dialog open={violationDialogOpen} onOpenChange={setViolationDialogOpen}>
+      {/* Pre-validation Confirmation Dialog */}
+      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Swap Cannot Be Approved</DialogTitle>
+            <DialogTitle>
+              {confirmValidating
+                ? "Checking Rules…"
+                : confirmError
+                  ? "Cannot Approve Swap"
+                  : confirmViolations.length > 0
+                    ? "Swap Cannot Be Approved"
+                    : "Confirm Approval"}
+            </DialogTitle>
             <DialogDescription>
-              This swap would violate one or more hard scheduling rules. Resolve the issues below
-              before approving.
+              {confirmValidating
+                ? "Validating shift compatibility…"
+                : confirmError
+                  ? confirmError
+                  : confirmViolations.length > 0
+                    ? "This swap would violate one or more hard scheduling rules. Resolve the issues below before approving."
+                    : confirmOpenRequest
+                      ? "This is an open swap request with no target staff selected. Approving will mark the assignment as swapped and create a coverage request."
+                      : "All scheduling rules pass. Confirm to complete the swap."}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
-            {swapViolations.map((v, i) => (
-              <Alert key={i} variant="destructive">
-                <AlertTitle className="capitalize">{v.ruleId.replace(/-/g, " ")}</AlertTitle>
-                <AlertDescription>{v.description}</AlertDescription>
-              </Alert>
-            ))}
-          </div>
-          <div className="flex justify-end pt-2 border-t">
-            <Button variant="outline" onClick={() => setViolationDialogOpen(false)}>
-              Close
+
+          {confirmValidating && (
+            <p className="text-sm text-muted-foreground">Validating…</p>
+          )}
+
+          {!confirmValidating && confirmViolations.length > 0 && (
+            <div className="space-y-3">
+              {confirmViolations.map((v, i) => (
+                <Alert key={i} variant="destructive">
+                  <AlertTitle className="capitalize">{v.ruleId.replace(/-/g, " ")}</AlertTitle>
+                  <AlertDescription>{v.description}</AlertDescription>
+                </Alert>
+              ))}
+            </div>
+          )}
+
+          {!confirmValidating && confirmValid && !confirmError && (
+            <Alert className="border-green-500 bg-green-50 dark:bg-green-950/20">
+              <AlertTitle className="text-green-700 dark:text-green-300">No violations found</AlertTitle>
+              <AlertDescription className="text-green-600 dark:text-green-400">
+                This swap is compatible with all scheduling rules.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button variant="outline" onClick={() => setConfirmDialogOpen(false)}>
+              {confirmViolations.length > 0 || confirmError ? "Close" : "Cancel"}
             </Button>
+            {!confirmValidating && confirmValid && !confirmError && (
+              <Button onClick={handleConfirmApprove} disabled={confirmApproving}>
+                {confirmApproving ? "Approving…" : "Confirm Approval"}
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>

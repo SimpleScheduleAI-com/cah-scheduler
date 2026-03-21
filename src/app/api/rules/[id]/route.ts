@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { rule } from "@/db/schema";
+import { rule, exceptionLog } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
@@ -24,6 +24,8 @@ export async function PUT(
   const { id } = await params;
   const body = await request.json();
 
+  const existing = db.select().from(rule).where(eq(rule.id, id)).get();
+
   const updated = db
     .update(rule)
     .set({
@@ -43,6 +45,16 @@ export async function PUT(
   if (!updated) {
     return NextResponse.json({ error: "Rule not found" }, { status: 404 });
   }
+
+  db.insert(exceptionLog).values({
+    entityType: "rule",
+    entityId: id,
+    action: "updated",
+    description: `Rule configuration updated: ${updated.name}`,
+    previousState: existing ? { weight: existing.weight, isActive: existing.isActive, parameters: existing.parameters } : undefined,
+    newState: { weight: updated.weight, isActive: updated.isActive, parameters: updated.parameters },
+    performedBy: "nurse_manager",
+  }).run();
 
   return NextResponse.json(updated);
 }

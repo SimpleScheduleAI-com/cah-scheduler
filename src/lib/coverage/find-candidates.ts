@@ -32,6 +32,7 @@ export interface CandidateRecommendation {
   score: number;
   isOvertime: boolean;
   hoursThisWeek: number;
+  fteHoursPerWeek?: number; // contracted weekly hours (fte * 40); only set for overtime-tier candidates
   restHoursBefore?: number; // hours of rest between candidate's last preceding shift and this one
   weekendsThisPeriod: number;
   consecutiveDaysBeforeShift: number;
@@ -163,21 +164,28 @@ export async function findCandidatesForShift(
   escalationStepsChecked.push("overtime");
   allCandidates.push(...await findOvertimeCandidates(shiftRecord, excludeStaffId, vacancyContext));
 
+  // Agency is a last-resort tier. If this is a charge nurse shift, agency
+  // staff cannot be charge-qualified, so including them would surface the same
+  // hard-rule-violation warning we are trying to eliminate. Skip them entirely
+  // — if there are zero qualified candidates, the UI already shows "No
+  // coverage candidates found", which is the correct signal for the manager.
   escalationStepsChecked.push("agency");
-  allCandidates.push({
-    staffId: "agency",
-    staffName: "Request Agency Staff",
-    role: "Agency",
-    icuCompetencyLevel: 0,
-    isChargeNurseQualified: false,
-    source: "agency",
-    reasons: ["External staffing agency", "Requires phone call to agency", "Higher cost option"],
-    score: 10,
-    isOvertime: false,
-    hoursThisWeek: 0,
-    weekendsThisPeriod: 0,
-    consecutiveDaysBeforeShift: 0,
-  });
+  if (!vacancyContext.chargeRequired) {
+    allCandidates.push({
+      staffId: "agency",
+      staffName: "Request Agency Staff",
+      role: "Agency",
+      icuCompetencyLevel: 0,
+      isChargeNurseQualified: false,
+      source: "agency",
+      reasons: ["External staffing agency", "Requires phone call to agency", "Higher cost option"],
+      score: 10,
+      isOvertime: false,
+      hoursThisWeek: 0,
+      weekendsThisPeriod: 0,
+      consecutiveDaysBeforeShift: 0,
+    });
+  }
 
   const sortedCandidates = allCandidates
     .sort((a, b) => b.score - a.score)
@@ -289,6 +297,8 @@ async function findFloatCandidates(
     const isQualified = isHomeUnit || !!(s.crossTrainedUnits?.includes(shiftDetails.unit));
     if (!isQualified) continue;
 
+    if (vacancyContext.chargeRequired && !s.isChargeNurseQualified) continue;
+
     const availability = await checkStaffAvailability(s.id, shiftDetails);
     if (!availability.available) continue;
 
@@ -300,6 +310,7 @@ async function findFloatCandidates(
     }
     if (s.icuCompetencyLevel >= 3) reasons.push(`Competency Level ${s.icuCompetencyLevel}`);
     if (vacancyContext.chargeRequired && s.isChargeNurseQualified) reasons.push("Charge nurse qualified");
+    if (availability.calloutWarning) reasons.push(availability.calloutWarning);
 
     const hoursThisWeek = availability.hoursThisWeek;
     candidates.push({
@@ -367,6 +378,8 @@ async function findPRNCandidates(
     }
     if (!availableSet.has(shiftDetails.date)) continue;
 
+    if (vacancyContext.chargeRequired && !s.isChargeNurseQualified) continue;
+
     const availability = await checkStaffAvailability(s.id, shiftDetails);
     if (!availability.available) continue;
 
@@ -378,6 +391,7 @@ async function findPRNCandidates(
     }
     if (s.reliabilityRating >= 4) reasons.push(`High reliability rating (${s.reliabilityRating}/5)`);
     if (vacancyContext.chargeRequired && s.isChargeNurseQualified) reasons.push("Charge nurse qualified");
+    if (availability.calloutWarning) reasons.push(availability.calloutWarning);
 
     const hoursThisWeek = availability.hoursThisWeek;
     candidates.push({
@@ -432,6 +446,8 @@ async function findOvertimeCandidates(
     const isQualified = isHomeUnit || !!(s.crossTrainedUnits?.includes(shiftDetails.unit));
     if (!isQualified) continue;
 
+    if (vacancyContext.chargeRequired && !s.isChargeNurseQualified) continue;
+
     const availability = await checkStaffAvailability(s.id, shiftDetails);
     if (!availability.available) continue;
 
@@ -447,6 +463,7 @@ async function findOvertimeCandidates(
     }
     if (s.flexHoursYearToDate < 20) reasons.push("Low flex hours YTD (fair distribution)");
     if (vacancyContext.chargeRequired && s.isChargeNurseQualified) reasons.push("Charge nurse qualified");
+    if (availability.calloutWarning) reasons.push(availability.calloutWarning);
 
     candidates.push({
       staffId: s.id,
@@ -462,6 +479,7 @@ async function findOvertimeCandidates(
       ),
       isOvertime: wouldBeOvertime,
       hoursThisWeek,
+      fteHoursPerWeek: s.fte * 40,
       restHoursBefore: availability.restHoursBefore,
       weekendsThisPeriod: countWeekendsInSchedulePeriod(s.id, shiftDetails.scheduleId),
       consecutiveDaysBeforeShift: countConsecutiveDaysBefore(s.id, shiftDetails.date),
@@ -480,6 +498,8 @@ interface AvailabilityResult {
   hoursThisWeek: number;
   reason?: string;
   restHoursBefore?: number;
+  /** Set when the candidate already has a callout_replacement assignment this week. */
+  calloutWarning?: string;
 }
 
 async function checkStaffAvailability(
@@ -566,6 +586,58 @@ async function checkStaffAvailability(
     return { available: false, hoursThisWeek, reason: "Would exceed 60 hours in 7 days" };
   }
 
+  // 3b. On-call limits — max 1 on-call shift per week; max 1 on-call weekend per month.
+  // Query on-call type assignments this week to enforce the weekly limit.
+  const onCallThisWeek = db
+    .select({ id: assignment.id })
+    .from(assignment)
+    .innerJoin(shift, eq(assignment.shiftId, shift.id))
+    .innerJoin(shiftDefinition, eq(shift.shiftDefinitionId, shiftDefinition.id))
+    .where(
+      and(
+        eq(assignment.staffId, staffId),
+        eq(shiftDefinition.shiftType, "on_call"),
+        gte(shift.date, format(weekStart, "yyyy-MM-dd")),
+        lte(shift.date, format(weekEnd, "yyyy-MM-dd")),
+        ne(assignment.status, "cancelled"),
+        ne(assignment.status, "called_out")
+      )
+    )
+    .all();
+  if (onCallThisWeek.length >= 1) {
+    return { available: false, hoursThisWeek, reason: "Already has an on-call shift this week (max 1/week)" };
+  }
+
+  // On-call weekend limit: max 1 per calendar month.
+  const shiftDayOfWeek = shiftDate.getUTCDay();
+  if (shiftDayOfWeek === 0 || shiftDayOfWeek === 6) {
+    const monthStart = new Date(Date.UTC(shiftDate.getUTCFullYear(), shiftDate.getUTCMonth(), 1));
+    const monthEnd = new Date(Date.UTC(shiftDate.getUTCFullYear(), shiftDate.getUTCMonth() + 1, 0));
+    const onCallWeekendsThisMonth = db
+      .select({ date: shift.date })
+      .from(assignment)
+      .innerJoin(shift, eq(assignment.shiftId, shift.id))
+      .innerJoin(shiftDefinition, eq(shift.shiftDefinitionId, shiftDefinition.id))
+      .where(
+        and(
+          eq(assignment.staffId, staffId),
+          eq(shiftDefinition.shiftType, "on_call"),
+          gte(shift.date, monthStart.toISOString().slice(0, 10)),
+          lte(shift.date, monthEnd.toISOString().slice(0, 10)),
+          ne(assignment.status, "cancelled"),
+          ne(assignment.status, "called_out")
+        )
+      )
+      .all()
+      .filter((r) => {
+        const d = new Date(r.date + "T00:00:00Z").getUTCDay();
+        return d === 0 || d === 6;
+      });
+    if (onCallWeekendsThisMonth.length >= 1) {
+      return { available: false, hoursThisWeek, reason: "Already has an on-call weekend this month (max 1/month)" };
+    }
+  }
+
   // 4. Rest hours — check D-1 and D+1 assignments
   //
   // Bug fix: the previous code used `newStartHour - prevEndHour` for the D-1
@@ -642,7 +714,30 @@ async function checkStaffAvailability(
     }
   }
 
-  return { available: true, hoursThisWeek, restHoursBefore };
+  // 5. Callout-replacement warning — not a hard block, but surfaces a note to the manager.
+  // If the candidate already has a callout_replacement assignment this week, flag it so
+  // the manager can make an informed decision rather than unknowingly stacking coverage.
+  const calloutReplacementsThisWeek = db
+    .select({ id: assignment.id })
+    .from(assignment)
+    .innerJoin(shift, eq(assignment.shiftId, shift.id))
+    .where(
+      and(
+        eq(assignment.staffId, staffId),
+        eq(assignment.assignmentSource, "callout_replacement"),
+        gte(shift.date, format(weekStart, "yyyy-MM-dd")),
+        lte(shift.date, format(weekEnd, "yyyy-MM-dd")),
+        ne(assignment.status, "cancelled"),
+        ne(assignment.status, "called_out")
+      )
+    )
+    .all();
+  const calloutWarning =
+    calloutReplacementsThisWeek.length >= 1
+      ? "Already covering one callout this week — confirm this is acceptable"
+      : undefined;
+
+  return { available: true, hoursThisWeek, restHoursBefore, calloutWarning };
 }
 
 // ---------------------------------------------------------------------------

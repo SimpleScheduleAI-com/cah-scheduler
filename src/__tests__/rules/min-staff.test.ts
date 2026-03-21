@@ -7,9 +7,11 @@ describe("min-staff rule", () => {
     const shift = makeShift({ id: "s1", requiredStaffCount: 2 });
     const a1 = makeAssignment({ id: "a1", shiftId: "s1", staffId: "staff-1" });
     const a2 = makeAssignment({ id: "a2", shiftId: "s1", staffId: "staff-2" });
+    // unitConfig: null disables the unit-level floor so we test only requiredStaffCount logic
     const ctx = makeContext({
       shiftMap: new Map([["s1", shift]]),
       assignments: [a1, a2],
+      unitConfig: null,
     });
     expect(minStaffRule.evaluate(ctx)).toHaveLength(0);
   });
@@ -77,10 +79,12 @@ describe("min-staff rule", () => {
     const band = { id: "b1", minPatients: 0, maxPatients: 6, requiredRNs: 3, requiredLPNs: 0, requiredCNAs: 0, requiredChargeNurses: 1, patientToNurseRatio: "2:1" };
     const a1 = makeAssignment({ id: "a1", shiftId: "s1", staffId: "staff-1" });
     const a2 = makeAssignment({ id: "a2", shiftId: "s1", staffId: "staff-2" });
+    // unitConfig: null disables the unit-level floor so we test only census fallback logic
     const ctx = makeContext({
       shiftMap: new Map([["s1", shift]]),
       assignments: [a1, a2],
       censusBands: [band],
+      unitConfig: null,
     });
     // Census 100 doesn't match band (0-6), so falls back to requiredStaffCount=2, which is met
     expect(minStaffRule.evaluate(ctx)).toHaveLength(0);

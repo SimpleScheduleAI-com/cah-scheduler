@@ -43,9 +43,6 @@ export interface Unit {
   holidayShiftsRequired: number;
   // Escalation sequence for callouts
   escalationSequence: string[];
-  // Acuity configuration
-  acuityYellowExtraStaff: number;
-  acuityRedExtraStaff: number;
   // Low census policy
   lowCensusOrder: string[];
   // OT approval threshold

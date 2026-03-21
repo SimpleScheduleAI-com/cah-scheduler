@@ -46,8 +46,8 @@ Each unit may have different rules:
 | **Schedule Period Weeks** | Length of scheduling cycle | 6 weeks |
 | **Holiday Shifts Required** | Minimum holidays per person | 1 (per period) |
 | **Escalation Sequence** | Callout coverage order | Float → PRN → OT → Agency |
-| **Acuity Yellow Extra Staff** | Extra staff at Yellow acuity | +1 |
-| **Acuity Red Extra Staff** | Extra staff at Red acuity | +2 |
+| **Min Staff — Day Shift** | Absolute minimum staff for any day shift, regardless of census | 3 |
+| **Min Staff — Night/Evening Shift** | Absolute minimum staff for any night or evening shift, regardless of census | 2 |
 | **Low Census Order** | Who goes home first in low census | Voluntary → OT → PRN → Full-Time |
 | **Callout Threshold Days** | Days before shift to classify as callout vs open shift | 7 days |
 | **OT Approval Threshold** | Hours requiring CNO approval | 4 hours |

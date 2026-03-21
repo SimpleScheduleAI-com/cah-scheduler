@@ -48,6 +48,7 @@ export class SchedulerState {
   private assignmentsByStaff = new Map<string, AssignmentDraft[]>();
   private assignmentsByShift = new Map<string, AssignmentDraft[]>();
   private workedDatesByStaff = new Map<string, Set<string>>();
+  private _totalCount = 0;
 
   addAssignment(draft: AssignmentDraft): void {
     // Staff list — maintain sorted order by date then startTime for predictable retrieval
@@ -65,6 +66,8 @@ export class SchedulerState {
     const dates = this.workedDatesByStaff.get(draft.staffId) ?? new Set<string>();
     dates.add(draft.date);
     this.workedDatesByStaff.set(draft.staffId, dates);
+
+    this._totalCount++;
   }
 
   removeAssignment(draft: AssignmentDraft): void {
@@ -74,7 +77,10 @@ export class SchedulerState {
       const idx = staffList.findIndex(
         (a) => a.shiftId === draft.shiftId && a.date === draft.date && a.startTime === draft.startTime
       );
-      if (idx !== -1) staffList.splice(idx, 1);
+      if (idx !== -1) {
+        staffList.splice(idx, 1);
+        this._totalCount--;
+      }
     }
 
     // Remove from assignmentsByShift
@@ -149,6 +155,26 @@ export class SchedulerState {
     const weekEnd = getWeekEnd(weekStart);
     return (this.assignmentsByStaff.get(staffId) ?? [])
       .filter((a) => a.date >= weekStart && a.date <= weekEnd)
+      .reduce((sum, a) => sum + a.durationHours, 0);
+  }
+
+  /**
+   * Same as getWeeklyHours but excludes the assignment on `excludeShiftId`.
+   *
+   * Used in softPenalty when rescoring assignments that are already in state
+   * (e.g. during swap/replacement delta calculations). Without this exclusion,
+   * the shift being scored is counted in `weekHours` AND added again as
+   * `durationHours`, causing a phantom OT double-count that makes the
+   * replacement pass systematically reject beneficial OT-reducing moves.
+   *
+   * In the greedy phase the candidate is not yet in state, so excluding a
+   * shiftId that doesn't exist has no effect — behaviour is unchanged.
+   */
+  getWeeklyHoursExcluding(staffId: string, date: string, excludeShiftId: string): number {
+    const weekStart = getWeekStart(date);
+    const weekEnd = getWeekEnd(weekStart);
+    return (this.assignmentsByStaff.get(staffId) ?? [])
+      .filter((a) => a.date >= weekStart && a.date <= weekEnd && a.shiftId !== excludeShiftId)
       .reduce((sum, a) => sum + a.durationHours, 0);
   }
 
@@ -271,12 +297,26 @@ export class SchedulerState {
     return this.workedDatesByStaff.get(staffId)?.has(date) ?? false;
   }
 
-  /** Total number of weekend-day assignments for `staffId` so far. */
+  /**
+   * Returns the number of distinct weekend units worked by `staffId` so far.
+   *
+   * Industry standard: Saturday + Sunday of the same calendar week = ONE weekend,
+   * not two. A nurse who works both days accumulates a count of 1, not 2.
+   * This matches how "weekendShiftsRequired" is intended: 3 means three complete
+   * weekend rotations per period, not three individual weekend-day shifts.
+   *
+   * Uses the existing `getWeekendId()` helper which anchors Sunday back to its
+   * Saturday date so both days share the same weekend identifier.
+   */
   getWeekendCount(staffId: string): number {
-    return (this.assignmentsByStaff.get(staffId) ?? []).filter((a) => {
+    const weekendIds = new Set<string>();
+    for (const a of this.assignmentsByStaff.get(staffId) ?? []) {
       const day = new Date(a.date).getDay();
-      return day === 0 || day === 6;
-    }).length;
+      if (day === 0 || day === 6) {
+        weekendIds.add(getWeekendId(a.date));
+      }
+    }
+    return weekendIds.size;
   }
 
   /** Count on-call shifts this calendar week for `staffId`. */
@@ -326,9 +366,20 @@ export class SchedulerState {
     return false;
   }
 
+  /** Total number of assignments for `staffId`. */
+  getAssignmentCount(staffId: string): number {
+    return (this.assignmentsByStaff.get(staffId) ?? []).length;
+  }
+
+  /** Total number of assignments across all staff. O(1) — maintained by counter. */
+  totalAssignmentCount(): number {
+    return this._totalCount;
+  }
+
   /** Shallow clone for local-search swap evaluation. */
   clone(): SchedulerState {
     const copy = new SchedulerState();
+    copy._totalCount = this._totalCount;
     for (const [id, list] of this.assignmentsByStaff) {
       copy.assignmentsByStaff.set(id, [...list]);
     }

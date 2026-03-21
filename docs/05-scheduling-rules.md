@@ -82,16 +82,16 @@ The patient count range and staffing requirements for each tier are configured u
 - Shift says "requires charge nurse = yes"
 - At least one assigned staff must be charge-qualified
 
-### 3. Patient-to-Staff Ratio
+### 3. Patient-to-RN Ratio
 
-**What it means:** The ratio of patients to licensed nurses cannot exceed the defined limit.
+**What it means:** The ratio of patients to RNs cannot exceed the limit defined for that census band.
 
 **Example:**
 > If the ratio is 2:1 and there are 8 patients, you need at least 4 RNs assigned.
 
-**Note:** Only **RNs** count toward the patient ratio in ICU settings per AACN standards. LPNs and CNAs are support staff — they count toward total headcount but do not satisfy the RN:patient ratio requirement.
+**Important:** Only **RNs** count toward this ratio. LPNs and CNAs are support staff — they count toward total headcount but cannot substitute for RNs in the patient ratio (AACN standard).
 
-**Why it matters:** Too many patients per nurse = unsafe care.
+**Why it matters:** Too many patients per RN = unsafe care.
 
 ### 4. Minimum Rest Between Shifts
 
@@ -115,21 +115,25 @@ The patient count range and staffing requirements for each tier are configured u
 
 **Why it matters:** Everyone needs rest. Burnout hurts retention and safety.
 
-### 6. ICU Competency Minimum
+### 6. ICU/ER Competency Requirement
 
-**What it means:** Only staff with competency level 2 or higher can be assigned to ICU.
+**What it means:** Only staff with competency level 2 or higher can be assigned to **ICU or ER shifts**. Level 1 orientees are blocked from ICU/ER entirely.
 
-**Why it matters:** Level 1 (orientees) cannot work ICU independently - it's too complex.
+**Which units?** This rule applies only to shifts on units named "ICU" or "ER". It does not fire for Med-Surg, Float, or other units.
 
-### 7. Level 1 Preceptor Required
+**Why it matters:** ICU and ER require a baseline level of clinical competency. Level 1 orientees are still learning fundamental skills and cannot work these units safely, even with a preceptor present.
 
-**What it means:** Any Level 1 staff on a shift must have a Level 5 (preceptor) also on that shift.
+### 7. Level 1 Orientee: Preceptor Required
+
+**What it means:** Any Level 1 staff on a **non-ICU/ER shift** must have a Level 5 (Expert/Preceptor) RN also assigned to the same shift.
 
 **Example:**
-> New hire Jenny (Level 1) is scheduled for Tuesday Day shift.
-> At least one Level 5 nurse must also be on Tuesday Day shift.
+> New hire Jenny (Level 1) is scheduled for Tuesday Day shift on Med-Surg.
+> At least one Level 5 RN must also be on that shift.
 
-**Why it matters:** Orientees need supervision and teaching.
+**ICU/ER exception:** Level 1 staff are never placed on ICU or ER shifts (see Rule 6 above). This preceptor rule applies only to other units where orientees may work under supervision.
+
+**Why it matters:** Orientees need direct supervision and teaching while they develop competency.
 
 ### 8. Level 2 ICU/ER Supervision
 
@@ -177,6 +181,10 @@ The patient count range and staffing requirements for each tier are configured u
 - Maximum 1 on-call shift per week
 - Maximum 1 on-call weekend per month
 
+**Where it's enforced:** During schedule generation, swap approval, and when the system recommends replacement staff for an open shift. A nurse who has already used their on-call allowance this week (or this month for weekends) will not appear in coverage recommendations.
+
+**Coverage warning:** If a nurse is already covering a callout this week, their name appears in coverage recommendations with a note — "Already covering one callout this week — confirm this is acceptable" — so you can decide whether to use them as a last resort.
+
 **Why it matters:** On-call is stressful. You're always "half working." Too much on-call leads to burnout.
 
 ### 13. Maximum 60 Hours in 7 Days
@@ -219,26 +227,28 @@ Part-time and extra-hours nurses are always scheduled before a full-time nurse w
 
 This is a firm rule, not just a preference — a 0.5 FTE nurse working 36 hours (extra hours, but no overtime pay) will always be chosen over a 1.0 FTE nurse who would go to 48 hours, regardless of other scoring factors. If overtime still appears in the final schedule, it means every eligible candidate for that slot would have caused overtime.
 
-### 2. Weekend Shift Requirements
+### 2. Weekend Shift Target
 
-**What it means:** Each person should work a minimum number of weekend shifts per period.
+**What it means:** Each person should work a target number of weekend shifts per period. The scheduler tries to distribute weekends so everyone reaches this target.
 
-**Default:** 3 weekend shifts per 6-week schedule.
+**Default:** 3 weekend shifts per 6-week schedule (configurable per unit in Settings → Units, under "Target Weekends Per Nurse Per Schedule" in the Excel import/export).
 
 **Example:**
 > The schedule period has 6 weekends (12 weekend days).
-> Each full-time staff member should work at least 3 of those weekend days.
+> Each full-time staff member should work around 3 of those weekend days.
+
+**Important — violations fire on excess, not shortfall:**
+The system does *not* flag staff who have worked *fewer* weekends than the target. Instead, it flags each shift that is *one too many*. For example, if the target is 3 and someone is assigned 5 weekend shifts, the 4th and 5th shifts are flagged. Removing or swapping either one clears the violation.
+
+Staff at or below the target have no violation. Shortfall is handled by the scheduler's optimization logic — it will prefer that person for weekend slots — but no warning appears on the schedule.
 
 **Why it's soft:**
-- Some people may have 2, some may have 4 - close enough
-- Weekend-exempt staff are excluded
-- But we aim for fairness
-
-**How violations are shown:** The system does *not* flag staff who have too *few* weekend shifts — that would mean showing a warning with nothing to fix. Instead, it flags each shift that is *one too many* for that person. For example, if the required count is 3 and someone is assigned to 5 weekend shifts, the 4th and 5th weekend shifts are flagged. Removing or swapping either one clears the violation. Staff who are at or below the required count will not see any weekend violation.
+- Some people may end up with 2, some with 4 — close enough
+- Weekend-exempt staff are excluded entirely
 
 ### 3. Consecutive Weekends Penalty
 
-**What it means:** Try not to have anyone work more than 2 weekends in a row.
+**What it means:** Try not to have anyone work more than 2 weekends in a row (configurable — see Settings → Units → Max Consecutive Weekends).
 
 **What counts as one weekend?** Saturday and Sunday of the same calendar weekend count as **one weekend**, not two. Working both days of the same weekend is normal and does not make it "two consecutive weekends."
 
@@ -246,6 +256,8 @@ This is a firm rule, not just a preference — a 0.5 FTE nurse working 36 hours 
 > John works Weekend 1 (Sat + Sun), Weekend 2 (Sat + Sun), Weekend 3 (Sat + Sun).
 > That's 3 consecutive weekends - the scheduler will try to avoid this.
 > But working both Saturday and Sunday of a single weekend counts as just **one** weekend.
+
+**Escalating penalty:** The penalty gets heavier the longer the streak runs. A 3rd consecutive weekend costs more than double the penalty of the 2nd, and each additional weekend costs progressively more. This means the scheduler strongly prefers breaking a streak early rather than letting it grow — a run of 5 is treated as far worse than two separate runs of 2 or 3.
 
 **Why it's soft:** Sometimes unavoidable with small staff, but we try.
 

@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { staff, staffPreferences } from "@/db/schema";
+import { staff, staffPreferences, exceptionLog } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
@@ -62,6 +62,15 @@ export async function PUT(
     return NextResponse.json({ error: "Staff not found" }, { status: 404 });
   }
 
+  db.insert(exceptionLog).values({
+    entityType: "staff",
+    entityId: id,
+    action: "updated",
+    description: `Staff record updated: ${updated.firstName} ${updated.lastName}`,
+    newState: { isActive: updated.isActive, role: updated.role, fte: updated.fte },
+    performedBy: "nurse_manager",
+  }).run();
+
   return NextResponse.json(updated);
 }
 
@@ -70,6 +79,19 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+
+  const existing = db.select().from(staff).where(eq(staff.id, id)).get();
+  if (existing) {
+    db.insert(exceptionLog).values({
+      entityType: "staff",
+      entityId: id,
+      action: "deleted",
+      description: `Staff member removed: ${existing.firstName} ${existing.lastName} (${existing.role})`,
+      previousState: { role: existing.role, employmentType: existing.employmentType },
+      performedBy: "nurse_manager",
+    }).run();
+  }
+
   db.delete(staff).where(eq(staff.id, id)).run();
   return NextResponse.json({ success: true });
 }

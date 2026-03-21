@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { openShift, shift, shiftDefinition, staff, assignment, exceptionLog } from "@/db/schema";
 import { eq, and, aliasedTable } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { findCandidatesForShift } from "@/lib/coverage/find-candidates";
 
 export async function GET() {
   const originalAssignment = aliasedTable(assignment, "original_assignment");
@@ -49,7 +50,27 @@ export async function GET() {
     .orderBy(shift.date)
     .all();
 
-  return NextResponse.json(coverageRequests);
+  // Refresh recommendations live for pending/approved records so hoursThisWeek and
+  // isOvertime always reflect current week totals, not the stale snapshot from when
+  // the open shift was originally created.
+  const ACTIVE_STATUSES = new Set(["pending_approval", "approved"]);
+  const enriched = await Promise.all(
+    coverageRequests.map(async (r) => {
+      if (!ACTIVE_STATUSES.has(r.status)) return r;
+      try {
+        const { candidates, escalationStepsChecked } = await findCandidatesForShift(
+          r.shiftId,
+          r.originalStaffId ?? undefined
+        );
+        return { ...r, recommendations: candidates, escalationStepsChecked };
+      } catch {
+        // If refresh fails, fall back to stored snapshot
+        return r;
+      }
+    })
+  );
+
+  return NextResponse.json(enriched);
 }
 
 export async function POST(request: Request) {

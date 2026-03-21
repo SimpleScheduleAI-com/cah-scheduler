@@ -11,7 +11,7 @@ import {
 } from "@/db/schema";
 import { eq, and, ne, lte, gte } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { validateSwap, type SwapSideParams } from "@/lib/swap/validate-swap";
+import { validateSwap, type SwapSideParams, type SwapViolation } from "@/lib/swap/validate-swap";
 
 export async function GET(
   _request: Request,
@@ -262,7 +262,14 @@ export async function PUT(
         const reqShiftDetails = getShiftDetails(requestingAssignment);
         const tgtShiftDetails = getShiftDetails(targetAssignment);
 
-        if (reqStaffRow && tgtStaffRow && reqShiftDetails && tgtShiftDetails) {
+        if (!reqStaffRow || !tgtStaffRow || !reqShiftDetails || !tgtShiftDetails) {
+          return NextResponse.json(
+            { error: "Cannot validate swap: assignment or staff record not found" },
+            { status: 400 }
+          );
+        }
+
+        {
           const reqName = `${reqStaffRow.firstName} ${reqStaffRow.lastName}`;
           const tgtName = `${tgtStaffRow.firstName} ${tgtStaffRow.lastName}`;
 
@@ -350,6 +357,26 @@ export async function PUT(
             hasApprovedLeave: tgtHasLeave,
           };
 
+          // Role compatibility: RN can only swap with RN, CNA with CNA, etc.
+          // Check this first — role mismatch is a hard block; no need to run further checks.
+          if (reqStaffRow.role !== tgtStaffRow.role) {
+            return NextResponse.json(
+              {
+                error: "Swap violates hard scheduling rules",
+                violations: [
+                  {
+                    staffId: reqStaffRow.id,
+                    staffName: reqName,
+                    ruleId: "role-compatibility",
+                    severity: "hard",
+                    description: `${reqName} (${reqStaffRow.role}) and ${tgtName} (${tgtStaffRow.role}) have different roles — a ${tgtStaffRow.role} cannot cover an ${reqStaffRow.role} shift.`,
+                  } satisfies SwapViolation,
+                ],
+              },
+              { status: 422 }
+            );
+          }
+
           const violations = validateSwap(requestingSide, targetSide);
           if (violations.length > 0) {
             return NextResponse.json(
@@ -397,6 +424,22 @@ export async function PUT(
         }
       }
     }
+  }
+
+  if (body.status === "denied") {
+    db.insert(exceptionLog).values({
+      entityType: "swap_request",
+      entityId: id,
+      action: "swap_denied",
+      description: `Swap request denied${body.denialReason ? `: ${body.denialReason}` : ""}${body.validationNotes ? ` — Violations: ${body.validationNotes}` : ""}`,
+      previousState: { status: existing.status },
+      newState: {
+        status: "denied",
+        denialReason: body.denialReason ?? null,
+        validationNotes: body.validationNotes ?? null,
+      },
+      performedBy: body.reviewedBy ?? "nurse_manager",
+    }).run();
   }
 
   const updated = db

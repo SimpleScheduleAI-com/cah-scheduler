@@ -16,6 +16,32 @@ export function buildSchedulerContext(scheduleId: string): SchedulerContext {
   const staffList = [...ruleContext.staffMap.values()];
   const shifts = [...ruleContext.shiftMap.values()];
 
+  // ── Scale weekendShiftsRequired to the actual schedule period ────────────
+  // The unit config stores the requirement for the STANDARD period (default 3
+  // per 6-week block). For shorter schedules (e.g., 14 days = 2 weeks) the
+  // threshold must be scaled down, otherwise every nurse is perpetually below
+  // the quota — the penalty gives an identical flat bonus to everyone and
+  // weekendRedistributionSweep finds zero improvement, causing all three
+  // variants (Balanced / Fair / Cost) to converge to identical schedules.
+  //
+  // Derived from shift dates already in the context — no extra DB query needed.
+  // For a standard 6-week schedule the scale factor is 1 (no change).
+  let unitConfig = ruleContext.unitConfig;
+  if (unitConfig && shifts.length > 0) {
+    const dates = shifts.map((s) => s.date).sort();
+    const firstMs = new Date(dates[0] + "T00:00:00Z").getTime();
+    const lastMs  = new Date(dates[dates.length - 1] + "T00:00:00Z").getTime();
+    const actualWeeks = ((lastMs - firstMs) / (1000 * 60 * 60 * 24) + 1) / 7;
+    const standardWeeks = unitConfig.schedulePeriodWeeks; // default 6
+    const scaledRequired = Math.max(
+      1,
+      Math.round(unitConfig.weekendShiftsRequired * actualWeeks / standardWeeks)
+    );
+    if (scaledRequired !== unitConfig.weekendShiftsRequired) {
+      unitConfig = { ...unitConfig, weekendShiftsRequired: scaledRequired };
+    }
+  }
+
   return {
     scheduleId,
     shifts,
@@ -24,7 +50,7 @@ export function buildSchedulerContext(scheduleId: string): SchedulerContext {
     staffMap: ruleContext.staffMap,
     prnAvailability: ruleContext.prnAvailability,
     staffLeaves: ruleContext.staffLeaves,
-    unitConfig: ruleContext.unitConfig,
+    unitConfig,
     scheduleUnit: ruleContext.scheduleUnit,
     publicHolidays: ruleContext.publicHolidays,
     historicalWeekendCounts: ruleContext.historicalWeekendCounts,

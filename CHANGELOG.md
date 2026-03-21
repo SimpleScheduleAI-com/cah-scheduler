@@ -6,6 +6,375 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.11] - 2026-03-21
+
+### Fixed
+
+- **Charge nurse clustering in greedy construction**: The greedy Pass 2 used a soft `chargeClustering` penalty (0.8 pts) to discourage placing additional charge-qualified nurses on a shift that already had one. This penalty was consistently outweighed by other scoring factors — a charge-qualified nurse with a better preference match (+0.75), higher weekend quota position (+0.4), or better skill mix (+0.6) still won the slot over a non-charge alternative. Result: one shift per 4-week schedule typically ended up with 3+ charge-qualified nurses, firing a "Charge Nurse Distribution" soft violation. A hard preference tier is now applied in Pass 2 (mirroring the existing non-OT preference): once any charge-qualified nurse is on a shift, the eligible pool for subsequent regular slots is filtered to non-charge-qualified nurses first. Only if no non-charge nurse is eligible does the scheduler fall back to the full pool, ensuring coverage is never compromised.
+
+### Files Modified
+
+- `src/lib/engine/scheduler/greedy.ts` — Pass 2: added charge-distribution preference tier (non-charge-first, fallback to full pool)
+
+---
+
+## [1.7.10] - 2026-03-21
+
+### Fixed
+
+- **FAIR variant was producing more violations than BALANCED after v1.7.9**: v1.7.9's `staffConsecWeekendDelta` fix made the FAIR local-search pass (300 iterations with FAIR weights) accept far more swaps — consecutive-weekend improvement deltas of up to −150 points now dominated the acceptance decision. But FAIR's `preference: 2.0` weight simultaneously moved nurses with `avoidWeekends` preferences below their 3-shift weekend minimum, and FAIR's `overtime: 0.5` accepted OT-causing swaps. The scoring function has no penalty for being *under* the weekend minimum (it only gives a bonus when assigning *to* an under-quota nurse), so the sweep had no signal to repair these shortfalls. Net result: FAIR ended up with more Weekend Required, Extra Hours, and OT violations than BALANCED — the opposite of its intent. The fix is to remove the FAIR local-search pass entirely. Since v1.7.9, `computeSwapDeltaPenalty` already includes `staffConsecWeekendDelta`, so consecutive-weekend streak repair under FAIR's `consecutiveWeekends: 15.0` weight is handled by the `weekendRedistributionSweep` directly. FAIR now runs the sweep immediately on BALANCED's output, without a local-search phase. The sweep under FAIR's `weekendCount: 3.0` and `consecutiveWeekends: 15.0` weights can only improve weekend distribution from BALANCED's already-optimised baseline.
+
+- **Hot-path Date object allocation eliminated in `weekendIdForDate` and `areConsecutiveWeekendIds`**: Both functions (added in v1.7.9) were creating `new Date` objects on every call with no caching. They are called inside the sweep inner loop (twice per `computeSwapDeltaPenalty` × every candidate swap × every restart). Module-level Maps cache results by date string; the same ~42 date strings in a 6-week schedule are now converted to Date objects at most once per process lifetime.
+
+### Files Modified
+
+- `src/lib/engine/scheduler/runner.ts` — removed `localSearch()` call for FAIR variant; updated FAIR comment block
+- `src/lib/engine/scheduler/local-search.ts` — added `_weekendIdCache` and `_satMsCache` module-level maps; `weekendIdForDate` and `areConsecutiveWeekendIds` now use cached lookups
+
+---
+
+## [1.7.9] - 2026-03-21
+
+### Fixed
+
+- **Consecutive-weekend penalty was invisible to all swap and replacement delta calculations**: `computeSwapDeltaPenalty` and `computeReplacementDeltaPenalty` call `softPenalty()` to score both the "before" and "after" state of a proposed swap. `softPenalty()` contains an `alreadyThisWeekend` guard that skips the consecutive-weekend penalty when the candidate shift's weekend is already in state — which it always is during delta calculations (the assignment is in state before scoring, and the new assignment is added to state before re-scoring). Both old and new scores return 0 for the consecutive-weekend component; the delta is always 0. The local search and all three sweeps could not detect consecutive-weekend improvements or degradations at all. Three new helper functions are added to `local-search.ts`: `weekendIdForDate`, `totalStreakPenalty`, and `staffConsecWeekendDelta`. The last function computes the consecutive-weekend penalty delta for one nurse by collecting their full set of weekend assignments from the **original, unmutated state** (before any swap mutation), simulating the proposed change, and computing the delta between the resulting sorted weekend sets. This is added to the return value of both `computeSwapDeltaPenalty` and `computeReplacementDeltaPenalty`. The `alreadyThisWeekend` guard in `softPenalty()` is unchanged — it remains correct for greedy construction and for preventing double-counting of Sat+Sun on the same calendar weekend.
+
+- **Weekend redistribution sweep can now fully repair consecutive streaks**: With the delta fix above, the sweep correctly detects that swapping a nurse off a 5th consecutive weekend produces a strongly negative delta. The regression test that previously asserted only `streak < initial` (because the sweep could only reduce streaks as an equity side-effect) is upgraded to assert `streak ≤ maxConsecutiveWeekends (2)` — the sweep can now reliably complete the repair.
+
+### Files Modified
+
+- `src/lib/engine/scheduler/local-search.ts` — added `weekendIdForDate`, `areConsecutiveWeekendIds`, `totalStreakPenalty`, `staffConsecWeekendDelta` helpers; integrated `cwDelta` into `computeSwapDeltaPenalty` and `computeReplacementDeltaPenalty`
+- `src/__tests__/scheduler/local-search.test.ts` — streak-repair test assertion upgraded from `toBeLessThan(initialStreak)` to `toBeLessThanOrEqual(2)`
+
+---
+
+## [1.7.8] - 2026-03-21
+
+### Added
+
+- **Regression tests for consecutive-weekend streak escalation (7 new tests in `scoring.test.ts`)**: Added a `"consecutive weekend streak penalty — escalation beyond maxConsecutive"` describe block that verifies the penalty escalates correctly for streaks beyond `maxConsecutive=2`. Tests use an isolation approach — comparing `penalty(N consecutive priors)` minus `penalty(N non-consecutive priors of identical count)` — to extract the pure consecutive component and eliminate weekend-equity contamination. This test design means the suite will FAIL if the loop cap bug from v1.7.7 is reintroduced: streak=3 fires 15 pts, streak=4 fires 22.5 pts, streak=5 fires 30 pts, streak=6 fires 37.5 pts.
+
+- **Regression tests for `weekendRedistributionSweep` (3 new tests in `local-search.test.ts`)**: First automated tests for `weekendRedistributionSweep`. A scenario with staffA assigned 5 consecutive Saturdays and staffB with zero weekends is used as the shared fixture. Three tests verify: (1) total assignment count is preserved after the sweep, (2) the sweep moves at least one weekend from the excess nurse to the deficit nurse, (3) a 5-consecutive-weekend streak is reduced (streak decreases, not necessarily to ≤ 2, because the `alreadyThisWeekend` guard in `softPenalty()` makes the consecutive component invisible to `computeSwapDeltaPenalty` — delta-driven swap decisions can't directly detect streak improvements; they can only detect equity improvements that happen to also break the streak).
+
+### Files Modified
+
+- `src/__tests__/scheduler/scoring.test.ts` — new describe block with 7 streak escalation tests; `penaltyWithPriors()` and `consecutivePenalty()` helpers added
+- `src/__tests__/scheduler/local-search.test.ts` — new describe block with 3 sweep tests; `makeSweepDraft()` and `maxConsecWeekendStreak()` helpers added; `weekendRedistributionSweep` added to import
+
+---
+
+## [1.7.7] - 2026-03-21
+
+### Fixed
+
+- **Consecutive-weekend streak penalty was capped at `maxConsecutive` iterations — streaks of 4–5 looked identical to streak=3**: The backward and forward loops in `softPenalty()` Section 3b (introduced in v1.6.10 as a performance fix) used `maxConsecutive` (default 2) as the loop bound. A nurse with 5 consecutive weekends would be counted as streak=3 (back found 2 prior weekends and stopped), yielding a penalty of 15 × 1.0 = 15 pts instead of the correct 15 × 2.0 = 30 pts. With the penalty halved, the 4th and 5th consecutive weekends looked no worse than a 3rd, removing the urgency to avoid them during greedy construction and local search. The loop bound is now `schedulePeriodWeeks` (default 6) so the full schedule horizon is scanned. `maxConsecutive` is unchanged — it still defines when the penalty fires and sets the threshold for the excess calculation. Correct escalation for FAIR weight=15: streak=3→15 pts, streak=4→22.5 pts, streak=5→30 pts, streak=6→37.5 pts.
+
+- **Weekend redistribution sweep could not break long consecutive streaks — `deficitStaffIds` filter blocked all valid partners**: `weekendRedistributionSweep()` restricted swap partners exclusively to nurses with below-average weekend counts (`deficitStaffIds`). When a nurse had 5 consecutive weekends, every nurse at or above average was excluded as a swap candidate — even nurses with 3 or 4 weekends who could break the streak without worsening the overall distribution. A two-phase structure is now used: **Phase 1** (deficit-only) runs unchanged; when Phase 1 finds no improvement and a consecutive streak violation still exists, **Phase 2** (streak-repair fallback) widens the partner pool to any nurse with fewer weekend shifts than the violating nurse. Partners are sorted ascending by weekend count so deficit nurses (lowest count) are tried first within the widened pool. This ensures deficit nurses remain highest priority while still allowing streak repair when the deficit pool is exhausted.
+
+### Files Modified
+
+- `src/lib/engine/scheduler/scoring.ts` — Section 3b: backward/forward loop bounds changed from `maxConsecutive` to `streakLookBound = unitConfig?.schedulePeriodWeeks ?? 6`
+- `src/lib/engine/scheduler/local-search.ts` — `weekendRedistributionSweep()`: added Phase 2 streak-repair fallback pass after Phase 1 deficit-only pass
+
+---
+
+## [1.7.6] - 2026-03-21
+
+### Fixed
+
+- **Weekend counting now uses industry-standard unit semantics (Sat+Sun = 1 weekend)**: `getWeekendCount()` previously counted individual weekend-day assignments (Saturday = 1, Sunday = 1), meaning a nurse who worked both days of the same weekend accumulated a count of 2. This caused the Section 3 equity bonus to fire after only 1.5 real weekends instead of the intended 3, and gave a spurious incentive to assign the second day of an already-covered weekend to the same nurse. The industry standard in nurse scheduling is that working any shift on Saturday OR Sunday (or both) counts as **one worked weekend**. `getWeekendCount()` now uses the existing `getWeekendId()` helper to count distinct weekend units (Sat-anchored Saturday date as the ID), so Sat+Sun of the same week = 1. `weekendShiftsRequired=3` now correctly means "3 full weekend rotations per period," which is the original intent.
+
+- **Historical weekend carryforward also corrected to unit semantics**: The `historicalWeekendCounts` query in `rule-engine.ts` that seeds the equity penalty across schedule periods was also using day-count semantics. It now accumulates per-staff Sets of Saturday-anchored weekend IDs before converting to counts, matching the new `getWeekendCount()` behavior.
+
+- **26-minute generation time eliminated — Section 9 holiday average precomputed outside hot path**: The holiday fairness penalty (Section 9 in `softPenalty()`, added in v1.7.4) computed the average holiday assignments across all staff on every `softPenalty()` call where the shift date is a holiday — an O(staff × assignments) loop inside the scoring function. During local search with 1800 total iterations this ran millions of inner iterations. A new `computeHolidayAvg()` helper is now called **once per local-search / sweep pass** and the result is threaded through `scoreSubset()` to `softPenalty()` as a `precomputedHolidayAvg` parameter. Generation time for a 6-week schedule drops back below 3 minutes.
+
+- **`totalAssignmentCount()` now O(1)**: The method iterated all staff entries on every FAIR variant `softPenalty()` call (Section 10, per-nurse load fairness). A `_totalCount` private counter is now maintained incrementally in `addAssignment()` / `removeAssignment()` and `clone()`, making the method a single integer return. The `_totalCount` is decremented only when `removeAssignment` actually finds and splices the entry, ensuring correctness under the temporary mutation pattern used in delta-penalty calculations.
+
+### Files Modified
+
+- `src/lib/engine/scheduler/state.ts` — `getWeekendCount()` rewritten to count distinct weekend units; `totalAssignmentCount()` replaced with O(1) counter; `_totalCount` field added; `addAssignment()`, `removeAssignment()`, and `clone()` updated
+- `src/lib/engine/rule-engine.ts` — `historicalWeekendCounts` accumulation changed from day-count to weekend-unit Set
+- `src/lib/engine/scheduler/scoring.ts` — `softPenalty()` gains optional `precomputedHolidayAvg?: number` parameter; Section 9 uses it when provided, falls back to inline computation otherwise
+- `src/lib/engine/scheduler/local-search.ts` — new `computeHolidayAvg()` helper; `scoreSubset()`, `computeSwapDeltaPenalty()`, and `computeReplacementDeltaPenalty()` thread `holidayAvg?` through; `localSearch()`, `overtimeReductionSweep()`, and `weekendRedistributionSweep()` precompute it once per pass
+- `src/__tests__/scheduler/state.test.ts` — `getWeekendCount` test updated to assert unit semantics (Sat+Sun = 1, not 2); added test for two distinct weekends
+
+---
+
+## [1.7.5] - 2026-03-21
+
+### Fixed
+
+- **Consecutive-weekend quota guard removed — penalty now fires during greedy construction**: The guard added in v1.6.10 (`if (weekendCount >= required)`) blocked the consecutive-weekend penalty for nurses who hadn't yet hit their weekend quota. During the greedy phase, most nurses are below quota for weeks 1–3, so the FAIR weight of 15.0 contributed zero penalty while streaks of 4–5 consecutive weekends formed. By the time quota was reached, the damage was done and the local search had no viable swaps to undo it. The guard was originally justified because the weight (3.0 at the time) was too weak to outweigh the quota-fill bonus (−0.5). With FAIR's weight now at 15.0, a 3rd consecutive weekend costs 15 pts vs. a quota-fill bonus of −1.5 pts — the penalty wins decisively. Removing the guard means the greedy phase never builds streaks beyond 2 consecutive weekends in the first place. BALANCED is unaffected in practice (weight 1.0 gives a mild +0.5 net at streak=3, not a blocker).
+
+- **Historical weekend carryforward now excludes called-out and cancelled assignments**: The query that builds `historicalWeekendCounts` (used to seed weekend equity across schedule periods) previously counted all assignments regardless of status. A nurse who called out sick on a Saturday was credited for "working" that weekend, inflating their carryforward count. In the next schedule, she would be over-quota from day 1 and receive fewer weekends — even though she never actually worked. The query now filters out `called_out` and `cancelled` statuses, so carryforward reflects actual worked weekends only.
+
+### Changed
+
+- **FAIR local search increased from 150 to 300 iterations**: For a 6-week schedule with ~420 assignments, 150 swap attempts could touch at most 36% of the schedule. Raising to 300 iterations doubles the optimization coverage. The consecutive-weekend guard fix is the more impactful change (prevents streaks at construction time), but 300 iterations ensures edge cases are also resolved during the improvement phase. Generation time for FAIR increases by approximately 36 additional seconds.
+
+### Files Modified
+
+- `src/lib/engine/scheduler/scoring.ts` — removed quota gate from Section 3b; updated comment explaining the weight-calibration rationale
+- `src/lib/engine/rule-engine.ts` — added `ne(assignment.status, "called_out")` and `ne(assignment.status, "cancelled")` filters to the historicalWeekendCounts query
+- `src/lib/engine/scheduler/runner.ts` — FAIR local-search iterations 150 → 300
+
+---
+
+## [1.7.4] - 2026-03-18
+
+### Changed
+
+- **Fairness-Optimized variant now uses FAIR weights during optimization**: Previously, the FAIR variant was built by running a single `weekendRedistributionSweep` on the BALANCED result — meaning all greedy and local-search phases used BALANCED weights. A 150-iteration local-search pass with FAIR weights is now run before the weekend sweep. This ensures that FAIR's higher penalties for consecutive weekends (15.0), weekend count equity (3.0), and holiday fairness (3.0) actively influence which assignment swaps are accepted, not just post-processing. FAIR should now consistently produce better fairness scores than BALANCED (which was previously not guaranteed).
+
+- **Holiday fairness is now active during schedule generation**: The `holidayFairness` weight (defined in all three `WeightProfile` objects since v1.6) was previously dead code — it was never referenced inside `softPenalty()`. A new Section 9 in `softPenalty()` now penalises assigning a holiday shift to a nurse who already has more holidays than the current staff average. The penalty scales with `weights.holidayFairness` and the nurse's excess holiday count above average. FAIR's weight (3.0) creates strong steering toward nurses with fewer holidays; BALANCED (1.0) applies mild pressure.
+
+- **Per-nurse load fairness now active in FAIR variant**: A new Section 10 in `softPenalty()` penalises assigning to nurses who already have significantly more total assignments than their peers. The penalty is `weights.weekendCount × 0.2 × loadExcess` (only when `loadExcess > 1`), which is meaningful in FAIR (weekendCount = 3.0) but near-zero in BALANCED/COST (1.0). This reduces the pattern where a handful of high-competency nurses accumulate 15 violations while others have 0.
+
+- **Consecutive weekends weight raised from 3.0 to 15.0 in FAIR profile**: At 3.0, the consecutive-weekend penalty (3.0 × 0.5 = 1.5 per shift above max) was easily outweighed by charge-nurse qualification bonuses and skill-mix preferences. At 15.0, the penalty for a third consecutive weekend (15.0 × 1.0 = 15 pts) is decisive — it will override charge preferences and skill bonuses, making three-plus consecutive weekends extremely rare in the FAIR variant.
+
+- **Two new `SchedulerState` methods**: `getAssignmentCount(staffId)` and `totalAssignmentCount()` added to support the per-nurse load fairness calculation in `softPenalty()`.
+
+### Files Modified
+
+- `src/lib/engine/scheduler/scoring.ts` — added `publicHolidays: string[]` parameter; added Section 9 (holiday fairness) and Section 10 (per-nurse load fairness)
+- `src/lib/engine/scheduler/state.ts` — added `getAssignmentCount()` and `totalAssignmentCount()` methods
+- `src/lib/engine/scheduler/weight-profiles.ts` — FAIR `consecutiveWeekends` raised from 3.0 to 15.0
+- `src/lib/engine/scheduler/runner.ts` — added 150-iteration FAIR local-search pass before weekend redistribution sweep; added `localSearch` to import
+- `src/lib/engine/scheduler/greedy.ts` — `softPenalty()` calls updated to pass `context.publicHolidays.map(h => h.date)`
+- `src/lib/engine/scheduler/local-search.ts` — `softPenalty()` calls updated to pass `context.publicHolidays.map(h => h.date)`
+
+---
+
+## [1.7.3] - 2026-03-18
+
+### Changed
+
+- **Excel Units column renamed to "Target Weekends Per Nurse Per Schedule"**: The column was renamed from "Min Weekends Per Nurse Per Schedule" (introduced in v1.7.2) because "Min" implied going *below* the value would be a violation. The actual rule penalizes nurses who work *more* than the target (excess weekend shifts are soft violations); working fewer than the target is handled by the scheduler's optimization pressure with no explicit violation. "Target" better reflects this intent. The import parser now accepts all three names — "Target Weekends Per Nurse Per Schedule", "Min Weekends Per Nurse Per Schedule", and the original "Weekend Shifts Required" — so existing Excel files continue to work.
+
+### Files Modified
+
+- `src/app/api/import/route.ts` — updated export header
+- `src/lib/import/parse-excel.ts` — updated template header; added new name as primary fallback in import parser
+- `docs/05-scheduling-rules.md` — soft rule §2 rewritten to clarify target vs minimum semantics
+
+---
+
+## [1.7.2] - 2026-03-18
+
+### Fixed
+
+- **Schedule grid doesn't update after census change (Issue 1)**: Navigating away to the Census page and returning no longer leaves the schedule showing stale required-staff counts. A `document.visibilitychange` listener now triggers a full refetch whenever the user returns to the schedule page. The "Re-evaluate" button was also corrected to call `fetchSchedule` (which already chains into rule evaluation) instead of `runEvaluation` directly — ensuring the latest DB state is always loaded before scoring.
+
+- **OT soft violation not shown after open-shift fill (Issue 2)**: When a replacement nurse's assignment was created via the open-shift approve or fill paths, the `isOvertime` flag was read from a stale stored recommendation snapshot. The flag is now computed dynamically at fill time by querying the nurse's actual scheduled hours in the same Sun–Sat week and comparing to 40 h.
+
+- **Swap approval allows RN ↔ CNA swaps (Issue 3)**: The swap approval path now performs an explicit role-compatibility check before calling `validateSwap`. Attempting to approve a swap between staff of different roles returns HTTP 422 with a `"role-compatibility"` violation explaining which roles are incompatible.
+
+- **ICU/ER competency rule applied to all units (Issue 4)**: The `icu-competency` rule was incorrectly flagging Level 1 staff on any shift regardless of unit. The rule now only fires for shifts on ICU or ER units. Level 1 orientees continue to be blocked from ICU/ER, but can work on non-ICU units (e.g., Med-Surg) if a Level 5 preceptor is present.
+
+- **Excel export hardcodes min staff 4/3 (Issue 5)**: The Units sheet in the exported setup Excel file was writing hardcoded `4` (day) and `3` (night) instead of the unit's actual `minStaffDay` / `minStaffNight` values. Also renamed two confusingly-labelled columns — "Weekend Shifts Required" → "Min Weekends Per Nurse Per Schedule" and "Holiday Shifts Required" → "Min Holidays Per Nurse Per Year" — to clarify that these are per-nurse fairness targets, not per-shift staffing minimums. The import parser now accepts both old and new column names for backward compatibility.
+
+- **On-call limit not enforced in open-shift recommendations (Issue 6)**: `findCandidatesForShift` now enforces the on-call limits rule (max 1 on-call shift per week; max 1 on-call weekend per month) as hard blocks. Candidates who have already reached either limit are excluded from recommendations. A soft warning — "Already covering one callout this week — confirm this is acceptable" — is surfaced in the candidate's reasons list when they already have a callout-replacement assignment that week, so the manager can make an informed decision.
+
+### Changed
+
+- **Rule names and descriptions updated**: Several rule entries received improved names and descriptions to better reflect their actual enforcement logic. Notable changes: "Patient-to-Licensed-Staff Ratio" → "Patient-to-RN Ratio" (LPNs and CNAs were never counted); ICU competency and Level 1 preceptor descriptions clarified to reflect the unit-scoped bug fix; on-call limits, rest hours, and no-overlapping-shifts descriptions made more precise. A one-shot migration script (`scripts/update-rule-descriptions.ts`) updates existing databases.
+
+### Files Modified
+
+- `src/app/schedule/[id]/page.tsx` — visibilitychange listener; Re-evaluate button now calls fetchSchedule
+- `src/app/api/open-shifts/[id]/route.ts` — dynamic isOvertime computation at fill/approve time
+- `src/app/api/swap-requests/[id]/route.ts` — role-compatibility check before validateSwap
+- `src/lib/engine/rules/icu-competency.ts` — unit filter (ICU/ER only); updated name and descriptions
+- `src/lib/coverage/find-candidates.ts` — on-call weekly/monthly limits as hard blocks; callout-replacement warning
+- `src/app/api/import/route.ts` — fixed hardcoded min staff in export; renamed Excel columns
+- `src/lib/import/parse-excel.ts` — updated column headers in template; import accepts old and new column names
+- `src/db/seed.ts` — updated rule names and descriptions for 8 rules
+- `scripts/update-rule-descriptions.ts` — new one-shot DB migration script for existing installs
+- `src/__tests__/rules/icu-competency.test.ts` — updated tests to use ICU shift in shiftMap; added non-ICU test case; updated description assertions
+- `src/__tests__/rules/min-staff.test.ts` — two tests updated to pass `unitConfig: null` to isolate requiredStaffCount logic from unit floor
+- `src/__tests__/coverage/find-candidates-fields.test.ts` — mock sequences updated for new on-call and callout queries
+
+---
+
+## [1.7.1] - 2026-03-17
+
+### Removed
+
+- **`acuityYellowExtraStaff` / `acuityRedExtraStaff` removed from unit settings UI**: These two fields appeared on the unit card ("Acuity Yellow: +1 staff", "Acuity Red: +2 staff") and as editable inputs in the unit settings dialog. Investigation confirmed they were never consumed by any rule evaluator or scheduler — the fields were loaded into `UnitConfig` but no code path ever read them from there. Actual acuity-based staffing is handled at the shift level (`shift.acuityExtraStaff`, which is zeroed automatically when a census band is selected via the Census page). Displaying these unit-level values gave managers the false impression that editing them would modify how census tiers are staffed.
+
+  The DB columns remain in place (no migration required). Census bands continue to define absolute staffing per tier and are unaffected.
+
+### Files Modified
+
+- `src/app/settings/units/page.tsx` — removed from card display, "Acuity Staffing" form section, `FormState`, `UnitConfig` interface, `defaultForm`, and `openEditDialog`
+- `src/lib/engine/rules/types.ts` — removed from `UnitConfig` interface
+- `src/types/rules.ts` — removed from `UnitConfig` interface
+- `src/lib/engine/rule-engine.ts` — removed from `UnitConfig` builder (fields were populated but never read)
+- 7 test fixture files — removed from mock `UnitConfig` objects
+
+---
+
+## [1.7.0] - 2026-03-17
+
+### Added
+
+- **Per-unit absolute staffing floor (`minStaffDay` / `minStaffNight`)**: Census-based staffing tiers define how many nurses are needed relative to patient volume, but there was previously no hard floor — at very low census a shift could legitimately satisfy the census band with fewer nurses than clinical safety requires. Two new configurable values are now stored on each unit: `minStaffDay` (minimum staff for any day shift) and `minStaffNight` (minimum staff for any night or evening shift). The effective required count for every shift is now `max(censusRequired, unitMinimum)`.
+
+  Industry-standard defaults for CAH (≤25 beds) are seeded automatically:
+  - **ICU** — Day: 3, Night: 2 (AACN 1:2 ratio; 3 day ensures break/code coverage at any census level)
+  - **ER** — Day: 2, Night: 2 (24/7 two-nurse minimum; single-nurse ER is not operationally safe)
+  - **Med-Surg** — Day: 3, Night: 2 (1:4–5 ratio standard; morning care load warrants 3)
+
+  These values are fully editable under **Settings → Units** in the new "Minimum Staffing Floor" section. The unit card also displays the current day/night minimums at a glance.
+
+  The floor is enforced as a **hard rule** in the existing `min-staff` evaluator and in the schedule grid's `getEffectiveRequired()` helper (which drives the staffing badge on the schedule view). On-call shifts are excluded — they do not count toward staffing. The Excel import (`Min Staff Day` / `Min Staff Night` columns) now correctly persists these values; previously they were parsed and validated but silently discarded.
+
+### Files Modified
+
+- `src/db/schema.ts` — `minStaffDay` and `minStaffNight` integer columns added to `unit` table (defaults: 3 / 2)
+- `src/db/seed.ts` — unit seeds updated with per-unit defaults
+- `src/lib/engine/rules/types.ts` — `UnitConfig` interface extended with `minStaffDay` and `minStaffNight`
+- `src/lib/engine/rules/min-staff.ts` — unit floor applied after census-band lookup in the hard rule evaluator
+- `src/app/api/schedules/[id]/route.ts` — `getEffectiveRequired()` loads unit minimums and applies `Math.max`
+- `src/app/settings/units/page.tsx` — "Minimum Staffing Floor" form section and card stat added
+- `src/app/api/units/[id]/route.ts` — PUT handler persists new fields
+- `src/app/api/units/route.ts` — POST handler persists new fields
+- `src/app/api/import/route.ts` — unit import now writes `minStaffDay` and `minStaffNight` (were parsed but discarded)
+- `RULES_SPECIFICATION.md` — §3.1 updated to document the floor, defaults, and rationale
+
+---
+
+## [1.6.19] - 2026-03-17
+
+### Added
+
+- **Comprehensive audit trail coverage for manager actions**: The audit log previously captured only ~15% of write operations. A systematic review identified every operationally significant manager action that left no trace. Eight routes have been updated to log entries on every meaningful state change:
+
+  - **Shift swap lifecycle** (`src/app/api/swap-requests/route.ts`, `src/app/api/swap-requests/[id]/route.ts`, `src/app/swaps/page.tsx`): Creating a swap request now logs a `swap_requested` entry with both staff names and shift dates (directed swap) or the requesting staff and date (open swap). Denying a request logs a `swap_denied` entry capturing the denial reason and, where applicable, the specific rule violations that made the swap invalid. The "Deny" button now silently pre-validates the swap before submitting so the audit entry can include a plain-English violation summary (e.g. "10-hour rest rule violated; Charge nurse requirement unmet").
+
+  - **Staff management** (`src/app/api/staff/route.ts`, `src/app/api/staff/[id]/route.ts`): Adding a new staff member logs a `created` entry with role, employment type, and FTE. Editing an existing record logs `updated` with the new active/role/FTE state. Removing a staff member logs `deleted` with the previous role and employment type captured before the row is deleted.
+
+  - **Schedule lifecycle** (`src/app/api/schedules/route.ts`, `src/app/api/schedules/[id]/route.ts`): Creating a new schedule period logs a `created` entry with name, date range, and unit. Publishing a schedule logs `published`, archiving logs `archived`, and all other edits log `updated`, each capturing the previous and new status.
+
+  - **Rule configuration** (`src/app/api/rules/[id]/route.ts`): Changing a rule's weight, toggling it active/inactive, or updating its parameters logs an `updated` entry with both the old and new values of weight, isActive, and parameters — the three fields managers routinely adjust.
+
+### Files Modified
+
+- `src/app/api/swap-requests/route.ts` — `swap_requested` audit log in POST handler
+- `src/app/api/swap-requests/[id]/route.ts` — `swap_denied` audit log when status=denied in PUT handler
+- `src/app/swaps/page.tsx` — `handleDeny` pre-validates to collect violation descriptions before submitting
+- `src/app/api/staff/route.ts` — `created` audit log in POST handler
+- `src/app/api/staff/[id]/route.ts` — `updated` in PUT, `deleted` in DELETE (existing record captured before delete)
+- `src/app/api/schedules/route.ts` — `created` audit log in POST handler
+- `src/app/api/schedules/[id]/route.ts` — `published`/`archived`/`updated` audit log in PUT handler
+- `src/app/api/rules/[id]/route.ts` — `updated` audit log in PUT handler (existing values captured before update)
+
+---
+
+## [1.6.18] - 2026-03-16
+
+### Fixed
+
+- **Schedule regeneration no longer crashes with FK constraint error** (`src/lib/engine/scheduler/runner.ts`): Regenerating a schedule that had any associated callout or shift-swap records failed with `SqliteError: FOREIGN KEY constraint failed`. Root cause: `src/db/index.ts` enables `PRAGMA foreign_keys = ON` globally; `callout.assignment_id` and `shift_swap_request.requesting_assignment_id` both reference `assignment.id` without a CASCADE or SET NULL policy, so the bulk `DELETE FROM assignment WHERE schedule_id = ?` was blocked whenever those records pointed to the old assignments. The delete window is now briefly bracketed with `PRAGMA foreign_keys = OFF / ON` via `db.$client.pragma()`. The stale IDs remain in callout and swap records as an audit trail; the historical facts (a callout occurred, a swap was requested) are preserved.
+
+- **Charge nurse clustering penalty strengthened** (`src/lib/engine/scheduler/scoring.ts`): The scheduler was placing 3 charge-qualified nurses on the same shift (e.g. Elizabeth Mitchell, Sophia Patel, and Carlos Rivera) despite other shifts needing coverage. Two compounding weaknesses caused this: (1) the previous penalty only counted assignments flagged as `isChargeNurse = true` (the designated charge slot) — charge-qualified nurses placed in regular staff slots on the same shift were invisible to the check; (2) the flat coefficient (0.5 × chargeClustering) produced a penalty of 0.5 for BALANCED and 0.25 for COST_OPTIMIZED, too weak to outweigh preference or overtime incentives.
+
+  The penalty now counts **all** charge-qualified nurses already on the shift (via `staffMap.get(a.staffId)?.isChargeNurseQualified`) and scales with the number already present: 1 present → +0.8 × weight, 2 present → +1.3 × weight, etc. With BALANCED weights (chargeClustering = 1.0), adding a second charge-qualified nurse to a shift costs +0.8 (up from 0.5) and adding a third costs +1.3. The `!isChargeCandidate` guard is preserved so the greedy pass is never blocked from filling the required charge slot.
+
+### Files Modified
+
+- `src/lib/engine/scheduler/runner.ts` — temporary FK enforcement disable/restore around the assignment and scenario DELETE calls
+- `src/lib/engine/scheduler/scoring.ts` — charge clustering section counts all charge-qualified nurses on the shift and uses a scaled coefficient
+
+---
+
+## [1.6.17] - 2026-03-16
+
+### Fixed
+
+- **OT sweep replacement pass now correctly eliminates reducible overtime** (`src/lib/engine/scheduler/state.ts`, `src/lib/engine/scheduler/scoring.ts`): The replacement pass in `overtimeReductionSweep` — which moves a shift from an OT nurse to a non-OT nurse — was systematically rejecting beneficial moves, leaving nurses at 48h while nurses with 24h were available. Root cause: `SchedulerState.getWeeklyHours()` returns total hours for the entire calendar week, not "hours before this specific shift." When rescoring existing assignments in the delta calculation, the assignment being scored was already in state, so its hours were double-counted (`weekHours = 48h`, `newTotal = 60h`). This phantom OT is symmetric for 2-way swaps (both parties' totals stay constant) and cancels cleanly. For replacements (moves), the totals are asymmetric — the replacement nurse (Sophia, 24h) gains a shift, raising her weekly total and making all her existing assignments appear to be in OT in the new state. The resulting phantom penalty (≈+2.6) far outweighed the real OT saving (≈1.0), so the move was rejected even when it eliminated 8 actual overtime hours.
+
+  Added `getWeeklyHoursExcluding(staffId, date, excludeShiftId)` to `SchedulerState`, which excludes the assignment being scored before summing weekly hours. `softPenalty` now uses this method, so delta calculations correctly reflect "hours from all OTHER shifts this week" rather than the entire week total. The replacement pass now produces a delta of ≈−3.0 for the same scenario, accepts the move, and eliminates the OT. In the greedy phase, candidates are not yet in state so the exclusion has no effect — greedy behaviour is unchanged.
+
+### Files Modified
+
+- `src/lib/engine/scheduler/state.ts` — added `getWeeklyHoursExcluding` method
+- `src/lib/engine/scheduler/scoring.ts` — `softPenalty` now uses `getWeeklyHoursExcluding` to avoid double-counting the current shift's hours
+
+---
+
+## [1.6.16] - 2026-03-16
+
+### Fixed
+
+- **Coverage recommendations: non-charge-qualified nurses excluded from charge nurse shift candidates** (`src/lib/coverage/find-candidates.ts`): When the original nurse held the charge nurse role, the candidate finder was including non-charge-qualified staff in the top-3 recommendations and marking them with a red "will create hard rule violation" warning. These candidates occupied recommendation slots without offering any actionable path to coverage. The charge-qualification check is now a hard filter in all four escalation tiers (float, PRN, overtime, agency) — the same pattern used for role rank and unit qualification. Charge-required shifts now only surface charge-qualified candidates. If no charge-qualified staff are available, the dialog shows "No coverage candidates found", which is the correct signal for the manager. Agency staff are also excluded for charge shifts since agency workers cannot be confirmed charge-qualified.
+
+- **Open Shifts page: cancelled coverage requests now show "Coverage Waived" when originated from approved leave** (`src/app/open-shifts/page.tsx`): When a coverage request created from an approved leave was cancelled in Open Shifts, the status badge showed the generic "Cancelled" label while Leave Management continued to show the leave as "Approved" — appearing contradictory with no explanation. The data model is correct (these are independent facts: the leave is active and the manager chose not to fill the gap), but the presentation was confusing. Cancelled open shifts with `reason === "leave_approved"` now display as **"Coverage Waived"** with a subtext note "Staff still on leave". The cancel confirmation dialog also now distinguishes leave-originated requests — it explains that cancelling waives coverage while the leave remains in effect, rather than showing a generic confirmation.
+
+### Files Modified
+
+- `src/lib/coverage/find-candidates.ts` — charge-qualification hard filter added to float, PRN, overtime, and agency tiers; agency candidate excluded entirely when `chargeRequired = true`
+- `src/app/open-shifts/page.tsx` — "Coverage Waived" label for leave-originated cancelled open shifts; cancel confirmation dialog with context-aware messaging for leave vs. non-leave origins
+
+---
+
+## [1.6.15] - 2026-03-16
+
+### Fixed
+
+- **All 3 schedule variants converge to identical results on sub-6-week schedules** (`src/lib/engine/scheduler/index.ts`): `weekendShiftsRequired` (default 3) is calibrated for a standard 6-week scheduling period. On a 14-day schedule there are only 2 weekends in the entire period — every nurse is perpetually below the 3-weekend quota, so the weekend-count penalty assigns the same flat bonus to all staff regardless of their relative weekend load. `computeSwapDeltaPenalty` returned exactly 0 for the weekend term on any swap, `weekendRedistributionSweep` accepted nothing, and the Fair variant became identical to Balanced. If the Balanced greedy also produced zero OT (common with adequate staffing), the Cost variant also matched.
+
+  `buildSchedulerContext` now scales `weekendShiftsRequired` proportionally to the actual schedule period derived from the shift dates already in context: `scaledRequired = max(1, round(required × actualWeeks / standardPeriodWeeks))`. A 14-day schedule uses `required = 1`; a standard 6-week schedule is unchanged at 3. The scoring function now correctly differentiates staff who have 0 weekends (bonus, below quota) from staff who have 1+ weekends (penalized, at/above quota), giving the redistribution sweep a meaningful signal and allowing Fair to diverge from Balanced.
+
+### Files Modified
+
+- `src/lib/engine/scheduler/index.ts` — `buildSchedulerContext` now scales `unitConfig.weekendShiftsRequired` to the actual schedule period
+
+---
+
+## [1.6.14] - 2026-03-16
+
+### Fixed
+
+- **Open-shift recommendations now refresh live on page load** (`src/app/api/open-shifts/route.ts`, `src/lib/coverage/find-candidates.ts`): Candidate recommendations were stored as a JSON snapshot when leave was approved and never updated. If a staff member worked additional hours after that point, the displayed `hoursThisWeek` and `isOvertime` flag were stale — causing the "Overtime" badge to misrepresent a nurse's actual current hours. The GET handler now calls `findCandidatesForShift()` fresh for each pending/approved coverage request on every page load. Historical (filled/cancelled) records retain their stored snapshot.
+
+- **Dashboard "Needs Attention": pending shift swaps now shown** (`src/app/api/dashboard/route.ts`, `src/app/dashboard/page.tsx`): Pending shift swap requests were never fetched by the dashboard API and were therefore invisible to the "Needs Attention" section. Added a `pendingSwapsCount` query and corresponding attention item that links to `/swaps`.
+
+- **Shift swap approval: pre-validation confirmation step added** (`src/app/api/swap-requests/[id]/validate/route.ts`, `src/app/swaps/page.tsx`): Clicking "Approve" on a swap previously committed the action immediately, surfacing hard-rule violations only after the fact via a 422 error response. The flow is now two-step: clicking "Approve" calls the new read-only `GET /api/swap-requests/[id]/validate` endpoint, which runs all hard-rule checks without making any DB writes. The result is shown in a confirmation dialog — if violations exist, they are displayed with no Confirm button; if all rules pass, a green "No violations found" message is shown alongside a "Confirm Approval" button. The actual approval only executes after the manager confirms.
+
+- **Shift swap approval: null guard no longer silently bypasses validation** (`src/app/api/swap-requests/[id]/route.ts`): If any required DB record (staff, assignment, or shift) was missing at approval time, the validation block was silently skipped and the swap was marked approved without performing any assignment changes or surfacing a warning. The null check is now an explicit early-return 400 error so data-gap cases are always surfaced rather than silently passed.
+
+### Files Modified
+
+- `src/app/api/open-shifts/route.ts` — `findCandidatesForShift` imported; GET handler refreshes recommendations for active records
+- `src/app/api/dashboard/route.ts` — `shiftSwapRequest` imported; `pendingSwapsCount` query added and returned
+- `src/app/dashboard/page.tsx` — `pendingSwapsCount` added to `DashboardData` interface and `attentionItems`
+- `src/app/api/swap-requests/[id]/validate/route.ts` — **new** read-only validation endpoint
+- `src/app/api/swap-requests/[id]/route.ts` — null guard replaced with explicit 400 return
+- `src/app/swaps/page.tsx` — two-step Approve flow with pre-validation confirmation dialog
+
+---
+
+## [1.6.13] - 2026-03-16
+
+### Fixed
+
+- **Approve Coverage dialog: three-state hours display for overtime-tier candidates** (`src/lib/coverage/find-candidates.ts`, `src/app/open-shifts/page.tsx`): Regular full-time/part-time staff in the "Overtime" coverage tier previously showed the "Overtime" badge with no hours context when they wouldn't actually hit 40h, making the badge misleading. Now a neutral note is shown below each overtime-tier candidate to make the situation clear:
+  - `> 40h` after shift → unchanged red ✗ warning: "Overtime — Xh this week (+Yh = OT cost)"
+  - `> FTE hours` but ≤ 40h after shift → amber note: "Xh this week — FTE exceeded, no OT cost" (e.g., a 0.8 FTE nurse at 34h getting an 8h shift crosses their 32h contracted threshold but not OT)
+  - `≤ FTE hours` after shift → muted note: "Xh this week — within contracted hours"
+  `fteHoursPerWeek` (`staff.fte × 40`) is now included in the `CandidateRecommendation` payload for overtime-tier candidates.
+
+- **Dashboard: open callouts now appear in "Needs Attention"** (`src/app/dashboard/page.tsx`): Open callouts were fetched by the API and shown in the metrics card but were never surfaced in the "Needs Attention" action list. The `attentionItems` array now includes an urgent entry linking to `/callouts` when `openCallouts > 0`.
+
+### Files Modified
+
+- `src/lib/coverage/find-candidates.ts` — `fteHoursPerWeek` added to `CandidateRecommendation` interface; set in `findOvertimeCandidates`
+- `src/app/open-shifts/page.tsx` — three-state hours note rendered for overtime-tier candidates
+- `src/app/dashboard/page.tsx` — open callouts entry added to `attentionItems`
+
+---
+
 ## [1.6.12] - 2026-03-16
 
 ### Fixed
