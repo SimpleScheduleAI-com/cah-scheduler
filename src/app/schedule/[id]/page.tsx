@@ -261,39 +261,35 @@ export default function ScheduleBuilderPage() {
             Generate Schedule
           </Button>
           <Button
-            variant="outline"
             size="sm"
             onClick={runEvaluation}
-            className="border-white/20 text-white hover:bg-white/10 hover:text-white"
+            className="bg-white/90 text-primary hover:bg-white"
           >
             Re-evaluate
           </Button>
           <Button
-            variant="outline"
             size="sm"
             onClick={handleExport}
-            className="border-white/20 text-white hover:bg-white/10 hover:text-white"
+            className="bg-white/90 text-primary hover:bg-white"
           >
             Export
           </Button>
           {schedule.status !== "published" ? (
             <Button
               size="sm"
-              variant="outline"
               onClick={handlePublish}
               disabled={publishing || (evaluation !== null && evaluation.hardViolations.length > 0)}
               title={evaluation && evaluation.hardViolations.length > 0 ? "Fix hard violations before publishing" : undefined}
-              className="border-white/20 text-white hover:bg-white/10 hover:text-white"
+              className="bg-white/90 text-primary hover:bg-white disabled:bg-white/50 disabled:text-primary/50"
             >
               {publishing ? "Publishing…" : "Publish"}
             </Button>
           ) : (
             <Button
               size="sm"
-              variant="outline"
               onClick={handlePublish}
               disabled={publishing}
-              className="border-white/20 text-white hover:bg-white/10 hover:text-white"
+              className="bg-white/90 text-primary hover:bg-white disabled:bg-white/50 disabled:text-primary/50"
             >
               {publishing ? "Saving…" : "Unpublish"}
             </Button>
