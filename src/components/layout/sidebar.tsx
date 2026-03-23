@@ -129,7 +129,7 @@ export function Sidebar() {
         mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       )}>
       <div className="flex h-14 items-center border-b px-4">
-        <h1 className="text-lg font-semibold">CAH Scheduler</h1>
+        <h1 className="text-lg font-semibold">SimpleScheduleAI</h1>
       </div>
       <nav className="flex-1 overflow-y-auto p-2">
         {navGroups.map((group, groupIndex) => (

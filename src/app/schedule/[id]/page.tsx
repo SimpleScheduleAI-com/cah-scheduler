@@ -254,10 +254,9 @@ export default function ScheduleBuilderPage() {
             {schedule.status}
           </Badge>
           <Button
-            variant="outline"
             size="sm"
             onClick={() => router.push(`/scenarios?scheduleId=${scheduleId}`)}
-            className="border-white/20 text-white hover:bg-white/10 hover:text-white"
+            className="bg-white text-primary hover:bg-white/90"
           >
             Generate Schedule
           </Button>
