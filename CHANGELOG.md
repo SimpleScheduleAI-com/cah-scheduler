@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.16] - 2026-03-24
+
+### Added
+
+- **Sidebar notification badges**: The navigation sidebar now displays live badge counts on four items — Callouts (open), Open Shifts (pending approval), Leave (pending approval), and Shift Swaps (pending review). Counts refresh on every page navigation via a new `GET /api/notifications` endpoint. Badges appear in red when the count is non-zero, letting the scheduling manager see pending work at a glance without visiting the Dashboard.
+
+- **Toast notifications after workflow actions**: All four workflow pages now confirm every action with a bottom-right toast notification, eliminating the "did that work?" uncertainty of silent table refreshes:
+  - **Leave**: submitted, approved, denied
+  - **Shift Swaps**: logged, approved, denied
+  - **Callouts**: logged, replacement assigned
+  - **Open Shifts**: coverage assigned, shift cancelled
+  - Error toasts displayed when API calls fail.
+
+- **Empty states on Leave and Swaps tables**: When no records match the active filter, a centered dashed-border empty state is now shown with a context-appropriate message ("No pending leave requests — all caught up.", "No pending swap requests.") instead of a blank table body. Callouts and Open Shifts already had empty states; this brings Leave and Swaps into parity.
+
+- **Consistent date formatting**: Date values that previously rendered as raw ISO strings (`2025-03-15`) throughout the Leave and Swaps pages are now formatted as `MMM d, yyyy` (e.g., "Mar 15, 2025") using `date-fns`. Applies to start/end dates in the Leave table, the detail dialog timestamps, and shift dates in the Swaps table.
+
+### Files Modified
+
+- `src/app/api/notifications/route.ts` — new endpoint returning pending counts for all four workflows
+- `src/components/layout/sidebar.tsx` — fetch counts on mount/navigation, render badge pill on nav items
+- `src/app/leave/page.tsx` — useToast wired to submit/approve/deny; empty state; date formatting
+- `src/app/swaps/page.tsx` — useToast wired to log/approve/deny; empty state; shift date formatting
+- `src/app/callouts/page.tsx` — useToast wired to log callout and fill replacement
+- `src/app/open-shifts/page.tsx` — useToast wired to assign coverage and cancel shift
+
+---
+
 ## [1.7.15] - 2026-03-24
 
 ### Fixed

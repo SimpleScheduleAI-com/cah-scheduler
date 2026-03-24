@@ -1,9 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+
+interface NotificationCounts {
+  pendingLeaveCount: number;
+  openShiftsCount: number;
+  openCallouts: number;
+  pendingSwapsCount: number;
+}
+
+const BADGE_COUNTS: Record<string, (c: NotificationCounts) => number> = {
+  "/callouts": (c) => c.openCallouts,
+  "/open-shifts": (c) => c.openShiftsCount,
+  "/leave": (c) => c.pendingLeaveCount,
+  "/swaps": (c) => c.pendingSwapsCount,
+};
 
 const navGroups: { label?: string; items: { href: string; label: string; icon: string }[] }[] = [
   {
@@ -102,6 +116,14 @@ const icons: Record<string, () => React.ReactNode> = {
 export function Sidebar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [counts, setCounts] = useState<NotificationCounts | null>(null);
+
+  useEffect(() => {
+    fetch("/api/notifications")
+      .then((r) => r.json())
+      .then(setCounts)
+      .catch(() => {});
+  }, [pathname]);
 
   return (
     <>
@@ -155,7 +177,17 @@ export function Sidebar() {
                     )}
                   >
                     {Icon && <Icon />}
-                    {item.label}
+                    <span className="flex-1">{item.label}</span>
+                    {counts && BADGE_COUNTS[item.href] && BADGE_COUNTS[item.href](counts) > 0 && (
+                      <span className={cn(
+                        "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-bold",
+                        isActive
+                          ? "bg-primary-foreground/20 text-primary-foreground"
+                          : "bg-red-500 text-white"
+                      )}>
+                        {BADGE_COUNTS[item.href](counts)}
+                      </span>
+                    )}
                   </Link>
                 );
               })}

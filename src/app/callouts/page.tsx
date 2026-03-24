@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useToast } from "@/components/ui/toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -112,6 +113,7 @@ const sourceLabels: Record<string, string> = {
 };
 
 export default function CalloutsPage() {
+  const { addToast } = useToast();
   const [callouts, setCallouts] = useState<CalloutRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [logDialogOpen, setLogDialogOpen] = useState(false);
@@ -168,6 +170,7 @@ export default function CalloutsPage() {
     setEscalationOptions(data.escalationOptions);
     setChargeNurseRequired(data.chargeNurseRequired ?? false);
     setEscalationDialogOpen(true);
+    addToast({ title: "Callout logged", description: `${reasonLabels[calloutReason] || calloutReason} — finding replacement candidates`, variant: "default" });
     fetchCallouts();
   }
 
@@ -186,10 +189,11 @@ export default function CalloutsPage() {
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      alert(`Failed to assign replacement: ${data.error ?? "Unknown error"}`);
+      addToast({ title: "Failed to assign replacement", description: data.error ?? "Unknown error", variant: "error" });
       return;
     }
 
+    addToast({ title: "Replacement assigned", description: `${candidate.firstName} ${candidate.lastName} (${sourceLabels[candidate.source] || candidate.source})`, variant: "success" });
     setEscalationDialogOpen(false);
     setActiveCalloutId(null);
     setChargeNurseRequired(false);

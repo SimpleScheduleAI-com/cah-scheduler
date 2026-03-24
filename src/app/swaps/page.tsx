@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -88,6 +89,7 @@ function formatAssignmentLabel(a: AssignmentOption): string {
 }
 
 export default function SwapsPage() {
+  const { addToast } = useToast();
   const [swapRequests, setSwapRequests] = useState<SwapRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "denied">("all");
@@ -176,7 +178,13 @@ export default function SwapsPage() {
         setConfirmValid(false);
         setConfirmDialogOpen(true);
       }
+      addToast({ title: "Swap approval failed", variant: "error" });
       return;
+    }
+    const req = swapRequests.find((r) => r.id === confirmSwapId);
+    if (req) {
+      const reqName = req.requestor ? `${req.requestor.firstName} ${req.requestor.lastName}` : "Staff";
+      addToast({ title: "Swap approved", description: `${reqName}'s swap request`, variant: "success" });
     }
     fetchData();
   }
@@ -194,11 +202,16 @@ export default function SwapsPage() {
     } catch {
       // validation failure does not block the denial
     }
+    const req = swapRequests.find((r) => r.id === id);
     await fetch(`/api/swap-requests/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "denied", validationNotes }),
     });
+    if (req) {
+      const reqName = req.requestor ? `${req.requestor.firstName} ${req.requestor.lastName}` : "Staff";
+      addToast({ title: "Swap denied", description: `${reqName}'s swap request`, variant: "warning" });
+    }
     fetchData();
   }
 
@@ -245,7 +258,7 @@ export default function SwapsPage() {
   async function handleSubmitSwap() {
     if (!requestingStaffId || !requestingAssignmentId) return;
     setSubmitting(true);
-    await fetch("/api/swap-requests", {
+    const res = await fetch("/api/swap-requests", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -258,6 +271,13 @@ export default function SwapsPage() {
     });
     setSubmitting(false);
     setLogDialogOpen(false);
+    if (res.ok) {
+      const reqStaff = allStaff.find((s) => s.id === requestingStaffId);
+      const name = reqStaff ? `${reqStaff.firstName} ${reqStaff.lastName}` : "Staff";
+      addToast({ title: "Swap request logged", description: `${name}'s request is pending review`, variant: "success" });
+    } else {
+      addToast({ title: "Failed to log swap request", variant: "error" });
+    }
     fetchData();
   }
 
@@ -303,7 +323,19 @@ export default function SwapsPage() {
           {loading ? (
             <p className="text-muted-foreground">Loading...</p>
           ) : filteredRequests.length === 0 ? (
-            <p className="text-muted-foreground">No swap requests found.</p>
+            <div className="rounded-lg border-2 border-dashed border-muted p-8 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+                  <path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>
+                </svg>
+              </div>
+              <p className="font-medium">
+                {filter === "all" ? "No swap requests" : `No ${filter} swap requests`}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {filter === "pending" ? "No swaps awaiting review." : "Swap requests will appear here once submitted."}
+              </p>
+            </div>
           ) : (
             <Table>
               <TableHeader>
@@ -323,7 +355,7 @@ export default function SwapsPage() {
                     <TableCell className="font-medium">
                       {req.requestor?.firstName} {req.requestor?.lastName}
                     </TableCell>
-                    <TableCell>{req.requestorShiftDate || "—"}</TableCell>
+                    <TableCell>{req.requestorShiftDate ? format(parseISO(req.requestorShiftDate), "MMM d, yyyy") : "—"}</TableCell>
                     <TableCell>
                       {req.target ? (
                         `${req.target.firstName} ${req.target.lastName}`
@@ -331,7 +363,7 @@ export default function SwapsPage() {
                         <span className="text-muted-foreground italic">Open request</span>
                       )}
                     </TableCell>
-                    <TableCell>{req.targetShiftDate || "—"}</TableCell>
+                    <TableCell>{req.targetShiftDate ? format(parseISO(req.targetShiftDate), "MMM d, yyyy") : "—"}</TableCell>
                     <TableCell>
                       <Badge variant={statusColors[req.status]}>{req.status}</Badge>
                     </TableCell>

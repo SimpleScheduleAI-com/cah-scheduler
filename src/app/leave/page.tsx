@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { format, parseISO } from "date-fns";
+import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -77,7 +79,12 @@ function calcDays(startDate: string, endDate: string): number {
   return diff + 1;
 }
 
+function fmtDate(dateStr: string) {
+  try { return format(parseISO(dateStr), "MMM d, yyyy"); } catch { return dateStr; }
+}
+
 export default function LeavePage() {
+  const { addToast } = useToast();
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,22 +125,37 @@ export default function LeavePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    await fetch("/api/staff-leave", {
+    const res = await fetch("/api/staff-leave", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
     setDialogOpen(false);
     setForm({ staffId: "", leaveType: "vacation", startDate: "", endDate: "", notes: "" });
+    if (res.ok) {
+      const staffMember = staff.find((s) => s.id === form.staffId);
+      const name = staffMember ? `${staffMember.firstName} ${staffMember.lastName}` : "Staff member";
+      addToast({ title: "Leave request submitted", description: `${name} — ${leaveTypeLabels[form.leaveType] || form.leaveType}`, variant: "success" });
+    } else {
+      addToast({ title: "Failed to submit request", variant: "error" });
+    }
     fetchData();
   }
 
   async function handleApprove(id: string) {
+    const req = leaveRequests.find((r) => r.id === id);
     await fetch(`/api/staff-leave/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "approved" }),
     });
+    if (req) {
+      addToast({
+        title: "Leave approved",
+        description: `${req.staffFirstName} ${req.staffLastName} — ${fmtDate(req.startDate)} to ${fmtDate(req.endDate)}`,
+        variant: "success",
+      });
+    }
     fetchData();
   }
 
@@ -153,6 +175,11 @@ export default function LeavePage() {
       setDenyError(data.error ?? "Failed to deny request.");
       return;
     }
+    addToast({
+      title: "Leave request denied",
+      description: `${denyTarget.staffFirstName} ${denyTarget.staffLastName} — ${leaveTypeLabels[denyTarget.leaveType] || denyTarget.leaveType}`,
+      variant: "warning",
+    });
     setDenyTarget(null);
     setDenialReason("");
     setDenyError("");
@@ -200,6 +227,20 @@ export default function LeavePage() {
         <CardContent>
           {loading ? (
             <p className="text-muted-foreground">Loading...</p>
+          ) : filteredRequests.length === 0 ? (
+            <div className="rounded-lg border-2 border-dashed border-muted p-8 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+                  <path d="M4.18 4.18A2 2 0 0 0 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 1.82-1.18"/><path d="M21 15.5V6a2 2 0 0 0-2-2H9.5"/><path d="M16 2v4"/><path d="M3 10h7"/><path d="M21 10h-5.5"/><path d="m2 2 20 20"/>
+                </svg>
+              </div>
+              <p className="font-medium">
+                {filter === "all" ? "No leave requests" : `No ${filter} leave requests`}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {filter === "pending" ? "All caught up — no requests awaiting approval." : "Leave requests will appear here once submitted."}
+              </p>
+            </div>
           ) : (
             <Table>
               <TableHeader>
@@ -221,7 +262,7 @@ export default function LeavePage() {
                     </TableCell>
                     <TableCell>{leaveTypeLabels[req.leaveType] || req.leaveType}</TableCell>
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                      {req.startDate} — {req.endDate}
+                      {fmtDate(req.startDate)} — {fmtDate(req.endDate)}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {calcDays(req.startDate, req.endDate)}d
@@ -230,7 +271,7 @@ export default function LeavePage() {
                       <Badge variant={statusColors[req.status]}>{req.status}</Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                      {new Date(req.submittedAt).toLocaleDateString()}
+                      {fmtDate(req.submittedAt)}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
@@ -291,7 +332,7 @@ export default function LeavePage() {
 
                 <span className="font-medium text-muted-foreground">Dates</span>
                 <span>
-                  {detailRequest.startDate} — {detailRequest.endDate}
+                  {fmtDate(detailRequest.startDate)} — {fmtDate(detailRequest.endDate)}
                   <span className="ml-2 text-muted-foreground">
                     ({calcDays(detailRequest.startDate, detailRequest.endDate)} days)
                   </span>
@@ -303,12 +344,12 @@ export default function LeavePage() {
                 </Badge>
 
                 <span className="font-medium text-muted-foreground">Submitted</span>
-                <span>{new Date(detailRequest.submittedAt).toLocaleString()}</span>
+                <span>{fmtDate(detailRequest.submittedAt)}</span>
 
                 {detailRequest.status === "approved" && detailRequest.approvedAt && (
                   <>
                     <span className="font-medium text-muted-foreground">Approved</span>
-                    <span>{new Date(detailRequest.approvedAt).toLocaleString()}</span>
+                    <span>{fmtDate(detailRequest.approvedAt)}</span>
                     {detailRequest.approvedBy && (
                       <>
                         <span className="font-medium text-muted-foreground">Approved By</span>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -106,6 +107,7 @@ const SOURCE_COLORS: Record<string, string> = {
 };
 
 export default function CoverageRequestsPage() {
+  const { addToast } = useToast();
   const [requests, setRequests] = useState<CoverageRequestData[]>([]);
   const [loading, setLoading] = useState(true);
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
@@ -135,7 +137,7 @@ export default function CoverageRequestsPage() {
   async function handleApproveCandidate(candidateStaffId: string) {
     if (!selectedRequest) return;
 
-    await fetch(`/api/open-shifts/${selectedRequest.id}`, {
+    const res = await fetch(`/api/open-shifts/${selectedRequest.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -145,6 +147,13 @@ export default function CoverageRequestsPage() {
     });
 
     setApproveDialogOpen(false);
+    if (res.ok) {
+      const candidate = selectedRequest.recommendations.find((r) => r.staffId === candidateStaffId);
+      const name = candidate?.staffName ?? "Staff member";
+      addToast({ title: "Coverage assigned", description: `${name} — ${format(parseISO(selectedRequest.shiftDate), "MMM d, yyyy")}`, variant: "success" });
+    } else {
+      addToast({ title: "Failed to assign coverage", variant: "error" });
+    }
     setSelectedRequest(null);
     fetchData();
   }
@@ -158,13 +167,18 @@ export default function CoverageRequestsPage() {
 
   async function handleCancelConfirm() {
     if (!cancelTargetId) return;
-    await fetch(`/api/open-shifts/${cancelTargetId}`, {
+    const res = await fetch(`/api/open-shifts/${cancelTargetId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "cancel" }),
     });
     setCancelDialogOpen(false);
     setCancelTargetId(null);
+    if (res.ok) {
+      addToast({ title: "Open shift cancelled", description: cancelTargetStaffName ? `Coverage request for ${cancelTargetStaffName}` : undefined, variant: "warning" });
+    } else {
+      addToast({ title: "Failed to cancel open shift", variant: "error" });
+    }
     fetchData();
   }
 
