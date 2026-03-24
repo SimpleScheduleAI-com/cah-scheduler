@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { EntityHistoryDialog } from "@/components/ui/entity-history-dialog";
 import {
   Select,
   SelectContent,
@@ -336,24 +337,31 @@ export default function SwapsPage() {
                     </TableCell>
                     <TableCell className="max-w-50 truncate">{req.notes}</TableCell>
                     <TableCell>
-                      {req.status === "pending" && (
-                        <div className="flex gap-1">
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() => handleApproveClick(req.id)}
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDeny(req.id)}
-                          >
-                            Deny
-                          </Button>
-                        </div>
-                      )}
+                      <div className="flex gap-1 items-center">
+                        {req.status === "pending" && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => handleApproveClick(req.id)}
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDeny(req.id)}
+                            >
+                              Deny
+                            </Button>
+                          </>
+                        )}
+                        <EntityHistoryDialog
+                          entityId={req.id}
+                          entityType="swap_request"
+                          title="Swap Request History"
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

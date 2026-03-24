@@ -6,6 +6,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.14] - 2026-03-24
+
+### Added
+
+- **"View History" button on every record in Swaps, Leave, Open Shifts, and Callouts pages**: A small clock icon button now appears on every row in all four workflow pages. Clicking it opens a timeline dialog showing every audit event recorded for that specific record — action badge, timestamp, description, reason/justification, and who performed the action. New reusable `EntityHistoryDialog` component added at `src/components/ui/entity-history-dialog.tsx`.
+
+### Fixed
+
+- **Leave request reasons and notes were not logged in the audit trail**: The POST handler for staff leave had `reason` and `notes` available in the request body but never wrote them to the `exception_log`. `reason` is now appended to the audit description ("Leave requested for Jane Doe: PTO from Jan 1–5 — Reason: Family vacation") and `notes` is written to the `justification` field.
+
+- **Deleting a leave record left no audit trace**: The DELETE handler for `/api/staff-leave/[id]` performed a hard delete with no log entry. A `deleted` audit event is now written before the row is removed, including the leave type, date range, and staff name in the description and the original reason in the justification field.
+
+- **Swap denial descriptions lacked staff names and shift dates**: The `swap_denied` audit log entry only recorded the raw denial reason text. Staff names and shift dates for both sides of the swap are now fetched and included in the description ("Swap denied: Jane Doe (Jan 3) ↔ Bob Smith (Jan 5) — Violations: ..."). The denial reason is also written to the `justification` field separately so it is displayed prominently in the audit trail UI.
+
+- **Deleting a swap request left no audit trace**: The DELETE handler for `/api/swap-requests/[id]` performed a hard delete with no log entry. A `deleted` audit event is now written before the row is removed, including both staff names and shift dates.
+
+- **Callout reason detail was not logged**: The callout POST handler logged only the top-level `reason` category. When `reasonDetail` was present it is now appended to the description ("Callout logged for Jane Doe (sick) — Detail: flu-like symptoms").
+
+- **Open shift POST log had no context**: The audit description was "Open shift created for shift [ID]". It now includes priority (when non-normal), reason, and reason detail ("Open shift created — priority: urgent — reason: callout — urgent replacement needed").
+
+- **Open shift cancellation reason was not logged**: When a coverage request was cancelled with `body.notes`, the notes were discarded. The `justification` field on the cancel log entry now contains `body.notes`.
+
+- **Deleting an open shift left no audit trace**: The DELETE handler for `/api/open-shifts/[id]` performed a hard delete with no log entry. A `deleted` audit event is now written before the row is removed.
+
+- **Audit API had no entity-level filter**: `GET /api/audit` supported `entityType`, `action`, and date range filters but not `entityId`. Added `entityId` query parameter support, backed by the existing `(entityType, entityId)` database index, to support per-record history lookups.
+
+### Files Modified
+
+- `src/app/api/audit/route.ts` — added `entityId` filter support
+- `src/app/api/staff-leave/route.ts` — POST: reason appended to description, notes written to justification
+- `src/app/api/staff-leave/[id]/route.ts` — DELETE: audit log entry added before hard delete
+- `src/app/api/swap-requests/[id]/route.ts` — deny: enriched description with staff names + shift dates, justification field set; DELETE: audit log entry added before hard delete
+- `src/app/api/callouts/route.ts` — POST: reasonDetail appended to description
+- `src/app/api/open-shifts/route.ts` — POST: enriched description with priority, reason, reasonDetail
+- `src/app/api/open-shifts/[id]/route.ts` — cancel: justification set from body.notes; DELETE: audit log entry added before hard delete
+- `src/components/ui/entity-history-dialog.tsx` — new reusable history timeline dialog component
+- `src/app/swaps/page.tsx` — EntityHistoryDialog added to every row
+- `src/app/leave/page.tsx` — EntityHistoryDialog added to every row
+- `src/app/open-shifts/page.tsx` — EntityHistoryDialog added to every row
+- `src/app/callouts/page.tsx` — EntityHistoryDialog added to every row
+
+---
+
 ## [1.7.13] - 2026-03-24
 
 ### Fixed

@@ -21,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { EntityHistoryDialog } from "@/components/ui/entity-history-dialog";
 import {
   Select,
   SelectContent,
@@ -258,6 +259,11 @@ export default function LeavePage() {
                         >
                           View
                         </Button>
+                        <EntityHistoryDialog
+                          entityId={req.id}
+                          entityType="leave"
+                          title="Leave Request History"
+                        />
                       </div>
                     </TableCell>
                   </TableRow>

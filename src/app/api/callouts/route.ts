@@ -69,11 +69,12 @@ export async function POST(request: Request) {
     ? `${calledOutStaff.firstName} ${calledOutStaff.lastName}`
     : body.staffId;
 
+  const reasonDetailSuffix = body.reasonDetail ? ` — Detail: ${body.reasonDetail}` : "";
   logAuditEvent({
     entityType: "callout",
     entityId: newCallout.id,
     action: "callout_logged",
-    description: `Callout logged for ${calledOutName} (${body.reason})`,
+    description: `Callout logged for ${calledOutName} (${body.reason})${reasonDetailSuffix}`,
     newState: newCallout as unknown as Record<string, unknown>,
   });
 

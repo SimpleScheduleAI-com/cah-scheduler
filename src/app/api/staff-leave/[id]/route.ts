@@ -229,6 +229,32 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+
+  const existing = db.select().from(staffLeave).where(eq(staffLeave.id, id)).get();
+  if (existing) {
+    const staffRecord = db
+      .select({ firstName: staff.firstName, lastName: staff.lastName })
+      .from(staff)
+      .where(eq(staff.id, existing.staffId))
+      .get();
+    const staffName = staffRecord
+      ? `${staffRecord.firstName} ${staffRecord.lastName}`
+      : existing.staffId;
+
+    db.insert(exceptionLog)
+      .values({
+        entityType: "leave",
+        entityId: id,
+        action: "deleted",
+        description: `Leave record deleted for ${staffName}: ${existing.leaveType} from ${existing.startDate} to ${existing.endDate}`,
+        previousState: existing as unknown as Record<string, unknown>,
+        justification: existing.reason || undefined,
+        performedBy: "nurse_manager",
+        createdAt: new Date().toISOString(),
+      })
+      .run();
+  }
+
   db.delete(staffLeave).where(eq(staffLeave.id, id)).run();
   return NextResponse.json({ success: true });
 }

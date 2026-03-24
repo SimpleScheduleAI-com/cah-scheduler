@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { EntityHistoryDialog } from "@/components/ui/entity-history-dialog";
 import {
   Select,
   SelectContent,
@@ -337,6 +338,11 @@ export default function CalloutsPage() {
                             View
                           </Button>
                         )}
+                        <EntityHistoryDialog
+                          entityId={c.id}
+                          entityType="callout"
+                          title="Callout History"
+                        />
                       </div>
                     </TableCell>
                   </TableRow>

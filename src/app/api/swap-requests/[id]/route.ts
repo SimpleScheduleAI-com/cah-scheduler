@@ -427,17 +427,49 @@ export async function PUT(
   }
 
   if (body.status === "denied") {
+    // Fetch staff names and shift dates for a readable denial description
+    const reqStaff = existing.requestingStaffId
+      ? db.select({ firstName: staff.firstName, lastName: staff.lastName })
+          .from(staff).where(eq(staff.id, existing.requestingStaffId)).get()
+      : null;
+    const tgtStaff = existing.targetStaffId
+      ? db.select({ firstName: staff.firstName, lastName: staff.lastName })
+          .from(staff).where(eq(staff.id, existing.targetStaffId)).get()
+      : null;
+
+    const reqAssignment = existing.requestingAssignmentId
+      ? db.select().from(assignment).where(eq(assignment.id, existing.requestingAssignmentId)).get()
+      : null;
+    const tgtAssignment = existing.targetAssignmentId
+      ? db.select().from(assignment).where(eq(assignment.id, existing.targetAssignmentId)).get()
+      : null;
+
+    const reqShift = reqAssignment ? getShiftDetails(reqAssignment) : null;
+    const tgtShift = tgtAssignment ? getShiftDetails(tgtAssignment) : null;
+
+    const reqLabel = reqStaff ? `${reqStaff.firstName} ${reqStaff.lastName}` : existing.requestingStaffId;
+    const tgtLabel = tgtStaff ? `${tgtStaff.firstName} ${tgtStaff.lastName}` : (existing.targetStaffId ?? "open swap");
+    const reqDate = reqShift?.date ?? "unknown date";
+    const tgtDate = tgtShift?.date ?? "";
+
+    const swapDesc = tgtDate
+      ? `${reqLabel} (${reqDate}) ↔ ${tgtLabel} (${tgtDate})`
+      : `${reqLabel} (${reqDate}) — open swap`;
+
+    const violationSuffix = body.validationNotes ? ` — Violations: ${body.validationNotes}` : "";
+
     db.insert(exceptionLog).values({
       entityType: "swap_request",
       entityId: id,
       action: "swap_denied",
-      description: `Swap request denied${body.denialReason ? `: ${body.denialReason}` : ""}${body.validationNotes ? ` — Violations: ${body.validationNotes}` : ""}`,
+      description: `Swap denied: ${swapDesc}${violationSuffix}`,
       previousState: { status: existing.status },
       newState: {
         status: "denied",
         denialReason: body.denialReason ?? null,
         validationNotes: body.validationNotes ?? null,
       },
+      justification: body.denialReason || undefined,
       performedBy: body.reviewedBy ?? "nurse_manager",
     }).run();
   }
@@ -486,6 +518,51 @@ export async function DELETE(
       { status: 400 }
     );
   }
+
+  // Fetch names and shift dates for a readable deletion log entry
+  const delReqStaff = existing.requestingStaffId
+    ? db.select({ firstName: staff.firstName, lastName: staff.lastName })
+        .from(staff).where(eq(staff.id, existing.requestingStaffId)).get()
+    : null;
+  const delTgtStaff = existing.targetStaffId
+    ? db.select({ firstName: staff.firstName, lastName: staff.lastName })
+        .from(staff).where(eq(staff.id, existing.targetStaffId)).get()
+    : null;
+
+  const delReqAssignment = existing.requestingAssignmentId
+    ? db.select().from(assignment).where(eq(assignment.id, existing.requestingAssignmentId)).get()
+    : null;
+  const delTgtAssignment = existing.targetAssignmentId
+    ? db.select().from(assignment).where(eq(assignment.id, existing.targetAssignmentId)).get()
+    : null;
+
+  const delReqShift = delReqAssignment ? getShiftDetails(delReqAssignment) : null;
+  const delTgtShift = delTgtAssignment ? getShiftDetails(delTgtAssignment) : null;
+
+  const delReqLabel = delReqStaff
+    ? `${delReqStaff.firstName} ${delReqStaff.lastName}`
+    : existing.requestingStaffId;
+  const delTgtLabel = delTgtStaff
+    ? `${delTgtStaff.firstName} ${delTgtStaff.lastName}`
+    : (existing.targetStaffId ?? "open swap");
+  const delReqDate = delReqShift?.date ?? "unknown date";
+  const delTgtDate = delTgtShift?.date ?? "";
+
+  const delSwapDesc = delTgtDate
+    ? `${delReqLabel} (${delReqDate}) ↔ ${delTgtLabel} (${delTgtDate})`
+    : `${delReqLabel} (${delReqDate}) — open swap`;
+
+  db.insert(exceptionLog)
+    .values({
+      entityType: "swap_request",
+      entityId: id,
+      action: "deleted",
+      description: `Swap request deleted: ${delSwapDesc}`,
+      previousState: existing as unknown as Record<string, unknown>,
+      performedBy: "nurse_manager",
+      createdAt: new Date().toISOString(),
+    })
+    .run();
 
   db.delete(shiftSwapRequest).where(eq(shiftSwapRequest.id, id)).run();
   return NextResponse.json({ success: true });

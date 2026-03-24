@@ -91,12 +91,18 @@ export async function POST(request: Request) {
     .returning()
     .get();
 
+  const parts: string[] = [`Open shift created`];
+  if (body.priority && body.priority !== "normal") parts.push(`priority: ${body.priority}`);
+  if (body.reason) parts.push(`reason: ${body.reason}`);
+  if (body.reasonDetail) parts.push(body.reasonDetail);
+  const openShiftDesc = parts.join(" — ");
+
   db.insert(exceptionLog)
     .values({
       entityType: "open_shift",
       entityId: newOpenShift.id,
       action: "open_shift_created",
-      description: `Open shift created for shift ${body.shiftId}`,
+      description: openShiftDesc,
       newState: newOpenShift as unknown as Record<string, unknown>,
       performedBy: body.performedBy || "nurse_manager",
     })

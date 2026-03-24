@@ -85,12 +85,14 @@ export async function POST(request: Request) {
     ? `${staffRecord.firstName} ${staffRecord.lastName}`
     : body.staffId;
 
+  const reasonSuffix = body.reason ? ` — Reason: ${body.reason}` : "";
   logAuditEvent({
     entityType: "leave",
     entityId: newLeave.id,
     action: "leave_requested",
-    description: `Leave requested for ${staffName}: ${body.leaveType} from ${body.startDate} to ${body.endDate}`,
+    description: `Leave requested for ${staffName}: ${body.leaveType} from ${body.startDate} to ${body.endDate}${reasonSuffix}`,
     newState: newLeave as unknown as Record<string, unknown>,
+    justification: body.notes || undefined,
   });
 
   return NextResponse.json(newLeave, { status: 201 });

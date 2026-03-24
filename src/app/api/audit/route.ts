@@ -10,6 +10,7 @@ type ActionType = InferSelectModel<typeof exceptionLog>["action"];
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const entityType = searchParams.get("entityType");
+  const entityId = searchParams.get("entityId");
   const action = searchParams.get("action");
   const from = searchParams.get("from");
   const to = searchParams.get("to");
@@ -20,6 +21,9 @@ export async function GET(request: Request) {
   const conditions = [];
   if (entityType) {
     conditions.push(eq(exceptionLog.entityType, entityType as EntityType));
+  }
+  if (entityId) {
+    conditions.push(eq(exceptionLog.entityId, entityId));
   }
   if (action) {
     conditions.push(eq(exceptionLog.action, action as ActionType));

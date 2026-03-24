@@ -20,6 +20,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { format, parseISO } from "date-fns";
+import { EntityHistoryDialog } from "@/components/ui/entity-history-dialog";
 
 interface CandidateRecommendation {
   staffId: string;
@@ -294,24 +295,31 @@ export default function CoverageRequestsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {(req.status === "pending_approval" || req.status === "no_candidates") && (
-                          <div className="flex gap-1">
-                            <Button
-                              size="sm"
-                              onClick={() => handleApproveClick(req)}
-                              disabled={!req.recommendations?.length}
-                            >
-                              Review
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleCancelClick(req)}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        )}
+                        <div className="flex gap-1 items-center">
+                          {(req.status === "pending_approval" || req.status === "no_candidates") && (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => handleApproveClick(req)}
+                                disabled={!req.recommendations?.length}
+                              >
+                                Review
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleCancelClick(req)}
+                              >
+                                Cancel
+                              </Button>
+                            </>
+                          )}
+                          <EntityHistoryDialog
+                            entityId={req.id}
+                            entityType="open_shift"
+                            title="Coverage Request History"
+                          />
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

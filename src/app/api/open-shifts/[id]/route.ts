@@ -308,6 +308,7 @@ export async function PUT(
         description: `Coverage request cancelled`,
         previousState: { status: existing.status },
         newState: { status: "cancelled" },
+        justification: body.notes || undefined,
         performedBy: body.performedBy || "nurse_manager",
         createdAt: new Date().toISOString(),
       })
@@ -336,6 +337,22 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+
+  const existing = db.select().from(openShift).where(eq(openShift.id, id)).get();
+  if (existing) {
+    db.insert(exceptionLog)
+      .values({
+        entityType: "open_shift",
+        entityId: id,
+        action: "deleted",
+        description: `Coverage request deleted for shift ${existing.shiftId}`,
+        previousState: existing as unknown as Record<string, unknown>,
+        performedBy: "nurse_manager",
+        createdAt: new Date().toISOString(),
+      })
+      .run();
+  }
+
   db.delete(openShift).where(eq(openShift.id, id)).run();
   return NextResponse.json({ success: true });
 }
