@@ -456,13 +456,14 @@ export async function PUT(
       ? `${reqLabel} (${reqDate}) ↔ ${tgtLabel} (${tgtDate})`
       : `${reqLabel} (${reqDate}) — open swap`;
 
+    const reasonSuffix = body.denialReason ? ` — Reason: ${body.denialReason}` : "";
     const violationSuffix = body.validationNotes ? ` — Violations: ${body.validationNotes}` : "";
 
     db.insert(exceptionLog).values({
       entityType: "swap_request",
       entityId: id,
       action: "swap_denied",
-      description: `Swap denied: ${swapDesc}${violationSuffix}`,
+      description: `Swap denied: ${swapDesc}${reasonSuffix}${violationSuffix}`,
       previousState: { status: existing.status },
       newState: {
         status: "denied",

@@ -324,14 +324,21 @@ export default function LeavePage() {
                     <span className="text-destructive">{detailRequest.denialReason}</span>
                   </>
                 )}
-              </div>
 
-              {(detailRequest.notes || detailRequest.reason) && (
-                <div className="rounded-md border p-3">
-                  <p className="mb-1 font-medium text-muted-foreground">Notes</p>
-                  <p className="text-sm">{detailRequest.notes || detailRequest.reason}</p>
-                </div>
-              )}
+                {detailRequest.reason && (
+                  <>
+                    <span className="font-medium text-muted-foreground">Reason</span>
+                    <span>{detailRequest.reason}</span>
+                  </>
+                )}
+
+                {detailRequest.notes && (
+                  <>
+                    <span className="font-medium text-muted-foreground">Notes</span>
+                    <span>{detailRequest.notes}</span>
+                  </>
+                )}
+              </div>
             </div>
           )}
         </DialogContent>

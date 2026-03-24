@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.15] - 2026-03-24
+
+### Fixed
+
+- **Leave "View" dialog did not show reason or notes fields**: The detail dialog showed `notes || reason` together under a single "Notes" label, and only if one of the two fields was non-null. Split into two separate labeled rows — "Reason" and "Notes" — each shown independently when present. Both fields now appear in the same 2-column grid as all other metadata.
+
+- **Swap denial reason was absent from audit trail description**: In v1.7.14 the denial reason was moved exclusively to the `justification` field, which renders as small muted sub-text below the main description in the audit trail UI. The denial reason is now also included directly in the description text ("Swap denied: [names] (dates) — Reason: [reason]") so it is always visible in the prominent Description column without relying on the sub-text.
+
+### Files Modified
+
+- `src/app/leave/page.tsx` — detail dialog: reason and notes shown as separate labeled rows inside the grid
+- `src/app/api/swap-requests/[id]/route.ts` — denial audit description now includes reason text inline
+
+---
+
 ## [1.7.14] - 2026-03-24
 
 ### Added
