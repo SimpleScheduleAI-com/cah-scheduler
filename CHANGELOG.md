@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.18] - 2026-03-24
+
+### Added
+
+- **Publish button disabled state clarity**: When a schedule has hard violations, the Publish button now shows a lock icon alongside the text and renders at noticeably lower opacity (`bg-white/40 text-primary/40`) compared to the enabled state. A small "X hard violations — fix first" label appears directly below the button so the reason is visible without hovering. The `cursor-not-allowed` cursor reinforces that the button is blocked. Previously, the disabled styling was visually indistinct from the enabled state on the teal header background.
+
+- **Generation progress bar — indeterminate initial animation**: The schedule generation progress bar on the Scenarios page is now animated during the "Starting…" phase (before any progress is reported). Previously the bar was zero-width at `0%`, making the shimmer effect invisible — the user saw a blank gray bar with no indication that generation had started. The bar now shows a sweeping indeterminate animation (`@keyframes sweep`) until progress reaches 5%. A spinning icon also appears next to the phase label during this period.
+
+- **Schedule creation form — error clears on field change**: Validation errors in the "New Schedule Period" dialog now clear immediately when the user edits any field (name, start date, end date, or unit). Previously errors persisted until the next submit attempt. Error also clears when the dialog is closed. Matches the behaviour of the Leave form (v1.7.17).
+
+### Files Modified
+
+- `src/app/schedule/[id]/page.tsx` — lock icon + violation count label on disabled Publish button
+- `src/app/scenarios/page.tsx` — indeterminate sweeping animation when progress < 5; spinner on phase text
+- `src/app/globals.css` — added `@keyframes sweep` for indeterminate progress bar
+- `src/app/schedule/page.tsx` — error cleared on field change and dialog close
+
+---
+
 ## [1.7.17] - 2026-03-24
 
 ### Added

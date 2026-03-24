@@ -303,16 +303,39 @@ export default function ScheduleBuilderPage() {
             Export
           </Button>
           {schedule.status !== "published" ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handlePublish}
-              disabled={publishing || (evaluation !== null && evaluation.hardViolations.length > 0)}
-              title={evaluation && evaluation.hardViolations.length > 0 ? "Fix hard violations before publishing" : undefined}
-              className="bg-white/90 text-primary hover:bg-white font-medium shadow-sm disabled:bg-white/50 disabled:text-primary/50"
-            >
-              {publishing ? "Publishing…" : "Publish"}
-            </Button>
+            <div className="flex flex-col items-center">
+              {(() => {
+                const disabledByViolations = evaluation !== null && evaluation.hardViolations.length > 0;
+                return (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handlePublish}
+                      disabled={publishing || disabledByViolations}
+                      title={disabledByViolations ? `Fix ${evaluation.hardViolations.length} hard violation${evaluation.hardViolations.length !== 1 ? "s" : ""} before publishing` : undefined}
+                      className="bg-white/90 text-primary hover:bg-white font-medium shadow-sm disabled:cursor-not-allowed disabled:bg-white/40 disabled:text-primary/40 disabled:shadow-none"
+                    >
+                      {publishing ? "Publishing…" : (
+                        <>
+                          {disabledByViolations && (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1 opacity-60">
+                              <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                            </svg>
+                          )}
+                          Publish
+                        </>
+                      )}
+                    </Button>
+                    {disabledByViolations && (
+                      <p className="text-[11px] text-white/70 text-center mt-0.5 leading-tight">
+                        {evaluation.hardViolations.length} hard violation{evaluation.hardViolations.length !== 1 ? "s" : ""} — fix first
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
           ) : (
             <Button
               variant="ghost"

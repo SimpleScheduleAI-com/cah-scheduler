@@ -168,6 +168,10 @@
   .animate-pulse-slow {
     animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
+  @keyframes sweep {
+    0% { left: -33%; }
+    100% { left: 100%; }
+  }
   @keyframes fadeIn {
     from {
       opacity: 0;

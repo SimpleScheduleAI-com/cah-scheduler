@@ -221,20 +221,38 @@ function ScenariosPageContent() {
       {/* Progress bar while generating */}
       {isGenerating && jobStatus && (
         <div className="mb-6 rounded-lg border bg-muted/30 p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm font-medium">
-              {jobStatus.currentPhase ?? "Starting…"}
-            </span>
-            <span className="text-sm text-muted-foreground">{jobStatus.progress}%</span>
-          </div>
-          <div className="h-3 w-full rounded-full bg-muted overflow-hidden shadow-inner">
-            <div
-              className="h-3 rounded-full gradient-primary transition-all duration-500 shadow-sm relative overflow-hidden"
-              style={{ width: `${jobStatus.progress}%` }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse-slow" />
-            </div>
-          </div>
+          {(() => {
+            const isPending = jobStatus.status === "pending" || jobStatus.progress < 5;
+            return (
+              <>
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-sm font-medium flex items-center gap-1.5">
+                    {isPending && (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin text-muted-foreground">
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                      </svg>
+                    )}
+                    {jobStatus.currentPhase ?? "Starting…"}
+                  </span>
+                  <span className="text-sm text-muted-foreground">{jobStatus.progress}%</span>
+                </div>
+                <div className="h-3 w-full rounded-full bg-muted overflow-hidden shadow-inner">
+                  {isPending ? (
+                    <div className="h-3 w-full rounded-full relative overflow-hidden bg-primary/20">
+                      <div className="absolute inset-y-0 w-1/3 gradient-primary rounded-full animate-[sweep_1.5s_ease-in-out_infinite]" />
+                    </div>
+                  ) : (
+                    <div
+                      className="h-3 rounded-full gradient-primary transition-all duration-500 shadow-sm relative overflow-hidden"
+                      style={{ width: `${jobStatus.progress}%` }}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse-slow" />
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
           {/* Step tracker — shows which variant is currently being built */}
           <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
             {[

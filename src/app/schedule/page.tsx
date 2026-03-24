@@ -192,7 +192,7 @@ export default function SchedulePage() {
         </div>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setError(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>New Schedule Period</DialogTitle>
@@ -205,7 +205,7 @@ export default function SchedulePage() {
                 id="sched-name"
                 placeholder="e.g. ICU — Feb/Mar 2026"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => { setName(e.target.value); setError(null); }}
               />
             </div>
 
@@ -216,7 +216,7 @@ export default function SchedulePage() {
                   id="sched-start"
                   type="date"
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={(e) => { setStartDate(e.target.value); setError(null); }}
                 />
               </div>
               <div className="space-y-1">
@@ -225,14 +225,14 @@ export default function SchedulePage() {
                   id="sched-end"
                   type="date"
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  onChange={(e) => { setEndDate(e.target.value); setError(null); }}
                 />
               </div>
             </div>
 
             <div className="space-y-1">
               <Label>Unit</Label>
-              <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+              <Select value={selectedUnit} onValueChange={(v) => { setSelectedUnit(v); setError(null); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a unit" />
                 </SelectTrigger>
