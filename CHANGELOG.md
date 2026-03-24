@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.17] - 2026-03-24
+
+### Added
+
+- **PRN Availability sidebar badge**: The `/availability` nav item now shows a count badge for PRN staff who have not yet submitted availability — completing the sidebar badge system begun in v1.7.16 (which omitted this item). Uses the same logic as the dashboard's `prnMissingCount` calculation.
+
+- **Amber "pending" status badge**: Added a `warning` variant to the Badge component (`bg-amber-100 text-amber-800`). Applied to pending statuses on the Leave and Swaps pages. Previously rendered as gray (`secondary`), which read as "inactive". Amber immediately signals that something needs attention, consistent with how the dashboard's attention items are coloured.
+
+- **Leave form client-side validation**: The "New Leave Request" dialog now validates before submitting: (1) staff member must be selected — shows "Please select a staff member." inline, (2) end date must be on or after start date — shows "End date must be on or after start date." Errors clear as soon as the relevant field is corrected.
+
+- **Schedule detail loading spinner**: The schedule detail page (`/schedule/[id]`) now shows a spinning animation during the initial data fetch instead of plain text "Loading schedule...". Consistent with loading patterns used elsewhere in the app.
+
+- **Audit trail timestamp improvements**: Audit entries from the last 24 hours now show relative time ("2 hours ago", "35 minutes ago") instead of absolute time. Older entries continue to show the absolute time ("2:34 PM"). The date line is now formatted as "Mar 24, 2026" (was `toLocaleDateString()` which produced locale-specific formats like "3/24/2026").
+
+- **`staffLevelColor()` utility function**: Extracted the ICU competency level → hex color mapping into a shared utility in `src/lib/utils.ts` (`staffLevelColor(level: number): string`). Previously hardcoded inline in `staff-table.tsx`. The utility is now importable wherever staff levels are displayed with colour coding.
+
+### Fixed
+
+- **Sidebar footer "Local prototype" label removed**: Replaced with `v1.7.17` at reduced opacity. The hardcoded "Local prototype" text was confusing and inappropriate for production use.
+
+### Files Modified
+
+- `src/app/api/notifications/route.ts` — added `prnMissingCount` to response
+- `src/components/layout/sidebar.tsx` — PRN Availability badge added; footer updated
+- `src/components/ui/badge.tsx` — new `warning` variant added
+- `src/app/leave/page.tsx` — pending badge uses warning variant; form validation added
+- `src/app/swaps/page.tsx` — pending badge uses warning variant
+- `src/app/schedule/[id]/page.tsx` — loading spinner added
+- `src/app/audit/page.tsx` — timestamps formatted with date-fns (relative + MMM d, yyyy)
+- `src/lib/utils.ts` — `staffLevelColor()` utility added
+- `src/components/staff/staff-table.tsx` — uses `staffLevelColor()` from utils
+
+---
+
 ## [1.7.16] - 2026-03-24
 
 ### Added

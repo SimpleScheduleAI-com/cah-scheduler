@@ -77,8 +77,8 @@ interface AssignmentOption {
   scheduleName: string;
 }
 
-const statusColors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  pending: "secondary",
+const statusColors: Record<string, "default" | "secondary" | "destructive" | "outline" | "warning"> = {
+  pending: "warning",
   approved: "default",
   denied: "destructive",
   cancelled: "outline",

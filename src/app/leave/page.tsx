@@ -66,8 +66,8 @@ const leaveTypeLabels: Record<string, string> = {
   other: "Other",
 };
 
-const statusColors: Record<string, "default" | "secondary" | "destructive"> = {
-  pending: "secondary",
+const statusColors: Record<string, "default" | "secondary" | "destructive" | "warning"> = {
+  pending: "warning",
   approved: "default",
   denied: "destructive",
 };
@@ -106,6 +106,7 @@ export default function LeavePage() {
     endDate: "",
     notes: "",
   });
+  const [formError, setFormError] = useState("");
 
   const fetchData = useCallback(async () => {
     const [leaveRes, staffRes] = await Promise.all([
@@ -125,6 +126,15 @@ export default function LeavePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.staffId) {
+      setFormError("Please select a staff member.");
+      return;
+    }
+    if (form.startDate && form.endDate && form.endDate < form.startDate) {
+      setFormError("End date must be on or after start date.");
+      return;
+    }
+    setFormError("");
     const res = await fetch("/api/staff-leave", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -438,7 +448,7 @@ export default function LeavePage() {
       </Dialog>
 
       {/* New Leave Request Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setFormError(""); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New Leave Request</DialogTitle>
@@ -446,7 +456,7 @@ export default function LeavePage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label>Staff Member</Label>
-              <Select value={form.staffId} onValueChange={(v) => setForm({ ...form, staffId: v })}>
+              <Select value={form.staffId} onValueChange={(v) => { setForm({ ...form, staffId: v }); setFormError(""); }}>
                 <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
                 <SelectContent>
                   {staff.map((s) => (
@@ -474,7 +484,7 @@ export default function LeavePage() {
                 <Input
                   type="date"
                   value={form.startDate}
-                  onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                  onChange={(e) => { setForm({ ...form, startDate: e.target.value }); setFormError(""); }}
                   required
                 />
               </div>
@@ -483,7 +493,7 @@ export default function LeavePage() {
                 <Input
                   type="date"
                   value={form.endDate}
-                  onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                  onChange={(e) => { setForm({ ...form, endDate: e.target.value }); setFormError(""); }}
                   required
                 />
               </div>
@@ -496,8 +506,11 @@ export default function LeavePage() {
                 placeholder="Reason for leave..."
               />
             </div>
+            {formError && (
+              <p className="text-xs text-destructive">{formError}</p>
+            )}
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); setFormError(""); }}>
                 Cancel
               </Button>
               <Button type="submit">Submit Request</Button>

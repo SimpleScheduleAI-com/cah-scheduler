@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { staffLevelColor } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -120,12 +121,7 @@ export function StaffTable({
                   className="inline-block h-2 rounded-full"
                   style={{
                     width: `${(s.icuCompetencyLevel / 5) * 40}px`,
-                    backgroundColor:
-                      s.icuCompetencyLevel >= 4
-                        ? "#16a34a"
-                        : s.icuCompetencyLevel >= 3
-                        ? "#ca8a04"
-                        : "#dc2626",
+                    backgroundColor: staffLevelColor(s.icuCompetencyLevel),
                   }}
                 />
               </span>

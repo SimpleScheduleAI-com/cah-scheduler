@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { format, parseISO, formatDistanceToNow, isAfter, subHours } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -241,9 +242,19 @@ export default function AuditPage() {
               <TableBody>
                 {logs.map((entry) => (
                   <TableRow key={entry.id}>
-                    <TableCell className="text-sm text-muted-foreground align-top">
-                      <div>{new Date(entry.createdAt).toLocaleDateString()}</div>
-                      <div className="text-xs opacity-70">{new Date(entry.createdAt).toLocaleTimeString()}</div>
+                    <TableCell className="text-sm text-muted-foreground align-top whitespace-nowrap">
+                      {(() => {
+                        const ts = parseISO(entry.createdAt);
+                        const recent = isAfter(ts, subHours(new Date(), 24));
+                        return (
+                          <>
+                            <div>{format(ts, "MMM d, yyyy")}</div>
+                            <div className="text-xs opacity-70">
+                              {recent ? formatDistanceToNow(ts, { addSuffix: true }) : format(ts, "h:mm a")}
+                            </div>
+                          </>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="align-top overflow-hidden">
                       <Badge

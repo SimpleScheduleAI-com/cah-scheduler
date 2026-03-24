@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { staffLeave, openShift, callout, shiftSwapRequest } from "@/db/schema";
-import { eq, or, count } from "drizzle-orm";
+import { staffLeave, openShift, callout, shiftSwapRequest, staff, prnAvailability } from "@/db/schema";
+import { eq, or, count, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -28,10 +28,22 @@ export async function GET() {
     .where(eq(shiftSwapRequest.status, "pending"))
     .get();
 
+  const prnStaff = db
+    .select({ id: staff.id })
+    .from(staff)
+    .where(and(eq(staff.isActive, true), eq(staff.employmentType, "per_diem")))
+    .all();
+
+  const submittedPrnIds = new Set(
+    db.select({ staffId: prnAvailability.staffId }).from(prnAvailability).all().map((r) => r.staffId)
+  );
+  const prnMissingCount = prnStaff.filter((s) => !submittedPrnIds.has(s.id)).length;
+
   return NextResponse.json({
     pendingLeaveCount: pendingLeave?.count ?? 0,
     openShiftsCount: pendingOpenShifts?.count ?? 0,
     openCallouts: openCallouts?.count ?? 0,
     pendingSwapsCount: pendingSwaps?.count ?? 0,
+    prnMissingCount,
   });
 }

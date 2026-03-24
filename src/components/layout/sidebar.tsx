@@ -10,6 +10,7 @@ interface NotificationCounts {
   openShiftsCount: number;
   openCallouts: number;
   pendingSwapsCount: number;
+  prnMissingCount: number;
 }
 
 const BADGE_COUNTS: Record<string, (c: NotificationCounts) => number> = {
@@ -17,6 +18,7 @@ const BADGE_COUNTS: Record<string, (c: NotificationCounts) => number> = {
   "/open-shifts": (c) => c.openShiftsCount,
   "/leave": (c) => c.pendingLeaveCount,
   "/swaps": (c) => c.pendingSwapsCount,
+  "/availability": (c) => c.prnMissingCount,
 };
 
 const navGroups: { label?: string; items: { href: string; label: string; icon: string }[] }[] = [
@@ -197,7 +199,7 @@ export function Sidebar() {
       </nav>
       <div className="border-t p-4">
         <p className="text-xs text-muted-foreground">ICU - CAH Texas</p>
-        <p className="text-xs text-muted-foreground">Local prototype</p>
+        <p className="text-xs text-muted-foreground/50">v1.7.17</p>
       </div>
     </aside>
     </>
