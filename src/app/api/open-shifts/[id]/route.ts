@@ -1,7 +1,40 @@
 import { db } from "@/db";
-import { openShift, assignment, shift, exceptionLog } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { openShift, assignment, shift, shiftDefinition, exceptionLog } from "@/db/schema";
+import { eq, and, gte, lte, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
+
+/**
+ * Compute the total scheduled hours for a staff member in the Sun-Sat week
+ * containing `shiftDate`. Used to accurately set isOvertime on new assignments.
+ */
+function computeWeeklyHours(staffId: string, shiftDate: string): number {
+  const d = new Date(shiftDate + "T00:00:00Z");
+  const day = d.getUTCDay(); // 0=Sun
+  const weekStart = new Date(d);
+  weekStart.setUTCDate(d.getUTCDate() - day);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
+
+  const fmt = (dt: Date) => dt.toISOString().slice(0, 10);
+
+  const rows = db
+    .select({ durationHours: shiftDefinition.durationHours })
+    .from(assignment)
+    .innerJoin(shift, eq(assignment.shiftId, shift.id))
+    .innerJoin(shiftDefinition, eq(shift.shiftDefinitionId, shiftDefinition.id))
+    .where(
+      and(
+        eq(assignment.staffId, staffId),
+        gte(shift.date, fmt(weekStart)),
+        lte(shift.date, fmt(weekEnd)),
+        ne(assignment.status, "called_out"),
+        ne(assignment.status, "cancelled")
+      )
+    )
+    .all();
+
+  return rows.reduce((sum, r) => sum + r.durationHours, 0);
+}
 
 export async function GET(
   _request: Request,
@@ -49,7 +82,19 @@ export async function PUT(
 
     const selectedCandidate = recommendations.find(r => r.staffId === body.selectedStaffId);
     const source = selectedCandidate?.source || body.source || "manual";
-    const isOvertime = selectedCandidate?.isOvertime || body.isOvertime || false;
+
+    // Compute isOvertime dynamically based on current DB hours, not stale snapshot.
+    const shiftRecord2 = db
+      .select({ date: shift.date, durationHours: shiftDefinition.durationHours })
+      .from(shift)
+      .innerJoin(shiftDefinition, eq(shift.shiftDefinitionId, shiftDefinition.id))
+      .where(eq(shift.id, existing.shiftId))
+      .get();
+    const currentWeekHours = shiftRecord2
+      ? computeWeeklyHours(body.selectedStaffId, shiftRecord2.date)
+      : 0;
+    const shiftDuration = shiftRecord2?.durationHours ?? 0;
+    const isOvertime = currentWeekHours + shiftDuration > 40;
 
     // Handle agency selection differently - just mark as approved, no assignment
     if (body.selectedStaffId === "agency") {
@@ -172,6 +217,19 @@ export async function PUT(
       : null;
     const inheritChargeRoleFill = originalAssignmentFill?.isChargeNurse === true;
 
+    // Compute isOvertime dynamically for the fill action too
+    const fillShiftDetails = db
+      .select({ date: shift.date, durationHours: shiftDefinition.durationHours })
+      .from(shift)
+      .innerJoin(shiftDefinition, eq(shift.shiftDefinitionId, shiftDefinition.id))
+      .where(eq(shift.id, existing.shiftId))
+      .get();
+    const fillWeekHours = fillShiftDetails
+      ? computeWeeklyHours(body.filledByStaffId, fillShiftDetails.date)
+      : 0;
+    const fillShiftDuration = fillShiftDetails?.durationHours ?? 0;
+    const fillIsOvertime = fillWeekHours + fillShiftDuration > 40;
+
     // Create new assignment for the staff filling the shift
     const newAssignment = db
       .insert(assignment)
@@ -180,7 +238,7 @@ export async function PUT(
         staffId: body.filledByStaffId,
         scheduleId: shiftRecord.scheduleId,
         isChargeNurse: inheritChargeRoleFill,
-        isOvertime: body.isOvertime ?? false,
+        isOvertime: fillIsOvertime,
         assignmentSource: "manual",
         notes: `Manually filled from coverage request (original: ${existing.originalStaffId})`,
       })

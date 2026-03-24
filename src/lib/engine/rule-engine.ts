@@ -58,8 +58,8 @@ export function buildContext(scheduleId: string): RuleContext {
         maxOnCallPerWeek: unitRecord.maxOnCallPerWeek,
         maxOnCallWeekendsPerMonth: unitRecord.maxOnCallWeekendsPerMonth,
         maxConsecutiveWeekends: unitRecord.maxConsecutiveWeekends,
-        acuityYellowExtraStaff: unitRecord.acuityYellowExtraStaff,
-        acuityRedExtraStaff: unitRecord.acuityRedExtraStaff,
+        minStaffDay: unitRecord.minStaffDay,
+        minStaffNight: unitRecord.minStaffNight,
       }
     : null;
 
@@ -277,17 +277,33 @@ export function buildContext(scheduleId: string): RuleContext {
       .select({ staffId: assignment.staffId, date: shift.date })
       .from(assignment)
       .innerJoin(shift, eq(assignment.shiftId, shift.id))
-      .where(and(gte(shift.date, lookbackStartStr), lt(shift.date, scheduleStartDate)))
+      .where(and(
+        gte(shift.date, lookbackStartStr),
+        lt(shift.date, scheduleStartDate),
+        ne(assignment.status, "called_out"),
+        ne(assignment.status, "cancelled")
+      ))
       .all();
 
+    // Count distinct weekend UNITS per staff (Sat+Sun of same week = 1 weekend).
+    // Using a Set of Saturday-anchored weekend IDs mirrors the semantics of
+    // getWeekendCount() in SchedulerState — a nurse working both Sat and Sun
+    // of the same weekend counts as 1, not 2.
+    const historicalWeekendIds = new Map<string, Set<string>>();
     for (const row of histRows) {
       const day = new Date(row.date).getDay();
       if (day === 0 || day === 6) {
-        historicalWeekendCounts.set(
-          row.staffId,
-          (historicalWeekendCounts.get(row.staffId) ?? 0) + 1
-        );
+        // Anchor Sunday back to its Saturday date (same logic as getWeekendId())
+        const satObj = new Date(row.date);
+        if (satObj.getDay() === 0) satObj.setDate(satObj.getDate() - 1);
+        const weekendId = satObj.toISOString().slice(0, 10);
+        const ids = historicalWeekendIds.get(row.staffId) ?? new Set<string>();
+        ids.add(weekendId);
+        historicalWeekendIds.set(row.staffId, ids);
       }
+    }
+    for (const [staffId, ids] of historicalWeekendIds) {
+      historicalWeekendCounts.set(staffId, ids.size);
     }
   }
 

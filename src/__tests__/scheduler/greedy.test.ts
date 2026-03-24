@@ -57,8 +57,8 @@ const defaultUnitConfig: UnitConfig = {
   maxOnCallPerWeek: 1,
   maxOnCallWeekendsPerMonth: 1,
   maxConsecutiveWeekends: 2,
-  acuityYellowExtraStaff: 1,
-  acuityRedExtraStaff: 2,
+  minStaffDay: 3,
+  minStaffNight: 2,
 };
 
 function makeContext(

@@ -27,6 +27,7 @@ interface DashboardData {
   understaffedShifts: number;
   overstaffedShifts: number;
   openCallouts: number;
+  pendingSwapsCount: number;
   pendingLeaveCount: number;
   openShiftsCount: number;
   prnMissingCount: number;
@@ -101,6 +102,12 @@ export default function DashboardPage() {
       : []),
     ...(data.openShiftsCount > 0
       ? [{ href: "/open-shifts", text: `${data.openShiftsCount} open shift${data.openShiftsCount > 1 ? "s" : ""} need${data.openShiftsCount === 1 ? "s" : ""} coverage`, urgent: true }]
+      : []),
+    ...(data.openCallouts > 0
+      ? [{ href: "/callouts", text: `${data.openCallouts} open callout${data.openCallouts > 1 ? "s" : ""} need${data.openCallouts === 1 ? "s" : ""} attention`, urgent: true }]
+      : []),
+    ...(data.pendingSwapsCount > 0
+      ? [{ href: "/swaps", text: `${data.pendingSwapsCount} shift swap${data.pendingSwapsCount > 1 ? "s" : ""} pending review`, urgent: false }]
       : []),
     ...(data.prnMissingCount > 0
       ? [{ href: "/availability", text: `${data.prnMissingCount} PRN staff haven't submitted availability`, urgent: false }]

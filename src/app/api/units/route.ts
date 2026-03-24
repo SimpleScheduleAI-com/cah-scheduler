@@ -55,6 +55,8 @@ export async function POST(request: Request) {
       maxOnCallPerWeek: body.maxOnCallPerWeek ?? 1,
       maxOnCallWeekendsPerMonth: body.maxOnCallWeekendsPerMonth ?? 1,
       maxConsecutiveWeekends: body.maxConsecutiveWeekends ?? 2,
+      minStaffDay: body.minStaffDay ?? 3,
+      minStaffNight: body.minStaffNight ?? 2,
     })
     .returning()
     .get();

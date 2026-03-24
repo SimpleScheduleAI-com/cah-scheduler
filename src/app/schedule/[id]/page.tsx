@@ -78,6 +78,10 @@ export default function ScheduleBuilderPage() {
 
   const fetchSchedule = useCallback(async () => {
     const res = await fetch(`/api/schedules/${scheduleId}`);
+    if (!res.ok) {
+      setLoading(false);
+      return;
+    }
     const data = await res.json();
     setSchedule(data);
     setLoading(false);
@@ -102,6 +106,16 @@ export default function ScheduleBuilderPage() {
       runEvaluation();
     }
   }, [schedule, runEvaluation]);
+
+  // Re-fetch whenever the user returns to this tab/page (e.g. after changing census).
+  // fetchSchedule state change triggers runEvaluation automatically via the effect above.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (!document.hidden) fetchSchedule();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [fetchSchedule]);
 
   async function handleAssign(shiftId: string, staffId: string, isChargeNurse: boolean) {
     await fetch(`/api/schedules/${scheduleId}/assignments`, {
@@ -154,8 +168,11 @@ export default function ScheduleBuilderPage() {
     setViolationsModalOpen(true);
   }
 
-  if (loading || !schedule) {
+  if (loading) {
     return <p className="text-muted-foreground">Loading schedule...</p>;
+  }
+  if (!schedule) {
+    return <p className="text-muted-foreground">Schedule not found.</p>;
   }
 
   // Build violations maps for the grid

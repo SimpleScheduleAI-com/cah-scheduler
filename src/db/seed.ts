@@ -64,6 +64,8 @@ async function seed() {
     maxOnCallPerWeek: 1,
     maxOnCallWeekendsPerMonth: 1,
     maxConsecutiveWeekends: 2,
+    minStaffDay: 3,
+    minStaffNight: 2,
   }).run();
 
   const erUnitId = uuid();
@@ -83,6 +85,8 @@ async function seed() {
     maxOnCallPerWeek: 1,
     maxOnCallWeekendsPerMonth: 1,
     maxConsecutiveWeekends: 2,
+    minStaffDay: 2,
+    minStaffNight: 2,
   }).run();
 
   const medSurgUnitId = uuid();
@@ -102,6 +106,8 @@ async function seed() {
     maxOnCallPerWeek: 2,
     maxOnCallWeekendsPerMonth: 2,
     maxConsecutiveWeekends: 2,
+    minStaffDay: 3,
+    minStaffNight: 2,
   }).run();
 
   console.log("✓ Created 3 unit configurations (ICU, ER, Med-Surg)");
@@ -275,16 +281,16 @@ async function seed() {
     // Hard rules
     { id: uuid(), name: "Minimum Staff Per Shift", ruleType: "hard" as const, category: "staffing" as const, description: "Each shift must meet the minimum staff count", parameters: { evaluator: "min-staff" }, weight: 1.0 },
     { id: uuid(), name: "Charge Nurse Required", ruleType: "hard" as const, category: "staffing" as const, description: "Shifts requiring a charge nurse must have one assigned", parameters: { evaluator: "charge-nurse" }, weight: 1.0 },
-    { id: uuid(), name: "Patient-to-Nurse Ratio", ruleType: "hard" as const, category: "staffing" as const, description: "RN:patient ratio must not exceed census band limit (2:1 ICU standard)", parameters: { evaluator: "patient-ratio" }, weight: 1.0 },
-    { id: uuid(), name: "Minimum Rest Between Shifts", ruleType: "hard" as const, category: "rest" as const, description: "Staff must have minimum 10 hours rest between shifts", parameters: { evaluator: "rest-hours", minRestHours: 10 }, weight: 1.0 },
-    { id: uuid(), name: "Maximum Consecutive Days", ruleType: "hard" as const, category: "rest" as const, description: "Staff cannot work more than 5 consecutive days", parameters: { evaluator: "max-consecutive", maxConsecutiveDays: 5 }, weight: 1.0 },
-    { id: uuid(), name: "ICU Competency Minimum", ruleType: "hard" as const, category: "skill" as const, description: "Staff assigned to ICU must have competency level 2+", parameters: { evaluator: "icu-competency", minLevel: 2 }, weight: 1.0 },
-    { id: uuid(), name: "Level 1 Preceptor Required", ruleType: "hard" as const, category: "skill" as const, description: "Level 1 staff must have Level 5 preceptor on same shift", parameters: { evaluator: "level1-preceptor", minPreceptorLevel: 5 }, weight: 1.0 },
-    { id: uuid(), name: "Level 2 ICU/ER Supervision", ruleType: "hard" as const, category: "skill" as const, description: "Level 2 staff in ICU/ER must have Level 4+ supervision", parameters: { evaluator: "level2-supervision", minSupervisorLevel: 4 }, weight: 1.0 },
-    { id: uuid(), name: "No Overlapping Shifts", ruleType: "hard" as const, category: "rest" as const, description: "Staff cannot be assigned to overlapping shifts", parameters: { evaluator: "no-overlapping-shifts" }, weight: 1.0 },
-    { id: uuid(), name: "PRN Availability", ruleType: "hard" as const, category: "preference" as const, description: "PRN staff can only be scheduled on available days", parameters: { evaluator: "prn-availability" }, weight: 1.0 },
-    { id: uuid(), name: "Staff On Leave", ruleType: "hard" as const, category: "preference" as const, description: "Staff with approved leave cannot be scheduled", parameters: { evaluator: "staff-on-leave" }, weight: 1.0 },
-    { id: uuid(), name: "On-Call Limits", ruleType: "hard" as const, category: "rest" as const, description: "On-call limited per week and weekend per month", parameters: { evaluator: "on-call-limits", maxOnCallPerWeek: 1, maxOnCallWeekendsPerMonth: 1 }, weight: 1.0 },
+    { id: uuid(), name: "Patient-to-RN Ratio", ruleType: "hard" as const, category: "staffing" as const, description: "RN-to-patient ratio must not exceed the census band maximum (default 2:1). Only RNs count — LPNs and CNAs are support staff, not substitutes. Only enforced for shifts using a numeric census value; census-band shifts satisfy the ratio by construction.", parameters: { evaluator: "patient-ratio" }, weight: 1.0 },
+    { id: uuid(), name: "Minimum Rest Between Shifts", ruleType: "hard" as const, category: "rest" as const, description: "Staff must have at least 10 hours of rest between consecutive shifts", parameters: { evaluator: "rest-hours", minRestHours: 10 }, weight: 1.0 },
+    { id: uuid(), name: "Maximum Consecutive Days", ruleType: "hard" as const, category: "rest" as const, description: "Staff cannot work more than 5 consecutive days without a day off", parameters: { evaluator: "max-consecutive", maxConsecutiveDays: 5 }, weight: 1.0 },
+    { id: uuid(), name: "ICU/ER Competency Requirement (Level 2+)", ruleType: "hard" as const, category: "skill" as const, description: "Staff assigned to ICU or ER shifts must hold ICU Competency Level 2 or above. Level 1 orientees are blocked from ICU/ER shifts regardless of preceptor availability.", parameters: { evaluator: "icu-competency", minLevel: 2 }, weight: 1.0 },
+    { id: uuid(), name: "Level 1 Orientee: Level 5 Preceptor Required", ruleType: "hard" as const, category: "skill" as const, description: "A Level 1 orientee on any non-ICU/ER shift requires a Level 5 RN on the same shift as preceptor. Level 1 orientees cannot be placed on ICU or ER shifts under any circumstances (enforced by the ICU/ER Competency rule).", parameters: { evaluator: "level1-preceptor", minPreceptorLevel: 5 }, weight: 1.0 },
+    { id: uuid(), name: "Level 2 Staff in ICU/ER: Level 4+ Supervisor Required", ruleType: "hard" as const, category: "skill" as const, description: "Level 2 staff working in ICU or ER must have at least one Level 4 or above nurse on the same shift for direct supervision", parameters: { evaluator: "level2-supervision", minSupervisorLevel: 4 }, weight: 1.0 },
+    { id: uuid(), name: "No Overlapping Shifts", ruleType: "hard" as const, category: "rest" as const, description: "Staff cannot be assigned to two shifts whose hours overlap on the same calendar day", parameters: { evaluator: "no-overlapping-shifts" }, weight: 1.0 },
+    { id: uuid(), name: "PRN Availability", ruleType: "hard" as const, category: "preference" as const, description: "Per-diem (PRN) staff can only be scheduled on dates they have submitted availability for", parameters: { evaluator: "prn-availability" }, weight: 1.0 },
+    { id: uuid(), name: "Staff On Approved Leave", ruleType: "hard" as const, category: "preference" as const, description: "Staff with manager-approved leave cannot be scheduled for any shift during the leave period", parameters: { evaluator: "staff-on-leave" }, weight: 1.0 },
+    { id: uuid(), name: "On-Call Limits (Max 1/Week, 1 Weekend/Month)", ruleType: "hard" as const, category: "rest" as const, description: "A staff member may hold at most 1 on-call shift per week and 1 on-call weekend per month. Enforced during auto-generation, swap approval, and open-shift candidate ranking.", parameters: { evaluator: "on-call-limits", maxOnCallPerWeek: 1, maxOnCallWeekendsPerMonth: 1 }, weight: 1.0 },
     { id: uuid(), name: "Maximum 60 Hours in 7 Days", ruleType: "hard" as const, category: "rest" as const, description: "Staff cannot work more than 60 hours in 7 days", parameters: { evaluator: "max-hours-60", maxHours: 60 }, weight: 1.0 },
     // Soft rules
     { id: uuid(), name: "Overtime & Extra Hours", ruleType: "soft" as const, category: "cost" as const, description: "Penalty for overtime (>40h) and extra hours", parameters: { evaluator: "overtime-v2", actualOtPenaltyWeight: 1.0, extraHoursPenaltyWeight: 0.3 }, weight: 8.0 },

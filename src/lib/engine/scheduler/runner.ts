@@ -9,7 +9,7 @@ import {
 } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { generateSchedule, buildSchedulerContext, BALANCED, FAIR, COST_OPTIMIZED } from "./index";
-import { mulberry32, overtimeReductionSweep, weekendRedistributionSweep, recomputeOvertimeFlags } from "./local-search";
+import { mulberry32, localSearch, overtimeReductionSweep, weekendRedistributionSweep, recomputeOvertimeFlags } from "./local-search";
 import { checkForUnexplainedUnderstaffing } from "./validate-output";
 import type { AssignmentDraft, UnderstaffedShift, SchedulerContext } from "./types";
 
@@ -227,8 +227,15 @@ export async function runGenerationJob(jobId: string, scheduleId: string): Promi
 
     // ── 1. Clear existing assignments ─────────────────────────────────────
     setProgress(jobId, 8, "Clearing existing assignments");
+    // Temporarily disable FK enforcement so that historical callout and
+    // shift-swap-request records (which reference assignment.id with no
+    // CASCADE / SET NULL) do not block the deletion of old assignments.
+    // The stale IDs in those records remain as audit trail; they simply
+    // no longer point to a live row.
+    db.$client.pragma("foreign_keys = OFF");
     db.delete(assignment).where(eq(assignment.scheduleId, scheduleId)).run();
     db.delete(scenario).where(eq(scenario.scheduleId, scheduleId)).run();
+    db.$client.pragma("foreign_keys = ON");
 
     // ── 2. Generate BALANCED variant ──────────────────────────────────────
     setProgress(jobId, 10, "Building Balanced schedule");
@@ -252,6 +259,15 @@ export async function runGenerationJob(jobId: string, scheduleId: string): Promi
     // An independent FAIR greedy+local-search run can produce worse weekend distribution
     // because its high preference weight (2.0) honours avoidWeekends flags, concentrating
     // weekends on fewer staff. Starting from Balanced avoids that failure mode.
+    //
+    // No local-search pass is run for FAIR (v1.7.10). The 300-iteration pass with FAIR weights
+    // (added v1.7.5) was harmful after v1.7.9: staffConsecWeekendDelta made the local-search
+    // accept far more swaps under FAIR's high consecutiveWeekends weight, but FAIR's preference
+    // weight (2.0) simultaneously moved avoidWeekends nurses below their weekend minimum — a
+    // shortfall the scoring function has no penalty for and the sweep had no signal to repair.
+    // Since v1.7.9 the sweep's computeSwapDeltaPenalty already includes staffConsecWeekendDelta,
+    // so consecutive-weekend streak repair under FAIR's consecutiveWeekends: 15.0 weight is
+    // handled by the sweep directly. The local-search pass is redundant and removed.
     setProgress(jobId, 45, "Building Fairness-Optimized schedule");
     const fairBase = balancedResult.assignments.map((a) => ({ ...a }));
     const fairFinalAssignments = weekendRedistributionSweep(fairBase, context, FAIR);

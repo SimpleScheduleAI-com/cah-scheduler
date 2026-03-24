@@ -152,6 +152,8 @@ function importData(data: ImportResult) {
       description: u.description,
       weekendShiftsRequired: u.weekendShiftsRequired,
       holidayShiftsRequired: u.holidayShiftsRequired,
+      minStaffDay: u.minStaffDay,
+      minStaffNight: u.minStaffNight,
     }).run();
   }
 
@@ -525,22 +527,23 @@ function exportCurrentData(): ArrayBuffer {
   XLSX.utils.book_append_sheet(workbook, staffSheet, "Staff");
 
   // Units sheet
+  // Note: "Target Weekends Per Nurse Per Schedule" is a per-nurse fairness target —
+  // excess assignments beyond this target generate soft violations; shortfall does not.
+  // "Min Holidays Per Nurse Per Year" is the annual holiday fairness target per nurse.
   const unitsHeaders = [
     "Name",
     "Description",
     "Min Staff Day",
     "Min Staff Night",
-    "Weekend Shifts Required",
-    "Holiday Shifts Required",
+    "Target Weekends Per Nurse Per Schedule",
+    "Min Holidays Per Nurse Per Year",
   ];
 
-  // For min staff, we'll use a default since it's not stored directly
-  // The actual staffing is determined by census bands
   const unitsRows = unitsData.map((u) => [
     u.name,
     u.description || "",
-    4, // Default min staff day
-    3, // Default min staff night
+    u.minStaffDay,
+    u.minStaffNight,
     u.weekendShiftsRequired,
     u.holidayShiftsRequired,
   ]);

@@ -36,6 +36,11 @@ Every generation run produces three independent schedules, each optimised for a 
 
 All three variants obey exactly the same hard rules — only their *preferences and trade-offs* differ.
 
+**How the Fairness and Cost variants are built:** Both start from the same optimised base schedule as Balanced, then apply additional improvement passes:
+
+- **Fairness-Optimized** runs a *weekend redistribution sweep* — it identifies nurses who are carrying significantly more weekend shifts than others (or who have long consecutive-weekend streaks) and swaps those shifts with nurses who have fewer weekends. The sweep continues until no further improvement is possible.
+- **Cost-Optimized** runs an *overtime reduction sweep* followed by a weekend redistribution sweep — it first swaps out assignments that would trigger overtime pay, then balances weekends. Both sweeps are deterministic, so the Cost variant is fully reproducible from the same Balanced output.
+
 All variants also apply a **capacity-spreading preference**: when two staff members are otherwise equally suitable for a shift, the one who has worked fewer hours that week is preferred. This mirrors what a charge nurse naturally does when filling a gap ("who has the most availability this week?") and reduces the chance of one nurse accumulating overtime while another is underused.
 
 ### Applying an Alternative Variant
@@ -184,4 +189,4 @@ No. The Balanced variant uses a different random seed on each run, so the result
 
 ---
 
-*Last Updated: February 2026*
+*Last Updated: March 2026 — v1.7.11*

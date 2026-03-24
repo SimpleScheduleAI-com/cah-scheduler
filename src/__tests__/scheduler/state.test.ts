@@ -229,10 +229,18 @@ describe("SchedulerState", () => {
   });
 
   describe("getWeekendCount", () => {
-    it("counts Saturday and Sunday assignments", () => {
-      // 2026-02-14 is Saturday, 2026-02-15 is Sunday
+    it("counts Saturday+Sunday of the same week as ONE weekend unit", () => {
+      // Industry standard: working both days of the same weekend = 1 worked weekend, not 2
+      // 2026-02-14 is Saturday, 2026-02-15 is Sunday (same weekend unit)
       state.addAssignment(makeDraft({ staffId: "s1", date: "2026-02-14", shiftId: "sh1" }));
       state.addAssignment(makeDraft({ staffId: "s1", date: "2026-02-15", shiftId: "sh2" }));
+      expect(state.getWeekendCount("s1")).toBe(1);
+    });
+
+    it("counts two different weekends as 2 weekend units", () => {
+      // 2026-02-14 = Saturday of week 1, 2026-02-21 = Saturday of week 2
+      state.addAssignment(makeDraft({ staffId: "s1", date: "2026-02-14", shiftId: "sh1" }));
+      state.addAssignment(makeDraft({ staffId: "s1", date: "2026-02-21", shiftId: "sh2" }));
       expect(state.getWeekendCount("s1")).toBe(2);
     });
 

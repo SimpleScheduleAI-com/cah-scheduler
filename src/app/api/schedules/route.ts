@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { schedule, shiftDefinition, shift, censusBand } from "@/db/schema";
+import { schedule, shiftDefinition, shift, censusBand, exceptionLog } from "@/db/schema";
 import { eq, and, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { buildShiftInserts } from "@/lib/schedules/build-shifts";
@@ -58,6 +58,15 @@ export async function POST(request: Request) {
   for (const values of inserts) {
     db.insert(shift).values(values).run();
   }
+
+  db.insert(exceptionLog).values({
+    entityType: "schedule",
+    entityId: newSchedule.id,
+    action: "created",
+    description: `Schedule created: ${newSchedule.name} (${newSchedule.startDate} to ${newSchedule.endDate})`,
+    newState: { name: newSchedule.name, startDate: newSchedule.startDate, endDate: newSchedule.endDate, unit: newSchedule.unit },
+    performedBy: "nurse_manager",
+  }).run();
 
   return NextResponse.json(
     { ...newSchedule, shiftsCreated: definitions.length > 0 },

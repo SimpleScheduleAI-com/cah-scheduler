@@ -6,6 +6,8 @@ import {
   assignment,
   staff,
   censusBand,
+  exceptionLog,
+  unit,
 } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
@@ -93,48 +95,65 @@ export async function GET(
     .where(eq(censusBand.isActive, true))
     .all();
 
-  // Helper to calculate effective required staff based on census tier or patient count.
-  // Priority 1: censusBandId direct lookup — use band directly, no Math.max,
-  //   so Blue (low census) can legitimately require FEWER staff than the base shift definition.
-  // Priority 2: acuityLevel + unit fallback — handles stale censusBandId (e.g. after DB re-seed)
-  //   and seeded shifts that have acuityLevel but no censusBandId. Also no Math.max.
-  // Priority 3: actualCensus (legacy numeric patient count path) — keeps Math.max so base is floor.
+  // Get unit minimums — the absolute floor regardless of census level
+  const schedUnit = db
+    .select({ minStaffDay: unit.minStaffDay, minStaffNight: unit.minStaffNight })
+    .from(unit)
+    .where(eq(unit.name, sched.unit))
+    .get();
+  const unitMinDay = schedUnit?.minStaffDay ?? 3;
+  const unitMinNight = schedUnit?.minStaffNight ?? 2;
+
+  // Helper to calculate effective required staff based on census tier or patient count,
+  // then applies the unit's absolute staffing floor: effectiveRequired = max(censusRequired, unitMin).
+  // Priority 1: censusBandId direct lookup — census band sets the census-based count.
+  // Priority 2: acuityLevel + unit fallback — handles stale censusBandId (e.g. after DB re-seed).
+  // Priority 3: actualCensus (legacy numeric patient count path).
+  // Floor: unit.minStaffDay (day shifts) or unit.minStaffNight (night/evening). on_call excluded.
   function getEffectiveRequired(
     censusBandId: string | null,
     acuityLevel: string | null,
-    unit: string | null,
+    unitName: string | null,
     actualCensus: number | null,
-    baseRequired: number
+    baseRequired: number,
+    shiftType: string
   ): number {
+    let censusRequired: number;
+
     if (censusBandId) {
       const band = censusBands.find((b) => b.id === censusBandId);
-      if (band) return band.requiredRNs + band.requiredCNAs;
-    }
-
-    // Fallback: match by acuityLevel + unit (handles stale censusBandId or unseeded censusBandId)
-    if (acuityLevel && unit) {
-      const band = censusBands.find((b) => b.color === acuityLevel && b.unit === unit);
-      if (band) return band.requiredRNs + band.requiredCNAs;
-    }
-
-    if (actualCensus !== null) {
+      if (band) {
+        censusRequired = band.requiredRNs + band.requiredCNAs;
+      } else {
+        censusRequired = baseRequired;
+      }
+    } else if (acuityLevel && unitName) {
+      const band = censusBands.find((b) => b.color === acuityLevel && b.unit === unitName);
+      if (band) {
+        censusRequired = band.requiredRNs + band.requiredCNAs;
+      } else {
+        censusRequired = baseRequired;
+      }
+    } else if (actualCensus !== null) {
       const band = censusBands.find(
         (b) => actualCensus >= b.minPatients && actualCensus <= b.maxPatients
       );
-      if (band) {
-        const censusRequired = band.requiredRNs + band.requiredCNAs;
-        return Math.max(censusRequired, baseRequired);
-      }
+      censusRequired = band ? Math.max(band.requiredRNs + band.requiredCNAs, baseRequired) : baseRequired;
+    } else {
+      censusRequired = baseRequired;
     }
 
-    return baseRequired;
+    // Apply unit absolute floor (on_call shifts don't count toward staffing)
+    if (shiftType === "on_call") return censusRequired;
+    const unitMin = shiftType === "day" ? unitMinDay : unitMinNight;
+    return Math.max(censusRequired, unitMin);
   }
 
   // Build response
   const shiftsWithAssignments = shifts.map((s) => {
     const baseRequired = s.requiredStaffCount ?? s.defRequiredStaff;
     const effectiveRequired = getEffectiveRequired(
-      s.censusBandId, s.acuityLevel, s.defUnit, s.actualCensus, baseRequired
+      s.censusBandId, s.acuityLevel, s.defUnit, s.actualCensus, baseRequired, s.defShiftType
     );
 
     return {
@@ -172,6 +191,8 @@ export async function PUT(
   const { id } = await params;
   const body = await request.json();
 
+  const existing = db.select().from(schedule).where(eq(schedule.id, id)).get();
+
   const updated = db
     .update(schedule)
     .set({
@@ -184,6 +205,21 @@ export async function PUT(
     .where(eq(schedule.id, id))
     .returning()
     .get();
+
+  if (updated) {
+    const scheduleAction =
+      body.status === "published" ? "published" :
+      body.status === "archived" ? "archived" : "updated";
+    db.insert(exceptionLog).values({
+      entityType: "schedule",
+      entityId: id,
+      action: scheduleAction,
+      description: `Schedule ${scheduleAction}: ${updated.name}`,
+      previousState: existing ? { status: existing.status } : undefined,
+      newState: { status: updated.status },
+      performedBy: "nurse_manager",
+    }).run();
+  }
 
   return NextResponse.json(updated);
 }

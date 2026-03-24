@@ -8,6 +8,13 @@
       "when": 1772556358862,
       "tag": "0000_volatile_vanisher",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1773731054163,
+      "tag": "0001_first_bloodstorm",
+      "breakpoints": true
     }
   ]
 }

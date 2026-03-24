@@ -71,7 +71,8 @@ function computeTotalPenalty(
       context.staffMap,
       a.isChargeNurse,
       context.unitConfig,
-      context.historicalWeekendCounts ?? new Map()
+      context.historicalWeekendCounts ?? new Map(),
+      context.publicHolidays.map((h) => h.date)
     );
   }
   return total;
@@ -135,12 +136,18 @@ function buildAffectedSet(
  * Sum softPenalty for a subset of assignments.
  * Coworker lists are fetched from `state` so skill-mix reflects the current
  * (possibly already-mutated) full shift composition.
+ *
+ * `holidayAvg` is the precomputed average holiday assignments per staff member.
+ * When provided it is forwarded to softPenalty(), bypassing the O(staff×assignments)
+ * inner loop in Section 9. Callers should compute it once per scoring pass and
+ * pass it here to avoid recomputing it on every call.
  */
 function scoreSubset(
   subset: AssignmentDraft[],
   state: SchedulerState,
   context: SchedulerContext,
-  weights: WeightProfile
+  weights: WeightProfile,
+  holidayAvg?: number
 ): number {
   let total = 0;
   for (const x of subset) {
@@ -151,10 +158,142 @@ function scoreSubset(
     total += softPenalty(
       staffInfo, shiftInfo, state, weights, coworkers,
       context.staffMap, x.isChargeNurse, context.unitConfig,
-      context.historicalWeekendCounts ?? new Map()
+      context.historicalWeekendCounts ?? new Map(),
+      context.publicHolidays.map((h) => h.date),
+      holidayAvg
     );
   }
   return total;
+}
+
+// ─── Consecutive-weekend delta helpers ───────────────────────────────────────
+//
+// softPenalty() contains an `alreadyThisWeekend` guard that returns 0 for the
+// consecutive-weekend component whenever the candidate shift's weekend is already
+// in state.  During delta calculations, computeSwapDeltaPenalty temporarily adds
+// the new assignments BEFORE re-scoring — so the guard fires for both the old and
+// new assignments, making the consecutive-weekend delta permanently 0.
+//
+// These helpers bypass softPenalty() and compute the consecutive-weekend penalty
+// directly from the nurse's complete weekend set in the ORIGINAL (unmutated) state,
+// simulating the proposed change without touching the state at all.
+
+// Module-level caches for weekendIdForDate and areConsecutiveWeekendIds.
+// Both functions are called in the hot sweep inner loop (twice per computeSwapDeltaPenalty ×
+// every candidate swap × every sweep restart). The same ~42 date strings appear throughout a
+// 6-week schedule, so memoization eliminates nearly all Date object allocation.
+const _weekendIdCache = new Map<string, string | null>();
+const _satMsCache     = new Map<string, number>();
+
+/** Returns the Saturday-anchored weekend ID for a date, or null if it is a weekday. */
+function weekendIdForDate(dateStr: string): string | null {
+  const hit = _weekendIdCache.get(dateStr);
+  if (hit !== undefined) return hit;
+  const d   = new Date(dateStr + "T00:00:00Z");
+  const day = d.getUTCDay();
+  if (day === 0) d.setUTCDate(d.getUTCDate() - 1); // Sunday → Saturday
+  else if (day !== 6) { _weekendIdCache.set(dateStr, null); return null; } // weekday → null
+  const result = d.toISOString().slice(0, 10);
+  _weekendIdCache.set(dateStr, result);
+  return result;
+}
+
+/** True if two Saturday-anchored weekend IDs are exactly one week apart. */
+function areConsecutiveWeekendIds(satA: string, satB: string): boolean {
+  let msA = _satMsCache.get(satA);
+  if (msA === undefined) { msA = new Date(satA + "T00:00:00Z").getTime(); _satMsCache.set(satA, msA); }
+  let msB = _satMsCache.get(satB);
+  if (msB === undefined) { msB = new Date(satB + "T00:00:00Z").getTime(); _satMsCache.set(satB, msB); }
+  return Math.abs((msB - msA) / 604800000 - 1) < 0.01;
+}
+
+/**
+ * Total consecutive-weekend penalty for a sorted array of Saturday-anchored weekend IDs.
+ *
+ * Uses "steady-state" scoring: every weekend in a run of N sees the full run,
+ * so each weekend in an over-limit run contributes the same per-weekend penalty:
+ *   weight × (0.5 + (N − maxConsecutive) × 0.5)
+ *
+ * Old and new states use the same formula, so delta sign and relative magnitude
+ * are correct for swap decisions.
+ */
+function totalStreakPenalty(
+  sortedIds: string[],
+  maxConsecutive: number,
+  weights: WeightProfile
+): number {
+  if (!sortedIds.length) return 0;
+  let penalty = 0;
+  let runLen = 1;
+  for (let i = 1; i <= sortedIds.length; i++) {
+    const atEnd = i === sortedIds.length;
+    if (!atEnd && areConsecutiveWeekendIds(sortedIds[i - 1], sortedIds[i])) {
+      runLen++;
+    } else {
+      if (runLen > maxConsecutive) {
+        const excess = runLen - maxConsecutive;
+        penalty += runLen * weights.consecutiveWeekends * (0.5 + excess * 0.5);
+      }
+      runLen = 1;
+    }
+  }
+  return penalty;
+}
+
+/**
+ * Consecutive-weekend penalty delta for one nurse when they lose `removedDate`
+ * and gain `gainedDate` (pass null when no weekend shift is involved on that side).
+ *
+ * Must be called BEFORE any state mutation so that getStaffAssignments() reflects
+ * the current (pre-swap) state.
+ */
+function staffConsecWeekendDelta(
+  staffId: string,
+  removedDate: string | null,
+  gainedDate: string | null,
+  state: SchedulerState,
+  maxConsecutive: number,
+  weights: WeightProfile
+): number {
+  const oldIds = new Set<string>();
+  for (const a of state.getStaffAssignments(staffId)) {
+    const wid = weekendIdForDate(a.date);
+    if (wid) oldIds.add(wid);
+  }
+
+  const newIds = new Set(oldIds);
+  if (removedDate !== null) { const wid = weekendIdForDate(removedDate); if (wid) newIds.delete(wid); }
+  if (gainedDate  !== null) { const wid = weekendIdForDate(gainedDate);  if (wid) newIds.add(wid); }
+
+  const oldP = totalStreakPenalty([...oldIds].sort(), maxConsecutive, weights);
+  const newP = totalStreakPenalty([...newIds].sort(), maxConsecutive, weights);
+  return newP - oldP;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Compute the average number of holiday assignments per staff member.
+ *
+ * Called once per local-search / sweep pass rather than inside softPenalty()
+ * to avoid an O(staff × assignments) loop on every scoring call.
+ * Staleness is negligible: the average changes by ≤ 1/staffCount per swap.
+ */
+function computeHolidayAvg(
+  state: SchedulerState,
+  staffMap: Map<string, StaffInfo>,
+  publicHolidayDates: string[]
+): number {
+  if (publicHolidayDates.length === 0) return 0;
+  let total = 0;
+  let count = 0;
+  for (const [sid] of staffMap) {
+    for (const a of state.getStaffAssignments(sid)) {
+      if (publicHolidayDates.includes(a.date)) total++;
+    }
+    count++;
+  }
+  return count > 0 ? total / count : 0;
 }
 
 /**
@@ -171,10 +310,11 @@ function computeSwapDeltaPenalty(
   newB: AssignmentDraft,
   state: SchedulerState,
   context: SchedulerContext,
-  weights: WeightProfile
+  weights: WeightProfile,
+  holidayAvg?: number
 ): number {
   const affected = buildAffectedSet(a, b, state);
-  const oldScore = scoreSubset(affected, state, context, weights);
+  const oldScore = scoreSubset(affected, state, context, weights, holidayAvg);
 
   // Apply the swap in-place
   state.removeAssignment(a);
@@ -188,7 +328,7 @@ function computeSwapDeltaPenalty(
     if (x.staffId === b.staffId && x.shiftId === b.shiftId) return newB;
     return x;
   });
-  const newScore = scoreSubset(newAffected, state, context, weights);
+  const newScore = scoreSubset(newAffected, state, context, weights, holidayAvg);
 
   // Restore
   state.removeAssignment(newA);
@@ -196,7 +336,73 @@ function computeSwapDeltaPenalty(
   state.addAssignment(a);
   state.addAssignment(b);
 
-  return newScore - oldScore;
+  // Add consecutive-weekend component, which is invisible to softPenalty() due to
+  // the alreadyThisWeekend guard firing on both old and new scores above.
+  // staffConsecWeekendDelta works on the original (now-restored) state.
+  const maxC = context.unitConfig?.maxConsecutiveWeekends ?? 2;
+  const cwDelta =
+    staffConsecWeekendDelta(a.staffId, a.date, newB.date, state, maxC, weights) +
+    staffConsecWeekendDelta(b.staffId, b.date, newA.date, state, maxC, weights);
+
+  return (newScore - oldScore) + cwDelta;
+}
+
+/**
+ * Compute the net penalty delta of replacing `old` with `replacement` (same shift,
+ * different staffId) without committing. Temporarily mutates `state`, scores the
+ * affected set, then restores.
+ *
+ * Returns (newPenalty − oldPenalty). Negative = improvement.
+ */
+function computeReplacementDeltaPenalty(
+  old: AssignmentDraft,
+  replacement: AssignmentDraft,
+  state: SchedulerState,
+  context: SchedulerContext,
+  weights: WeightProfile,
+  holidayAvg?: number
+): number {
+  // Build minimal affected set (mirrors buildAffectedSet logic for a single replacement):
+  //  1. All coworkers on the shift (skill mix, charge clustering)
+  //  2. Old staff's same-week assignments (OT delta when they're removed)
+  //  3. New staff's same-week assignments (OT delta when they gain a shift)
+  const seen = new Set<string>();
+  const affected: AssignmentDraft[] = [];
+  const addToAffected = (x: AssignmentDraft) => {
+    const k = `${x.staffId}:${x.shiftId}`;
+    if (!seen.has(k)) { seen.add(k); affected.push(x); }
+  };
+
+  for (const x of state.getShiftAssignments(old.shiftId)) addToAffected(x);
+  const week = getWeekStart(old.date);
+  for (const x of state.getStaffAssignments(old.staffId)) {
+    if (getWeekStart(x.date) === week) addToAffected(x);
+  }
+  for (const x of state.getStaffAssignments(replacement.staffId)) {
+    if (getWeekStart(x.date) === week) addToAffected(x);
+  }
+
+  const oldScore = scoreSubset(affected, state, context, weights, holidayAvg);
+
+  state.removeAssignment(old);
+  state.addAssignment(replacement);
+
+  const newAffected = affected.map((x) =>
+    x.staffId === old.staffId && x.shiftId === old.shiftId ? replacement : x
+  );
+  const newScore = scoreSubset(newAffected, state, context, weights, holidayAvg);
+
+  // Restore
+  state.removeAssignment(replacement);
+  state.addAssignment(old);
+
+  // Add consecutive-weekend component (invisible to softPenalty due to alreadyThisWeekend guard).
+  const maxC = context.unitConfig?.maxConsecutiveWeekends ?? 2;
+  const cwDelta =
+    staffConsecWeekendDelta(old.staffId, old.date, null, state, maxC, weights) +
+    staffConsecWeekendDelta(replacement.staffId, null, replacement.date, state, maxC, weights);
+
+  return (newScore - oldScore) + cwDelta;
 }
 
 /**
@@ -320,7 +526,7 @@ export function localSearch(
 
   const rand = mulberry32(seed);
 
-  let assignments = [...result.assignments];
+  const assignments = [...result.assignments];
 
   // Build state once — updated incrementally on every accepted swap
   const state = new SchedulerState();
@@ -335,6 +541,11 @@ export function localSearch(
   // Track the best solution seen (LA may temporarily accept worse solutions)
   let bestPenalty = currentPenalty;
   let bestAssignments = [...assignments];
+
+  // Precompute holiday average once for this pass — forwarded to softPenalty()
+  // Section 9, avoiding O(staff × assignments) recomputation on every call.
+  const publicHolidayDates = context.publicHolidays.map((h) => h.date);
+  let holidayAvg = computeHolidayAvg(state, context.staffMap, publicHolidayDates);
 
   for (let iter = 0; iter < maxIterations; iter++) {
     // Pick two distinct random assignments on different shifts
@@ -373,7 +584,7 @@ export function localSearch(
 
     // Delta penalty: only re-scores the ~15-30 affected assignments instead of
     // all ~280.  Temporarily mutates and restores state internally.
-    const delta = computeSwapDeltaPenalty(a, b, newA, newB, state, context, weights);
+    const delta = computeSwapDeltaPenalty(a, b, newA, newB, state, context, weights, holidayAvg);
     const newPenalty = currentPenalty + delta;
 
     // Late Acceptance: accept if no worse than K iterations ago
@@ -391,6 +602,10 @@ export function localSearch(
         bestPenalty = newPenalty;
         bestAssignments = [...assignments];
       }
+
+      // Refresh holiday average after an accepted swap (O(staff×assignments) but
+      // only runs on accepted moves, not every iteration).
+      holidayAvg = computeHolidayAvg(state, context.staffMap, publicHolidayDates);
     }
 
     // Always advance the buffer with the current (post-accept/reject) solution
@@ -446,6 +661,7 @@ export function overtimeReductionSweep(
   let madeProgress = true;
   let sweepIter = 0;
   const MAX_SWEEP_ITERS = 500;
+  const otPublicHolidayDates = context.publicHolidays.map((h) => h.date);
 
   while (madeProgress) {
     if (++sweepIter > MAX_SWEEP_ITERS) {
@@ -454,6 +670,10 @@ export function overtimeReductionSweep(
     }
     madeProgress = false;
     recomputeOvertimeFlags(assignments); // refresh flags before each pass
+
+    // Precompute holiday average once per sweep iteration — avoids O(staff×assignments)
+    // inside every softPenalty call during the inner swap/replacement loops.
+    const otHolidayAvg = computeHolidayAvg(state, context.staffMap, otPublicHolidayDates);
 
     const otIndices = assignments
       .map((_, i) => i)
@@ -493,7 +713,7 @@ export function overtimeReductionSweep(
               : null,
         };
 
-        const delta = computeSwapDeltaPenalty(a, b, newA, newB, state, context, weights);
+        const delta = computeSwapDeltaPenalty(a, b, newA, newB, state, context, weights, otHolidayAvg);
         if (delta < 0) {
           state.removeAssignment(a);
           state.removeAssignment(b);
@@ -504,6 +724,72 @@ export function overtimeReductionSweep(
           currentPenalty += delta;
           madeProgress = true;
           break outer; // restart sweep with updated state
+        }
+      }
+    }
+
+    // ── Pass 2: Replacement pass ──────────────────────────────────────────────
+    // Only runs when the swap pass finds nothing (madeProgress still false).
+    // For each OT assignment, tries replacing it with an unassigned eligible
+    // non-OT staff member from context.staffList — something the swap pass
+    // cannot do because it only rearranges existing assignments.
+    if (!madeProgress) {
+      replacementOuter: for (const otIdx of otIndices) {
+        const a = assignments[otIdx];
+        const shiftA = context.shiftMap.get(a.shiftId)!;
+
+        // Quick lookup: staff already on this specific shift (to skip them)
+        const staffOnShift = new Set(
+          state.getShiftAssignments(a.shiftId).map((x) => x.staffId)
+        );
+
+        for (const staffInfo of context.staffList) {
+          if (staffOnShift.has(staffInfo.id)) continue;
+
+          // If this is a charge slot, replacement must be charge-qualified
+          if (
+            a.isChargeNurse &&
+            (!staffInfo.isChargeNurseQualified || staffInfo.icuCompetencyLevel < 4)
+          ) continue;
+
+          // Replacement must not push this staff into OT in shiftA's week
+          if (
+            state.getWeeklyHours(staffInfo.id, shiftA.date) + shiftA.durationHours > 40
+          ) continue;
+
+          // Check hard rules — temporarily remove OT assignment so overlap/rest
+          // checks reflect the state after the original is gone.
+          state.removeAssignment(a);
+          let hardOk = false;
+          try {
+            hardOk = passesHardRules(staffInfo, shiftA, state, context);
+          } finally {
+            state.addAssignment(a);
+          }
+          if (!hardOk) continue;
+
+          const replacement: AssignmentDraft = {
+            ...a,
+            staffId: staffInfo.id,
+            isFloat: !!(staffInfo.homeUnit && staffInfo.homeUnit !== shiftA.unit),
+            floatFromUnit:
+              staffInfo.homeUnit && staffInfo.homeUnit !== shiftA.unit
+                ? (staffInfo.homeUnit ?? null)
+                : null,
+            isOvertime: false,
+          };
+
+          const delta = computeReplacementDeltaPenalty(
+            a, replacement, state, context, weights, otHolidayAvg
+          );
+          if (delta < 0) {
+            state.removeAssignment(a);
+            state.addAssignment(replacement);
+            assignments[otIdx] = replacement;
+            currentPenalty += delta;
+            madeProgress = true;
+            break replacementOuter;
+          }
         }
       }
     }
@@ -540,6 +826,7 @@ export function weekendRedistributionSweep(
   let madeProgress = true;
   let sweepIter = 0;
   const MAX_SWEEP_ITERS = 500;
+  const wrPublicHolidayDates = context.publicHolidays.map((h) => h.date);
 
   while (madeProgress) {
     if (++sweepIter > MAX_SWEEP_ITERS) {
@@ -547,6 +834,9 @@ export function weekendRedistributionSweep(
       break;
     }
     madeProgress = false;
+
+    // Precompute holiday average once per sweep iteration
+    const wrHolidayAvg = computeHolidayAvg(state, context.staffMap, wrPublicHolidayDates);
 
     // Compute weekend-shift count per staff (include staff with 0 weekend shifts)
     const weekendCounts = new Map<string, number>();
@@ -596,6 +886,24 @@ export function weekendRedistributionSweep(
         const staffA = context.staffMap.get(a.staffId)!;
         const staffB = context.staffMap.get(b.staffId)!;
 
+        // OT guard: unconditionally reject swaps that would push either staff member
+        // over 40h in the week they're gaining a shift. The penalty weight alone cannot
+        // always block this — when weekend equity improves for multiple staff, the
+        // combined delta can still be negative even with a high OT weight. Without this
+        // guard, weekendRedistributionSweep undoes OT gains from overtimeReductionSweep,
+        // causing all three variants to converge to the same OT count.
+        const sameWeek = getWeekStart(shiftA.date) === getWeekStart(shiftB.date);
+        const staffANewHoursInWeekB =
+          state.getWeeklyHours(staffA.id, shiftB.date) -
+          (sameWeek ? shiftA.durationHours : 0) +
+          shiftB.durationHours;
+        if (staffANewHoursInWeekB > 40) continue;
+        const staffBNewHoursInWeekA =
+          state.getWeeklyHours(staffB.id, shiftA.date) -
+          (sameWeek ? shiftB.durationHours : 0) +
+          shiftA.durationHours;
+        if (staffBNewHoursInWeekA > 40) continue;
+
         const newA: AssignmentDraft = {
           ...a,
           staffId: b.staffId,
@@ -615,7 +923,7 @@ export function weekendRedistributionSweep(
               : null,
         };
 
-        const delta = computeSwapDeltaPenalty(a, b, newA, newB, state, context, weights);
+        const delta = computeSwapDeltaPenalty(a, b, newA, newB, state, context, weights, wrHolidayAvg);
         if (delta < 0) {
           state.removeAssignment(a);
           state.removeAssignment(b);
@@ -626,6 +934,115 @@ export function weekendRedistributionSweep(
           currentPenalty += delta;
           madeProgress = true;
           break outer; // restart sweep with updated counts
+        }
+      }
+    }
+
+    // ── Phase 2: streak-repair fallback ──────────────────────────────────────
+    // Runs only when Phase 1 (deficit-only swaps) found no improvement AND
+    // there are nurses with consecutive-weekend streak > maxConsecutive.
+    // Widens the partner pool to any nurse with fewer weekend shifts than the
+    // streak-violating nurse (not just deficit nurses). Sorted ascending by
+    // weekend count so deficit nurses are still tried first within this pool.
+    if (!madeProgress) {
+      const maxConsecutiveWknd = context.unitConfig?.maxConsecutiveWeekends ?? 2;
+      const lookBound = context.unitConfig?.schedulePeriodWeeks ?? 6;
+
+      streakRepairOuter: for (const exIdx of excessIndices) {
+        const exStaffId = assignments[exIdx].staffId;
+        const exWeekendCount = weekendCounts.get(exStaffId) ?? 0;
+
+        // Compute backward streak for this nurse's weekend assignment
+        const exDate = assignments[exIdx].date;
+        const exSatObj = new Date(exDate);
+        if (exSatObj.getDay() === 0) exSatObj.setDate(exSatObj.getDate() - 1);
+        let streakBack = 0;
+        for (let i = 1; i <= lookBound; i++) {
+          const prevSat = new Date(exSatObj);
+          prevSat.setDate(prevSat.getDate() - 7 * i);
+          const prevSun = new Date(prevSat);
+          prevSun.setDate(prevSun.getDate() + 1);
+          if (
+            state.hasWorkedDate(exStaffId, prevSat.toISOString().slice(0, 10)) ||
+            state.hasWorkedDate(exStaffId, prevSun.toISOString().slice(0, 10))
+          ) {
+            streakBack++;
+          } else {
+            break;
+          }
+        }
+        if (1 + streakBack <= maxConsecutiveWknd) continue; // no streak violation here
+
+        // Build sorted candidate list: partners with fewer weekends than exStaffId,
+        // sorted ascending (fewest weekends = highest priority, deficit nurses first)
+        const candidates = assignments
+          .map((a, j) => ({ a, j }))
+          .filter(
+            ({ a, j }) =>
+              j !== exIdx &&
+              a.shiftId !== assignments[exIdx].shiftId &&
+              (weekendCounts.get(a.staffId) ?? 0) < exWeekendCount
+          )
+          .sort(
+            (x, y) =>
+              (weekendCounts.get(x.a.staffId) ?? 0) -
+              (weekendCounts.get(y.a.staffId) ?? 0)
+          );
+
+        for (const { j } of candidates) {
+          if (!isSwapValid(state, assignments, exIdx, j, context)) continue;
+
+          const a = assignments[exIdx];
+          const b = assignments[j];
+          const shiftA = context.shiftMap.get(a.shiftId)!;
+          const shiftB = context.shiftMap.get(b.shiftId)!;
+          const staffA = context.staffMap.get(a.staffId)!;
+          const staffB = context.staffMap.get(b.staffId)!;
+
+          // OT guard (same as Phase 1)
+          const sameWeek = getWeekStart(shiftA.date) === getWeekStart(shiftB.date);
+          const staffANewHoursInWeekB =
+            state.getWeeklyHours(staffA.id, shiftB.date) -
+            (sameWeek ? shiftA.durationHours : 0) +
+            shiftB.durationHours;
+          if (staffANewHoursInWeekB > 40) continue;
+          const staffBNewHoursInWeekA =
+            state.getWeeklyHours(staffB.id, shiftA.date) -
+            (sameWeek ? shiftB.durationHours : 0) +
+            shiftA.durationHours;
+          if (staffBNewHoursInWeekA > 40) continue;
+
+          const newA: AssignmentDraft = {
+            ...a,
+            staffId: b.staffId,
+            isFloat: !!(staffB.homeUnit && staffB.homeUnit !== shiftA.unit),
+            floatFromUnit:
+              staffB.homeUnit && staffB.homeUnit !== shiftA.unit
+                ? (staffB.homeUnit ?? null)
+                : null,
+          };
+          const newB: AssignmentDraft = {
+            ...b,
+            staffId: a.staffId,
+            isFloat: !!(staffA.homeUnit && staffA.homeUnit !== shiftB.unit),
+            floatFromUnit:
+              staffA.homeUnit && staffA.homeUnit !== shiftB.unit
+                ? (staffA.homeUnit ?? null)
+                : null,
+          };
+
+          const delta = computeSwapDeltaPenalty(a, b, newA, newB, state, context, weights, wrHolidayAvg);
+          if (delta < 0) {
+            state.removeAssignment(a);
+            state.removeAssignment(b);
+            state.addAssignment(newA);
+            state.addAssignment(newB);
+            assignments[exIdx] = newA;
+            assignments[j] = newB;
+            currentPenalty += delta;
+            madeProgress = true;
+            break streakRepairOuter;
+          }
         }
       }
     }

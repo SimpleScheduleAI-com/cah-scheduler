@@ -31,6 +31,7 @@ interface CandidateRecommendation {
   score: number;
   isOvertime: boolean;
   hoursThisWeek: number;
+  fteHoursPerWeek?: number;
   restHoursBefore?: number;
   isChargeNurseQualified?: boolean;
   weekendsThisPeriod?: number;
@@ -109,6 +110,10 @@ export default function CoverageRequestsPage() {
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<CoverageRequestData | null>(null);
   const [filter, setFilter] = useState<"pending_approval" | "filled" | "cancelled" | "all">("pending_approval");
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
+  const [cancelTargetIsLeave, setCancelTargetIsLeave] = useState(false);
+  const [cancelTargetStaffName, setCancelTargetStaffName] = useState("");
 
   const fetchData = useCallback(async () => {
     const res = await fetch("/api/open-shifts");
@@ -143,15 +148,22 @@ export default function CoverageRequestsPage() {
     fetchData();
   }
 
-  async function handleCancel(requestId: string) {
-    if (!confirm("Are you sure you want to cancel this coverage request?")) return;
+  function handleCancelClick(req: CoverageRequestData) {
+    setCancelTargetId(req.id);
+    setCancelTargetIsLeave(req.reason === "leave_approved");
+    setCancelTargetStaffName(`${req.originalStaffFirstName} ${req.originalStaffLastName}`);
+    setCancelDialogOpen(true);
+  }
 
-    await fetch(`/api/open-shifts/${requestId}`, {
+  async function handleCancelConfirm() {
+    if (!cancelTargetId) return;
+    await fetch(`/api/open-shifts/${cancelTargetId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "cancel" }),
     });
-
+    setCancelDialogOpen(false);
+    setCancelTargetId(null);
     fetchData();
   }
 
@@ -268,9 +280,18 @@ export default function CoverageRequestsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={STATUS_VARIANTS[req.status]}>
-                          {STATUS_LABELS[req.status]}
-                        </Badge>
+                        <div className="space-y-0.5">
+                          <Badge variant={STATUS_VARIANTS[req.status]}>
+                            {req.status === "cancelled" && req.reason === "leave_approved"
+                              ? "Coverage Waived"
+                              : STATUS_LABELS[req.status]}
+                          </Badge>
+                          {req.status === "cancelled" && req.reason === "leave_approved" && (
+                            <p className="text-xs text-muted-foreground">
+                              Staff still on leave
+                            </p>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         {(req.status === "pending_approval" || req.status === "no_candidates") && (
@@ -285,7 +306,7 @@ export default function CoverageRequestsPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleCancel(req.id)}
+                              onClick={() => handleCancelClick(req)}
                             >
                               Cancel
                             </Button>
@@ -300,6 +321,28 @@ export default function CoverageRequestsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Cancel Confirmation Dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancel Coverage Request</DialogTitle>
+            <DialogDescription>
+              {cancelTargetIsLeave
+                ? `This coverage request was created because ${cancelTargetStaffName} is on approved leave. Cancelling it means this shift will be uncovered — the leave will remain approved.`
+                : "Are you sure you want to cancel this coverage request?"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
+              Go Back
+            </Button>
+            <Button variant="destructive" onClick={handleCancelConfirm}>
+              {cancelTargetIsLeave ? "Cancel Coverage (Leave Stays Approved)" : "Cancel Coverage Request"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Approval Dialog with Candidate Selection */}
       <Dialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
@@ -410,6 +453,20 @@ export default function CoverageRequestsPage() {
                             </ul>
                           );
                         })()}
+
+                        {/* Hours this week — only for overtime-tier candidates who aren't hitting OT */}
+                        {candidate.source === "overtime" && !candidate.isOvertime && (
+                          <p className={`text-xs ${
+                            candidate.hoursThisWeek + selectedRequest.durationHours > (candidate.fteHoursPerWeek ?? 40)
+                              ? "text-amber-600"
+                              : "text-muted-foreground"
+                          }`}>
+                            · {candidate.hoursThisWeek}h this week —{" "}
+                            {candidate.hoursThisWeek + selectedRequest.durationHours > (candidate.fteHoursPerWeek ?? 40)
+                              ? "FTE exceeded, no OT cost"
+                              : "within contracted hours"}
+                          </p>
+                        )}
 
                         {/* Rest before shift */}
                         {candidate.staffId !== "agency" && (

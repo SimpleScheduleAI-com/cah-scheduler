@@ -58,8 +58,8 @@ const defaultUnitConfig: UnitConfig = {
   maxOnCallPerWeek: 1,
   maxOnCallWeekendsPerMonth: 1,
   maxConsecutiveWeekends: 2,
-  acuityYellowExtraStaff: 1,
-  acuityRedExtraStaff: 2,
+  minStaffDay: 3,
+  minStaffNight: 2,
 };
 
 function makeDraft(overrides: Partial<AssignmentDraft> = {}): AssignmentDraft {
@@ -260,5 +260,103 @@ describe("softPenalty", () => {
     // Just verify it's ≤ the non-charge version
     const pNoCharge = softPenalty(makeStaff({ isChargeNurseQualified: true }), makeShift(), state, BALANCED, [chargeDraft], localMap, false, defaultUnitConfig);
     expect(p).toBeLessThanOrEqual(pNoCharge);
+  });
+});
+
+// ─── Consecutive weekend streak escalation ───────────────────────────────────
+// Regression tests for v1.7.7: the backward/forward streak loops were previously
+// capped at maxConsecutive=2 iterations, making streak=4 and streak=5 report
+// the same penalty as streak=3. These tests verify correct escalation.
+//
+// Isolation strategy: compare penalty(consecutive priors) vs penalty(same COUNT of
+// non-consecutive priors). Both states have identical weekend equity (same count),
+// so the difference is purely the consecutive-weekend component. Old cap would
+// make all differences identical for N>3; the fix produces growing differences.
+describe("consecutive weekend streak penalty — escalation beyond maxConsecutive", () => {
+  // Consecutive Saturdays in Jan–Feb 2026 (Jan 3, 2026 is a Saturday)
+  const SATS = [
+    "2026-01-03", "2026-01-10", "2026-01-17",
+    "2026-01-24", "2026-01-31", "2026-02-07",
+  ];
+
+  // Non-consecutive Saturdays in Oct–Nov 2025 (alternating, 2 weeks apart,
+  // none adjacent to SATS[] targets so backward scan finds nothing → streak=1)
+  const NON_CONSEC = [
+    "2025-10-04", "2025-10-18", "2025-11-01",
+    "2025-11-15", "2025-11-29", "2025-12-13",
+  ];
+
+  // Build softPenalty for assigning SATS[n-1] (the nth Saturday) given (n-1) prior
+  // assignments on the provided dates (consecutive or non-consecutive).
+  // Holding prior count constant isolates the consecutive-weekend component.
+  function penaltyWithPriors(priorDates: string[], targetIdx: number): number {
+    const staff = makeStaff({ id: "staff-1", weekendExempt: false });
+    const staffMap = new Map<string, StaffInfo>([["staff-1", staff]]);
+    const state = new SchedulerState();
+    priorDates.forEach((date, i) => {
+      state.addAssignment({
+        shiftId: `prior-${i}`,
+        staffId: "staff-1",
+        date,
+        startTime: "07:00",
+        durationHours: 12,
+        unit: "Med-Surg",
+        shiftType: "day",
+        isChargeNurse: false,
+        isFloat: false,
+        floatFromUnit: null,
+        isOvertime: false,
+      });
+    });
+    const shift = makeShift({ id: "shift-new", date: SATS[targetIdx], unit: "Med-Surg" });
+    return softPenalty(staff, shift, state, FAIR, [], staffMap, false, defaultUnitConfig);
+  }
+
+  // Pure consecutive-weekend penalty for streak of n:
+  // = penalty(n-1 consecutive priors before SATS[n-1])
+  //   minus
+  //   penalty(n-1 non-consecutive priors before SATS[n-1])
+  // All other penalty components cancel since weekend count is identical in both states.
+  function consecutivePenalty(n: number): number {
+    return (
+      penaltyWithPriors(SATS.slice(0, n - 1), n - 1) -
+      penaltyWithPriors(NON_CONSEC.slice(0, n - 1), n - 1)
+    );
+  }
+
+  it("streak=2 (at limit) produces no consecutive-weekend penalty", () => {
+    // streak=2 = maxConsecutive → no violation, penalty component = 0
+    expect(consecutivePenalty(2)).toBeCloseTo(0, 1);
+  });
+
+  it("streak=3 produces first violation: ~15 pts (FAIR × 1.0)", () => {
+    // excess=1: FAIR.consecutiveWeekends × (0.5 + 1×0.5) = 15 × 1.0 = 15 pts
+    expect(consecutivePenalty(3)).toBeCloseTo(15.0, 1);
+  });
+
+  it("streak=4 produces ~22.5 pts (FAIR × 1.5) — regression: old cap reported 15", () => {
+    // excess=2: 15 × (0.5 + 2×0.5) = 15 × 1.5 = 22.5 pts
+    // OLD CAP BUG: loop stopped at maxConsecutive=2, back=2, streak=3 → 15 pts (wrong)
+    expect(consecutivePenalty(4)).toBeCloseTo(22.5, 1);
+  });
+
+  it("streak=5 produces ~30 pts (FAIR × 2.0) — regression: old cap reported 15", () => {
+    // excess=3: 15 × (0.5 + 3×0.5) = 15 × 2.0 = 30 pts
+    // OLD CAP BUG: loop stopped at back=2, streak=3 → 15 pts (wrong)
+    expect(consecutivePenalty(5)).toBeCloseTo(30.0, 1);
+  });
+
+  it("streak=6 produces ~37.5 pts (FAIR × 2.5) — regression: old cap reported 15", () => {
+    // excess=4: 15 × (0.5 + 4×0.5) = 15 × 2.5 = 37.5 pts
+    expect(consecutivePenalty(6)).toBeCloseTo(37.5, 1);
+  });
+
+  it("streak=4 penalty strictly exceeds streak=3 (escalation is not capped)", () => {
+    // This is the direct regression guard: with the old loop cap these were equal.
+    expect(consecutivePenalty(4)).toBeGreaterThan(consecutivePenalty(3));
+  });
+
+  it("streak=5 penalty strictly exceeds streak=4", () => {
+    expect(consecutivePenalty(5)).toBeGreaterThan(consecutivePenalty(4));
   });
 });

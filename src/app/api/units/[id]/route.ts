@@ -41,6 +41,8 @@ export async function PUT(
       maxOnCallPerWeek: body.maxOnCallPerWeek,
       maxOnCallWeekendsPerMonth: body.maxOnCallWeekendsPerMonth,
       maxConsecutiveWeekends: body.maxConsecutiveWeekends,
+      minStaffDay: body.minStaffDay,
+      minStaffNight: body.minStaffNight,
       updatedAt: new Date().toISOString(),
     })
     .where(eq(unit.id, id))

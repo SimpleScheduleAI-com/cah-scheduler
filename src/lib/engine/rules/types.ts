@@ -90,8 +90,8 @@ export interface UnitConfig {
   maxOnCallPerWeek: number;
   maxOnCallWeekendsPerMonth: number;
   maxConsecutiveWeekends: number;
-  acuityYellowExtraStaff: number;
-  acuityRedExtraStaff: number;
+  minStaffDay: number;
+  minStaffNight: number;
 }
 
 export interface PRNAvailabilityInfo {

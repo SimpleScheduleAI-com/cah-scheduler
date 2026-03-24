@@ -66,10 +66,10 @@ export function ScheduleGrid({ shifts, onShiftClick, onViolationsClick, violatio
             <th className="sticky left-0 bg-muted/50 px-4 py-3 text-left font-semibold">
               Date
             </th>
-            <th className="min-w-[250px] px-4 py-3 text-left font-semibold">
+            <th className="min-w-62.5 px-4 py-3 text-left font-semibold">
               Day Shift (07:00-19:00)
             </th>
-            <th className="min-w-[250px] px-4 py-3 text-left font-semibold">
+            <th className="min-w-62.5 px-4 py-3 text-left font-semibold">
               Night Shift (19:00-07:00)
             </th>
           </tr>

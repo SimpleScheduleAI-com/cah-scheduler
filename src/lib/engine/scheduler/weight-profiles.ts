@@ -25,7 +25,7 @@ export const FAIR: WeightProfile = {
   overtime: 0.5,
   preference: 2.0,
   weekendCount: 3.0,
-  consecutiveWeekends: 3.0,
+  consecutiveWeekends: 15.0,
   holidayFairness: 3.0,
   skillMix: 1.0,
   float: 0.5,

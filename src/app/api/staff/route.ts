@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { staff, staffPreferences } from "@/db/schema";
+import { staff, staffPreferences, exceptionLog } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
@@ -47,6 +47,15 @@ export async function POST(request: Request) {
       staffId: newStaff.id,
     })
     .run();
+
+  db.insert(exceptionLog).values({
+    entityType: "staff",
+    entityId: newStaff.id,
+    action: "created",
+    description: `Staff member created: ${newStaff.firstName} ${newStaff.lastName} (${newStaff.role}, ${newStaff.employmentType})`,
+    newState: { role: newStaff.role, employmentType: newStaff.employmentType, fte: newStaff.fte },
+    performedBy: "nurse_manager",
+  }).run();
 
   return NextResponse.json(newStaff, { status: 201 });
 }

@@ -79,9 +79,9 @@ This application helps nurse managers create fair, compliant, and cost-effective
 
 ## Need Help?
 
-- **Technical Issues:** Check the [GitHub repository](https://github.com/GrowthToDo/cah-scheduler)
+- **Technical Issues:** Check the [GitHub repository](https://github.com/SimpleScheduleAIApp/cah-scheduler)
 - **Questions:** Open an issue on GitHub
 
 ---
 
-*Last Updated: February 2026 — v1.4.13 (auto-generation, charge nurse rules, violations modal, overtime/weekend rule improvements, scenario switching, penalty calibration, charge protection look-ahead, PRN availability, automatic hard-violation repair, non-OT scheduling preference, marginal extra-hours display, local search safety guards, assignment dialog context indicators, assigned staff hours and preference context, OT badge on all overtime shifts)*
+*Last Updated: March 2026 — v1.7.11*

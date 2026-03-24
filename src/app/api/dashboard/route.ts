@@ -2,6 +2,7 @@ import { db } from "@/db";
 import {
   staff, schedule, shift, assignment, callout, exceptionLog,
   shiftDefinition, censusBand, staffLeave, openShift, prnAvailability, unit,
+  shiftSwapRequest,
 } from "@/db/schema";
 import { eq, desc, inArray, or, and, gt, count, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
@@ -109,6 +110,10 @@ export async function GET() {
     .where(eq(callout.status, "open"))
     .all();
 
+  // Pending swap requests
+  const pendingSwapsCount =
+    db.select({ cnt: count() }).from(shiftSwapRequest).where(eq(shiftSwapRequest.status, "pending")).get()?.cnt ?? 0;
+
   // Pending leave requests
   const pendingLeaveCount =
     db.select({ cnt: count() }).from(staffLeave).where(eq(staffLeave.status, "pending")).get()?.cnt ?? 0;
@@ -193,6 +198,7 @@ export async function GET() {
     understaffedShifts,
     overstaffedShifts,
     openCallouts: openCallouts.length,
+    pendingSwapsCount,
     pendingLeaveCount,
     openShiftsCount,
     prnMissingCount,
