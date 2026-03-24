@@ -132,21 +132,26 @@ export function StaffTable({
             </TableCell>
             <TableCell>
               {s.isChargeNurseQualified ? (
-                <Badge variant="default">Yes</Badge>
+                <span className="inline-flex items-center gap-1.5 text-sm">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-600">
+                    <path d="M20 6 9 17l-5-5"/>
+                  </svg>
+                  <span className="text-green-600 font-medium">Yes</span>
+                </span>
               ) : (
-                <span className="text-muted-foreground">No</span>
+                <span className="text-muted-foreground text-sm">—</span>
               )}
             </TableCell>
             <TableCell>
-              <div className="flex flex-col gap-0.5">
-                <Badge variant={s.isActive ? "default" : "secondary"}>
+              <div className="flex flex-wrap items-center gap-1">
+                <Badge variant={s.isActive ? "default" : "secondary"} className="text-xs">
                   {s.isActive ? "Active" : "Inactive"}
                 </Badge>
                 {s.weekendExempt && (
-                  <Badge variant="outline" className="text-xs">WE Exempt</Badge>
+                  <Badge variant="outline" className="text-[10px] px-1 py-0">WE</Badge>
                 )}
                 {s.voluntaryFlexAvailable && (
-                  <Badge variant="outline" className="text-xs text-green-600 border-green-600">VTO</Badge>
+                  <Badge variant="outline" className="text-[10px] px-1 py-0 text-green-600 border-green-600">VTO</Badge>
                 )}
               </div>
             </TableCell>

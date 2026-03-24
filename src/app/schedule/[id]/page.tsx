@@ -254,48 +254,64 @@ export default function ScheduleBuilderPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 -mx-6 -mt-6 px-6 py-6 gradient-primary flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{schedule.name}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-xs uppercase tracking-wider text-white/70 font-semibold mb-1">Current Schedule</p>
+          <h1 className="text-2xl font-bold text-white">{schedule.name}</h1>
+          <p className="mt-1 text-sm text-white/80">
             {format(parseISO(schedule.startDate), "MMM d")} -{" "}
             {format(parseISO(schedule.endDate), "MMM d, yyyy")} | {schedule.unit}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Badge
-            variant={schedule.status === "draft" ? "secondary" : "default"}
+            variant="secondary"
+            className="bg-white/20 text-white border-white/30"
           >
             {schedule.status}
           </Badge>
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => router.push(`/scenarios?scheduleId=${scheduleId}`)}
+            className="bg-white text-primary hover:bg-white/90 font-medium shadow-sm"
           >
             Generate Schedule
           </Button>
-          <Button variant="outline" size="sm" onClick={fetchSchedule}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={runEvaluation}
+            className="bg-white/90 text-primary hover:bg-white font-medium shadow-sm"
+          >
             Re-evaluate
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExport}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleExport}
+            className="bg-white/90 text-primary hover:bg-white font-medium shadow-sm"
+          >
             Export
           </Button>
           {schedule.status !== "published" ? (
             <Button
+              variant="ghost"
               size="sm"
               onClick={handlePublish}
               disabled={publishing || (evaluation !== null && evaluation.hardViolations.length > 0)}
               title={evaluation && evaluation.hardViolations.length > 0 ? "Fix hard violations before publishing" : undefined}
+              className="bg-white/90 text-primary hover:bg-white font-medium shadow-sm disabled:bg-white/50 disabled:text-primary/50"
             >
               {publishing ? "Publishing…" : "Publish"}
             </Button>
           ) : (
             <Button
+              variant="ghost"
               size="sm"
-              variant="outline"
               onClick={handlePublish}
               disabled={publishing}
+              className="bg-white/90 text-primary hover:bg-white font-medium shadow-sm disabled:bg-white/50 disabled:text-primary/50"
             >
               {publishing ? "Saving…" : "Unpublish"}
             </Button>

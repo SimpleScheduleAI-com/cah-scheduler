@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { format, parseISO } from "date-fns";
+import { SkeletonCard } from "@/components/ui/skeleton";
 
 interface Schedule {
   id: string;
@@ -112,7 +113,20 @@ export default function SchedulePage() {
     router.push(`/schedule/${created.id}`);
   }
 
-  if (loading) return <p className="text-muted-foreground">Loading...</p>;
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <SkeletonCard />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -127,17 +141,28 @@ export default function SchedulePage() {
       </div>
 
       {schedules.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
-          <p className="text-muted-foreground">No schedule periods yet.</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Click <strong>New Schedule</strong> to create your first one.
+        <div className="rounded-lg border-2 border-dashed border-muted p-16 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+              <path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>
+            </svg>
+          </div>
+          <p className="text-lg font-medium">No schedule periods yet</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Get started by creating your first schedule period
           </p>
+          <Button onClick={openDialog} className="mt-4">
+            New Schedule
+          </Button>
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {schedules.map((s) => (
+          {schedules.map((s, index) => (
             <Link key={s.id} href={`/schedule/${s.id}`}>
-              <Card className="cursor-pointer transition-colors hover:bg-accent">
+              <Card
+                className="cursor-pointer transition-all hover:bg-accent hover:shadow-lg hover:-translate-y-0.5 animate-fade-in"
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base">{s.name}</CardTitle>

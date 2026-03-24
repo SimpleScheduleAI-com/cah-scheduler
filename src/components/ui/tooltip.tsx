@@ -59,3 +59,41 @@ function TooltipContent({
 }
 
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
+
+// Rich Tooltip for complex content
+interface RichTooltipProps {
+  title: string
+  description?: string
+  details?: Array<{ label: string; value: string | number }>
+  children: React.ReactNode
+}
+
+export function RichTooltip({ title, description, details, children }: RichTooltipProps) {
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>{children}</TooltipTrigger>
+        <TooltipContent className="max-w-xs bg-card text-card-foreground border-2 border-primary/20 shadow-xl">
+          <div className="space-y-2">
+            <div>
+              <p className="font-semibold text-sm">{title}</p>
+              {description && (
+                <p className="text-xs text-muted-foreground mt-1">{description}</p>
+              )}
+            </div>
+            {details && details.length > 0 && (
+              <div className="space-y-1 pt-2 border-t">
+                {details.map((detail, i) => (
+                  <div key={i} className="flex justify-between text-xs gap-4">
+                    <span className="text-muted-foreground">{detail.label}:</span>
+                    <span className="font-medium">{detail.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}

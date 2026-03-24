@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { Avatar } from "@/components/ui/avatar";
 import { format, parseISO } from "date-fns";
 
 interface ShiftAssignment {
@@ -58,17 +59,17 @@ export function ScheduleGrid({ shifts, onShiftClick, onViolationsClick, violatio
   const sortedDates = [...dateGroups.keys()].sort();
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto rounded-lg border">
       <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b">
-            <th className="sticky left-0 bg-background px-3 py-2 text-left font-medium">
+        <thead className="bg-muted/50">
+          <tr className="border-b-2 border-primary/20">
+            <th className="sticky left-0 bg-muted/50 px-4 py-3 text-left font-semibold">
               Date
             </th>
-            <th className="min-w-62.5 px-3 py-2 text-left font-medium">
+            <th className="min-w-62.5 px-4 py-3 text-left font-semibold">
               Day Shift (07:00-19:00)
             </th>
-            <th className="min-w-62.5 px-3 py-2 text-left font-medium">
+            <th className="min-w-62.5 px-4 py-3 text-left font-semibold">
               Night Shift (19:00-07:00)
             </th>
           </tr>
@@ -84,9 +85,9 @@ export function ScheduleGrid({ shifts, onShiftClick, onViolationsClick, violatio
             return (
               <tr
                 key={date}
-                className={`border-b ${isWeekend ? "bg-muted/30" : ""}`}
+                className={`border-b transition-colors hover:bg-accent/20 ${isWeekend ? "bg-blue-50/50 dark:bg-blue-950/20" : ""}`}
               >
-                <td className="sticky left-0 bg-background px-3 py-2 font-medium whitespace-nowrap">
+                <td className={`sticky left-0 px-4 py-3 font-medium whitespace-nowrap ${isWeekend ? "bg-blue-50/50 dark:bg-blue-950/20" : "bg-background"}`}>
                   <div>{format(dateObj, "EEE, MMM d")}</div>
                   {isWeekend && (
                     <span className="text-xs text-muted-foreground">Weekend</span>
@@ -160,7 +161,7 @@ function ShiftCell({
   return (
     <button
       onClick={onClick}
-      className={`w-full rounded-md border-2 ${borderColor} bg-card p-2 text-left transition-colors hover:bg-accent`}
+      className={`w-full rounded-lg border-2 ${borderColor} bg-card p-3 text-left transition-all duration-200 hover:bg-accent hover:shadow-md hover:scale-[1.02]`}
     >
       <div className="mb-1 flex items-center justify-between">
         <span className="text-xs text-muted-foreground">
@@ -170,52 +171,65 @@ function ShiftCell({
           {hasHardViolations && (
             <Badge
               variant="destructive"
-              className="text-[10px] px-1 py-0 cursor-pointer hover:bg-red-700"
+              className="text-[10px] px-1.5 py-0.5 cursor-pointer hover:bg-red-700 flex items-center gap-0.5"
               onClick={(e) => {
                 e.stopPropagation();
                 onViolationsClick?.();
               }}
             >
-              {violations.length} hard
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>
+              </svg>
+              {violations.length}
             </Badge>
           )}
           {hasSoftViolations && (
             <Badge
-              className="text-[10px] px-1 py-0 bg-yellow-500 text-white cursor-pointer hover:bg-yellow-600"
+              className="text-[10px] px-1.5 py-0.5 bg-yellow-500 text-white cursor-pointer hover:bg-yellow-600 flex items-center gap-0.5"
               onClick={(e) => {
                 e.stopPropagation();
                 onViolationsClick?.();
               }}
             >
-              {softViolationCount} soft
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>
+              </svg>
+              {softViolationCount}
             </Badge>
           )}
           {isOverstaffed && !hasHardViolations && (
-            <Badge className="text-[10px] px-1 py-0 bg-blue-500 text-white">
-              +{excessCount} excess
+            <Badge className="text-[10px] px-1.5 py-0.5 bg-blue-500 text-white flex items-center gap-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>
+              </svg>
+              {excessCount}
             </Badge>
           )}
         </div>
       </div>
-      <div className="space-y-0.5">
+      <div className="space-y-1.5">
         {activeAssignments.map((a) => (
-          <div key={a.id} className="flex items-center gap-1 text-xs">
-            <span
-              className={`inline-block h-1.5 w-1.5 rounded-full ${
-                a.isChargeNurse ? "bg-blue-500" : "bg-gray-400"
-              }`}
+          <div key={a.id} className="flex items-center gap-2 text-xs">
+            <Avatar
+              firstName={a.staffFirstName}
+              lastName={a.staffLastName}
+              size="xs"
             />
-            <span className="truncate">
-              {a.staffFirstName} {a.staffLastName[0]}.
-            </span>
-            <Badge variant="secondary" className="text-[9px] px-1 py-0">
-              {a.staffRole}
-            </Badge>
-            {a.isOvertime && (
-              <Badge variant="destructive" className="text-[9px] px-1 py-0">
-                OT
-              </Badge>
-            )}
+            <div className="flex items-center gap-1 min-w-0 flex-1">
+              <span className="truncate font-medium">
+                {a.staffFirstName} {a.staffLastName[0]}.
+              </span>
+              {a.isChargeNurse && (
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500 shrink-0">
+                  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+                </svg>
+              )}
+              {a.isOvertime && (
+                <Badge variant="destructive" className="text-[8px] px-1 py-0 shrink-0">
+                  OT
+                </Badge>
+              )}
+            </div>
           </div>
         ))}
         {cancelledAssignments.map((a) => (
