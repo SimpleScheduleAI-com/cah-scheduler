@@ -143,8 +143,8 @@ export async function GET(
       censusRequired = baseRequired;
     }
 
-    // Apply unit absolute floor (on_call shifts don't count toward staffing)
-    if (shiftType === "on_call") return censusRequired;
+    // On-call shifts never use census-band staffing — return their base count (typically 1)
+    if (shiftType === "on_call") return baseRequired;
     const unitMin = shiftType === "day" ? unitMinDay : unitMinNight;
     return Math.max(censusRequired, unitMin);
   }

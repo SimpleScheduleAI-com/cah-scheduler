@@ -93,7 +93,7 @@ const STATUS_LABELS: Record<string, string> = {
 const SOURCE_LABELS: Record<string, string> = {
   float: "Float Pool",
   per_diem: "PRN",
-  overtime: "Overtime",
+  overtime: "Extra Shift",
   agency: "Agency",
 };
 

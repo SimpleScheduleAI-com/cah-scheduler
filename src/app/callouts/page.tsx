@@ -106,7 +106,7 @@ const reasonLabels: Record<string, string> = {
 const sourceLabels: Record<string, string> = {
   float: "Float Pool",
   per_diem: "Per Diem",
-  overtime: "Overtime",
+  overtime: "Extra Shift",
   agency: "Agency",
 };
 

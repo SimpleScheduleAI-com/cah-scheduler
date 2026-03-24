@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.12] - 2026-03-24
+
+### Fixed
+
+- **On-call shifts showing census-band staffing (0/5) instead of base count (0/1)**: `getEffectiveRequired` in the schedule API route returned `censusRequired` for on-call shifts. When all shifts in the schedule had a census band set (e.g. Green), on-call shifts inherited the band's total staffing (requiredRNs + requiredCNAs = 5) instead of their shift-definition base count (1). On-call shifts never count toward unit staffing and should always use their base `requiredStaffCount`. Changed the on-call early return from `censusRequired` to `baseRequired`.
+
+- **"Overtime" source label was misleading on coverage candidates**: The open-shifts and callouts pages displayed "Overtime" as the source badge for all regular full-time/part-time staff available for extra shifts. This classification label (meaning "overtime tier" in the escalation cascade) was confused with actual overtime (>40 h/week). Renamed the display label from "Overtime" to "Extra Shift" to accurately describe what it means — a regular staff member picking up an additional shift. The underlying `source: "overtime"` data value is unchanged; only the user-facing label changed.
+
+### Files Modified
+
+- `src/app/api/schedules/[id]/route.ts` — `getEffectiveRequired`: on-call early return now uses `baseRequired` instead of `censusRequired`
+- `src/app/open-shifts/page.tsx` — SOURCE_LABELS: "Overtime" → "Extra Shift"
+- `src/app/callouts/page.tsx` — sourceLabels: "Overtime" → "Extra Shift"
+
+---
+
 ## [1.7.11] - 2026-03-21
 
 ### Fixed
