@@ -749,7 +749,7 @@ You can filter by **Entity** (Assignments, Shifts / Census, Leave, Callouts, etc
 4. Go to Schedule Variants page when generation completes
 5. Review score cards; click "Apply" on your preferred variant
 6. Return to Schedule, make any manual adjustments
-7. Click "Publish"
+7. Click "Publish" — if there are unresolved hard violations, the Publish button shows a lock icon and lists the violation count beneath it so you know exactly what needs to be fixed first
 8. Click "Export" to download the schedule as an Excel file for distribution
 ```
 

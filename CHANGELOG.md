@@ -6,6 +6,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.19] - 2026-03-24
+
+### Added
+
+- **Schedule selector on Analytics page**: A dropdown in the Analytics header lets the manager choose which schedule period to view. All charts and metrics update when the selection changes. Defaults to the most recently started schedule (matching dashboard behaviour).
+
+- **Analytics data accuracy — census-band-derived required counts**: The analytics API now applies the same `getEffectiveRequired()` census-band priority cascade used by the dashboard. Previously, fill rate and unfilled shift counts were computed from the raw `shift.requiredStaffCount` column, which ignored census-band overrides and could diverge from the dashboard. Extracted the shared function to `src/lib/analytics/effective-required.ts`.
+
+- **Analytics — active assignment filter**: All analytics queries now exclude `cancelled` and `called_out` assignments, matching the dashboard's counting method. Previously all assignments were counted regardless of status, inflating fill rates.
+
+- **Analytics — correct overtime threshold**: Overtime hours are now computed relative to the actual schedule length (`40h × schedule_weeks`) instead of a hardcoded `40 × 6 = 240h`. Schedules shorter or longer than 6 weeks are now measured correctly.
+
+- **Analytics — callout trend scoped to schedule**: The callout trend chart previously fetched all callouts across the entire database. It now filters to callouts from shifts belonging to the selected schedule period.
+
+- **Analytics — violations from scenario**: Hard and soft violation counts now come from the most recent scenario generated for the selected schedule, replacing the previous hardcoded `0`. The Compliance Overview section shows hard violations (red) and soft violations (amber) as separate rows.
+
+- **Analytics — zero-overtime insight**: When all staff have zero overtime hours for the period, the Overtime by Staff chart is replaced by a green "No overtime this period — all staff worked within standard hours" message.
+
+- **Analytics — Labor Cost "Coming Soon"**: The Total Labor Cost summary card and Labor Cost Breakdown chart are replaced with "Coming Soon" panels. The current calculation used hardcoded rates ($30/$45/$60/hr) that are not real wage data; the feature will be enabled once per-staff hourly rates are configurable.
+
+- **Docs updated**: `docs/11-generating-schedules.md` now documents the startup animation on the generation progress bar and the Publish button lock guard. `docs/09-using-the-app.md` notes that the Publish button shows a violation count when blocked.
+
+### Files Modified
+
+- `src/lib/analytics/effective-required.ts` — new shared utility
+- `src/app/api/dashboard/route.ts` — uses shared utility (no behaviour change)
+- `src/app/api/analytics/route.ts` — all accuracy fixes + schedule param + violations
+- `src/app/analytics/page.tsx` — schedule selector, zero-OT state, violations breakdown, Coming Soon cost
+- `docs/11-generating-schedules.md` — generation animation + publish lock guard
+- `docs/09-using-the-app.md` — publish lock guard note
+
+---
+
 ## [1.7.18] - 2026-03-24
 
 ### Added

@@ -6,6 +6,7 @@ import {
 } from "@/db/schema";
 import { eq, desc, inArray, or, and, gt, count, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { getEffectiveRequired } from "@/lib/analytics/effective-required";
 
 export async function GET() {
   // Active staff count
@@ -53,28 +54,6 @@ export async function GET() {
     // Load census bands once — same priority logic as the schedule detail API
     const bands = db.select().from(censusBand).where(eq(censusBand.isActive, true)).all();
 
-    function getEffectiveRequired(
-      cbId: string | null,
-      acuityLevel: string | null,
-      unit: string | null,
-      actualCensus: number | null,
-      base: number
-    ): number {
-      if (cbId) {
-        const b = bands.find((b) => b.id === cbId);
-        if (b) return b.requiredRNs + b.requiredCNAs;
-      }
-      if (acuityLevel && unit) {
-        const b = bands.find((b) => b.color === acuityLevel && b.unit === unit);
-        if (b) return b.requiredRNs + b.requiredCNAs;
-      }
-      if (actualCensus !== null) {
-        const b = bands.find((b) => actualCensus >= b.minPatients && actualCensus <= b.maxPatients);
-        if (b) return Math.max(b.requiredRNs + b.requiredCNAs, base);
-      }
-      return base;
-    }
-
     // Load all assignments for this schedule in one query (avoids N+1)
     const shiftIds = shifts.map((s) => s.id);
     const allAssignments = shiftIds.length > 0
@@ -94,7 +73,7 @@ export async function GET() {
 
     for (const s of shifts) {
       const base = s.requiredStaffCount ?? s.defRequiredStaff;
-      const required = getEffectiveRequired(s.censusBandId, s.acuityLevel, s.defUnit, s.actualCensus, base);
+      const required = getEffectiveRequired(s.censusBandId, s.acuityLevel, s.defUnit, s.actualCensus, base, bands);
       totalSlots += required;
       const assigned = activeCountByShift.get(s.id) ?? 0;
       totalAssignments += assigned;
