@@ -596,7 +596,7 @@ export default function CalloutsPage() {
                             className={`text-[10px] px-1 py-0 ${
                               c.wouldBeOvertime
                                 ? "bg-orange-500 text-white"
-                                : "bg-muted text-muted-foreground"
+                                : "bg-slate-200 text-slate-800"
                             }`}
                           >
                             {c.hoursThisWeek}h{c.wouldBeOvertime ? " OT" : " this wk"}

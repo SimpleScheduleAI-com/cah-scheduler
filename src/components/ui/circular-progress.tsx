@@ -66,7 +66,7 @@ export function CircularProgress({
         />
       </svg>
       {showValue && (
-        <div className={cn("absolute font-bold", fontSize, colorMap[color])}>
+        <div className={cn("absolute inset-0 flex items-center justify-center font-bold", fontSize, colorMap[color])}>
           {Math.round(percentage)}%
         </div>
       )}

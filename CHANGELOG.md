@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.13] - 2026-03-24
+
+### Fixed
+
+- **Swap validation dialog froze on "Checking Rules..."**: The `/api/swap-requests/[id]/validate` GET handler had no try/catch. Any unhandled DB exception returned a raw 500 HTML page; calling `.json()` on that threw a `SyntaxError` in `handleApproveClick`, leaving `confirmValidating === true` permanently with no way to close the dialog. Fixed by wrapping the entire GET handler body in try/catch (returns `{ valid: false, error: "..." }` JSON on 500). Also added try/catch in `handleApproveClick` as a belt-and-suspenders guard.
+
+- **Dashboard gradient ribbon showed white strips top and bottom**: The `Card` component applies `py-6 bg-card` (white + 24px vertical padding) unconditionally. The inner `gradient-hero p-8` div only filled the `CardContent` area, leaving the Card's own padding visible as white. Added `p-0` to the hero card's className to remove the default padding and let the gradient fill the full card.
+
+- **CircularProgress "100%" text was mis-positioned**: The absolute text overlay had no `top`/`left`/`inset` values. Without explicit positioning it defaulted to the top-left corner of the container rather than the center of the SVG circle. Changed to `absolute inset-0 flex items-center justify-center` so the text is always centered regardless of digit count.
+
+- **"Xh this wk" badge text was invisible in Callouts page**: Non-overtime badge used `bg-muted text-muted-foreground` (near-white background with medium-gray text) at `text-[10px]` — insufficient contrast. Changed to `bg-slate-200 text-slate-800` for readable contrast.
+
+### Files Modified
+
+- `src/app/api/swap-requests/[id]/validate/route.ts` — added try/catch around GET handler body
+- `src/app/swaps/page.tsx` — added try/catch in `handleApproveClick`
+- `src/app/dashboard/page.tsx` — added `p-0` to hero Card
+- `src/components/ui/circular-progress.tsx` — fixed text centering with `inset-0 flex items-center justify-center`
+- `src/app/callouts/page.tsx` — fixed badge contrast
+
+---
+
 ## [1.7.12] - 2026-03-24
 
 ### Fixed

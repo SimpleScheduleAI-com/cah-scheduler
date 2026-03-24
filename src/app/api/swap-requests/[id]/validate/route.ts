@@ -141,6 +141,7 @@ export async function GET(
 ) {
   const { id } = await params;
 
+  try {
   const existing = db
     .select()
     .from(shiftSwapRequest)
@@ -260,4 +261,11 @@ export async function GET(
     valid: violations.length === 0,
     violations,
   });
+  } catch (err) {
+    console.error("[validate] Unhandled error:", err);
+    return NextResponse.json(
+      { valid: false, error: "Validation service error. Please try again." },
+      { status: 500 }
+    );
+  }
 }

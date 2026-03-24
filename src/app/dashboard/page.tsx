@@ -175,7 +175,7 @@ export default function DashboardPage() {
       )}
 
       {/* Current schedule — primary CTA with gradient hero */}
-      <Card className="mb-6 overflow-hidden border-0 shadow-lg">
+      <Card className="mb-6 overflow-hidden border-0 shadow-lg p-0">
         <div className="gradient-hero p-8">
           <CardContent className="flex items-center justify-between p-0">
             {data.scheduleInfo ? (

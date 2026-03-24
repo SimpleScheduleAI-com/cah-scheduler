@@ -134,20 +134,25 @@ export default function SwapsPage() {
     setConfirmValidating(true);
     setConfirmDialogOpen(true);
 
-    const res = await fetch(`/api/swap-requests/${id}/validate`);
-    const data = await res.json();
-    setConfirmValidating(false);
+    try {
+      const res = await fetch(`/api/swap-requests/${id}/validate`);
+      const data = await res.json();
+      setConfirmValidating(false);
 
-    if (!res.ok) {
-      setConfirmError(data.error ?? "An unexpected error occurred during validation.");
-      return;
-    }
+      if (!res.ok) {
+        setConfirmError(data.error ?? "An unexpected error occurred during validation.");
+        return;
+      }
 
-    setConfirmValid(data.valid);
-    setConfirmViolations(data.violations ?? []);
-    setConfirmOpenRequest(data.openRequest ?? false);
-    if (!data.valid && data.error) {
-      setConfirmError(data.error);
+      setConfirmValid(data.valid);
+      setConfirmViolations(data.violations ?? []);
+      setConfirmOpenRequest(data.openRequest ?? false);
+      if (!data.valid && data.error) {
+        setConfirmError(data.error);
+      }
+    } catch {
+      setConfirmValidating(false);
+      setConfirmError("Could not reach the validation service. Please try again.");
     }
   }
 
