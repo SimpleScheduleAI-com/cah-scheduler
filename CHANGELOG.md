@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.20] - 2026-03-26
+
+### Fixed
+
+- **OT not detected when replacing Saturday + Sunday open shifts**: When a staff member was put
+  on leave covering both Saturday and Sunday, the open-shifts replacement flow failed to detect
+  overtime for the second shift. Root cause: `computeWeeklyHours` (used to set `isOvertime` on
+  new assignments) and `checkStaffAvailability` (used to compute recommendations) both used a
+  **Sunday-to-Saturday payroll week**. This caused Saturday (end of one Sun-Sat week) and Sunday
+  (start of the next) to fall in different week windows, so the Saturday assignment was invisible
+  when computing hours for the Sunday approval. Both functions are now aligned to a
+  **Monday-to-Sunday week**, matching the assignment dialog's "hours this week" display.
+  Practical effect: assigning a nurse to Saturday will now correctly register as part of the
+  same week when the Sunday shift is evaluated. If the combined hours exceed 40h, the Sunday
+  assignment receives `isOvertime: true` and the OT badge appears in the schedule grid and
+  assignment dialog.
+
+- **No OT warning when selecting replacement for second open shift**: Same root cause as above.
+  After approving the Saturday replacement, the Sunday recommendation re-fetched candidate
+  hours using the same Sunday-Saturday window, so the Saturday assignment was invisible and the
+  nurse appeared as a normal (non-overtime) candidate without any warning. With the Mon-Sun fix,
+  the recommendation now correctly flags the candidate as overtime and shows the warning.
+
+- **OT warning not prominent enough in open-shifts candidate list**: The overtime warning was
+  only visible in the "Cons" section (a secondary details area). An inline **"OT — Xh + Yh"**
+  badge now appears directly in the candidate name row, in the primary selection area, so it is
+  impossible to miss before approving.
+
+### Files Modified
+
+- `src/app/api/open-shifts/[id]/route.ts` — `computeWeeklyHours` now uses Mon-Sun week
+- `src/lib/coverage/find-candidates.ts` — `checkStaffAvailability` now uses Mon-Sun week
+- `src/app/open-shifts/page.tsx` — inline OT badge on candidate name row
+
+---
+
 ## [1.7.19] - 2026-03-24
 
 ### Added

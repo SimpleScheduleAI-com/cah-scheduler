@@ -438,6 +438,11 @@ export default function CoverageRequestsPage() {
                           <span className={`text-xs px-2 py-0.5 rounded font-medium ${SOURCE_COLORS[candidate.source]}`}>
                             {SOURCE_LABELS[candidate.source]}
                           </span>
+                          {candidate.isOvertime && (
+                            <span className="text-xs px-2 py-0.5 rounded font-medium bg-red-100 text-red-700">
+                              OT — {candidate.hoursThisWeek}h + {selectedRequest.durationHours}h
+                            </span>
+                          )}
                         </div>
 
                         {/* Pros */}

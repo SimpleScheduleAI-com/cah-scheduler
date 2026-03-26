@@ -507,8 +507,9 @@ async function checkStaffAvailability(
   shiftDetails: ShiftDetails
 ): Promise<AvailabilityResult> {
   const shiftDate = parseISO(shiftDetails.date);
-  const weekStart = startOfWeek(shiftDate, { weekStartsOn: 0 });
-  const weekEnd = endOfWeek(shiftDate, { weekStartsOn: 0 });
+  // Use Monday as week start so Sat + Sun land in the same window (matches assignment dialog)
+  const weekStart = startOfWeek(shiftDate, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(shiftDate, { weekStartsOn: 1 });
 
   // 1. Approved leave
   const leaveRecords = db

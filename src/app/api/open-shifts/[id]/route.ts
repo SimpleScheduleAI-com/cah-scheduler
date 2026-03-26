@@ -4,14 +4,16 @@ import { eq, and, gte, lte, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 /**
- * Compute the total scheduled hours for a staff member in the Sun-Sat week
- * containing `shiftDate`. Used to accurately set isOvertime on new assignments.
+ * Compute the total scheduled hours for a staff member in the Mon-Sun week
+ * containing `shiftDate`. Uses Monday as the week start so that Saturday and
+ * Sunday land in the same week window — matching the assignment-dialog display.
  */
 function computeWeeklyHours(staffId: string, shiftDate: string): number {
   const d = new Date(shiftDate + "T00:00:00Z");
-  const day = d.getUTCDay(); // 0=Sun
+  const day = d.getUTCDay(); // 0=Sun, 1=Mon, …, 6=Sat
+  const daysFromMonday = day === 0 ? 6 : day - 1; // Mon=0, …, Sun=6
   const weekStart = new Date(d);
-  weekStart.setUTCDate(d.getUTCDate() - day);
+  weekStart.setUTCDate(d.getUTCDate() - daysFromMonday);
   const weekEnd = new Date(weekStart);
   weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
 
