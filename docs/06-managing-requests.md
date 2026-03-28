@@ -198,6 +198,8 @@ When you click "Approve" on a directed swap, the system validates these hard rul
 
 If any check fails, a dialog appears listing every violation. The swap is **not** performed and the request stays Pending so you can investigate and either deny it or correct the issue.
 
+> **Note on overtime after a swap:** Overtime is not a hard block — a swap will still be approved even if one staff member ends up over 40 hours for the week. However, after approval the system recalculates weekly hours for both staff members and updates the **OT** badge (red) on their assignments in the schedule grid and assignment dialog. If the swap pushes someone over 40 hours, the badge will appear so you can see it at a glance.
+
 ### Example: Valid Swap
 
 > **Before:**
@@ -404,3 +406,7 @@ The application provides dedicated pages for managing all three types of request
 ---
 
 [Next: Handling Callouts →](./07-handling-callouts.md)
+
+---
+
+*Last Updated: March 2026 — v1.7.21*

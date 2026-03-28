@@ -95,11 +95,13 @@ export async function GET(request: Request) {
     }
 
     // Group by ISO week and calculate fill rate using census-band-derived required counts
+    // Use Monday as week start (matching the assignment dialog and schedule grid display)
     const weeklyFillRate: { [key: string]: { total: number; filled: number } } = {};
     for (const s of shiftsWithData) {
       const date = new Date(s.date);
       const weekStart = new Date(date);
-      weekStart.setDate(date.getDate() - date.getDay());
+      const dow = date.getDay(); // 0=Sun
+      weekStart.setDate(date.getDate() - (dow === 0 ? 6 : dow - 1));
       const weekKey = weekStart.toISOString().split("T")[0];
 
       const base = s.requiredStaff ?? s.defRequired;
@@ -172,7 +174,8 @@ export async function GET(request: Request) {
     for (const c of callouts) {
       const date = new Date(c.date);
       const weekStart = new Date(date);
-      weekStart.setDate(date.getDate() - date.getDay());
+      const cdow = date.getDay(); // 0=Sun
+      weekStart.setDate(date.getDate() - (cdow === 0 ? 6 : cdow - 1));
       const weekKey = weekStart.toISOString().split("T")[0];
       weeklyCallouts[weekKey] = (weeklyCallouts[weekKey] || 0) + 1;
     }

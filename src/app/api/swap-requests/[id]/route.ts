@@ -35,6 +35,38 @@ export async function GET(
 }
 
 // ---------------------------------------------------------------------------
+// Helper: compute total scheduled hours for a staff member in the Mon-Sun
+// week containing shiftDate. Matches the week window used by the assignment
+// dialog display so isOvertime flags stay consistent.
+// ---------------------------------------------------------------------------
+function computeWeeklyHours(staffId: string, shiftDate: string): number {
+  const d = new Date(shiftDate + "T00:00:00Z");
+  const day = d.getUTCDay(); // 0=Sun, 1=Mon, …, 6=Sat
+  const daysFromMonday = day === 0 ? 6 : day - 1;
+  const weekStart = new Date(d);
+  weekStart.setUTCDate(d.getUTCDate() - daysFromMonday);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
+  const fmt = (dt: Date) => dt.toISOString().slice(0, 10);
+  const rows = db
+    .select({ durationHours: shiftDefinition.durationHours })
+    .from(assignment)
+    .innerJoin(shift, eq(assignment.shiftId, shift.id))
+    .innerJoin(shiftDefinition, eq(shift.shiftDefinitionId, shiftDefinition.id))
+    .where(
+      and(
+        eq(assignment.staffId, staffId),
+        gte(shift.date, fmt(weekStart)),
+        lte(shift.date, fmt(weekEnd)),
+        ne(assignment.status, "called_out"),
+        ne(assignment.status, "cancelled")
+      )
+    )
+    .all();
+  return rows.reduce((sum, r) => sum + r.durationHours, 0);
+}
+
+// ---------------------------------------------------------------------------
 // Helper: fetch shift details (date + shift def) for an assignment
 // ---------------------------------------------------------------------------
 function getShiftDetails(assignmentRow: { shiftId: string }) {
@@ -388,11 +420,32 @@ export async function PUT(
             );
           }
 
-          // All checks passed — perform the swap
+          // All checks passed — compute isOvertime for each staff member's new shift
+          // before performing the swap, so the DB flag stays in sync with the display.
+          const reqNewDuration = db
+            .select({ durationHours: shiftDefinition.durationHours })
+            .from(shift)
+            .innerJoin(shiftDefinition, eq(shift.shiftDefinitionId, shiftDefinition.id))
+            .where(eq(shift.id, targetAssignment.shiftId)) // requesting staff takes target's shift
+            .get()?.durationHours ?? 0;
+          const tgtNewDuration = db
+            .select({ durationHours: shiftDefinition.durationHours })
+            .from(shift)
+            .innerJoin(shiftDefinition, eq(shift.shiftDefinitionId, shiftDefinition.id))
+            .where(eq(shift.id, requestingAssignment.shiftId)) // target staff takes requesting's shift
+            .get()?.durationHours ?? 0;
+
+          const reqIsOvertime =
+            computeWeeklyHours(existing.requestingStaffId, tgtShiftDetails.date) + reqNewDuration > 40;
+          const tgtIsOvertime =
+            computeWeeklyHours(existing.targetStaffId, reqShiftDetails.date) + tgtNewDuration > 40;
+
+          // Perform the swap
           db.update(assignment)
             .set({
               staffId: existing.targetStaffId,
               assignmentSource: "swap",
+              isOvertime: reqIsOvertime,
               updatedAt: new Date().toISOString(),
             })
             .where(eq(assignment.id, requestingAssignment.id))
@@ -402,6 +455,7 @@ export async function PUT(
             .set({
               staffId: existing.requestingStaffId,
               assignmentSource: "swap",
+              isOvertime: tgtIsOvertime,
               updatedAt: new Date().toISOString(),
             })
             .where(eq(assignment.id, targetAssignment.id))

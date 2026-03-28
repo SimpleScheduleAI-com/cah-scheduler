@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.21] - 2026-03-27
+
+### Fixed
+
+- **OT badge missing after swap approval**: When a directed shift swap was approved, the two
+  assignment records had their `staffId` updated but `isOvertime` was never recomputed. If the
+  incoming staff member already had enough hours that week, the assignment retained the original
+  nurse's `isOvertime: false` — so the schedule grid and assignment dialog showed "48h this week"
+  in amber but no red OT badge. A `computeWeeklyHours` helper (Mon-Sun week, matching the
+  assignment dialog) is now called for each staff member before the DB updates, and `isOvertime`
+  is written correctly on both assignments.
+
+- **Analytics fill-rate and callout-trend charts used Sunday-start weeks**: The week-grouping
+  formula in the analytics API (`date.getDate() - date.getDay()`) backed up to Sunday, while the
+  rest of the system uses Monday as the week start. This caused Saturday and Sunday shifts to fall
+  in different chart buckets. Both trend loops now use the same Mon-Sun formula as the assignment
+  dialog and schedule grid.
+
+### Files Modified
+
+- `src/app/api/swap-requests/[id]/route.ts` — `computeWeeklyHours` helper + OT recompute on swap approval
+- `src/app/api/analytics/route.ts` — Mon-Sun week grouping for fill-rate and callout-trend charts
+
+---
+
 ## [1.7.20] - 2026-03-26
 
 ### Fixed
