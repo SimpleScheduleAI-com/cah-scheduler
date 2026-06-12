@@ -1,7 +1,7 @@
 # CAH Scheduler - Complete Rules Specification
 
-**Document Version:** 1.6.12
-**Last Updated:** March 16, 2026 (v1.6.12)
+**Document Version:** 1.6.13
+**Last Updated:** June 12, 2026 (v1.6.13)
 **Purpose:** This document describes all scheduling rules and logic implemented in the CAH Scheduler application. Please review and mark any rules that need modification.
 
 ---
@@ -544,6 +544,7 @@ Please review each section and note any changes needed:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.6.13 | Jun 12, 2026 | **Superseded evaluators deregistered:** `overtime-cost` (§4.1) and `weekend-fairness` (§4.2) can no longer be activated via rule rows — they were replaced by `overtime-v2` and `weekend-count`/`consecutive-weekends` and would have double-penalized the same hours/weekends if re-enabled. **Published-schedule guards:** regenerating a schedule or adding/removing assignments now requires the schedule to be unpublished first (HTTP 409 otherwise). No active rule behavior changed. |
 | 1.0 | Feb 2026 | Initial document with all rules and configuration options |
 | 1.1 | Feb 13, 2026 | Added Section 11 (Application UI Guide) documenting all available pages: Leave Management, Shift Swaps, PRN Availability, Unit Configuration, and Holidays Management |
 | 1.2 | Feb 15, 2026 | **Major updates based on expert feedback:** (1) Holiday fairness now tracks annually, Christmas Eve/Day merged as one holiday; (2) Low census order updated - removed Agency, added Voluntary Time Off (VTO); (3) Added Coverage page for managing shifts needing coverage; (4) Leave approval now auto-creates coverage requests for affected assignments; (5) Staff page now shows clickable calendar view for each staff member; (6) Added callout threshold days configuration |

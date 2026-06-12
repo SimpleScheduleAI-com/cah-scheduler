@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { assignment, shift, shiftDefinition, staff, publicHoliday, staffHolidayAssignment } from "@/db/schema";
+import { assignment, schedule, shift, shiftDefinition, staff, publicHoliday, staffHolidayAssignment } from "@/db/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { logAuditEvent } from "@/lib/audit/logger";
@@ -24,6 +24,17 @@ export async function POST(
 ) {
   const { id: scheduleId } = await params;
   const body = await request.json();
+
+  // A published schedule is the version of record staff were notified about.
+  // Mutating it directly would desynchronize what staff saw from what the
+  // system stores — require an explicit unpublish first.
+  const scheduleRecord = db.select().from(schedule).where(eq(schedule.id, scheduleId)).get();
+  if (scheduleRecord?.status === "published") {
+    return NextResponse.json(
+      { error: "Cannot modify assignments on a published schedule. Unpublish it first to make changes." },
+      { status: 409 }
+    );
+  }
 
   // Look up the shift up front — needed to compute isOvertime and for holiday tracking below
   const shiftRecord = db.select().from(shift).where(eq(shift.id, body.shiftId)).get();
@@ -168,6 +179,22 @@ export async function DELETE(request: Request) {
     .from(assignment)
     .where(eq(assignment.id, assignmentId))
     .get();
+
+  // Same published-schedule guard as POST: removals on the version of record
+  // must go through unpublish first.
+  if (existing) {
+    const owningSchedule = db
+      .select()
+      .from(schedule)
+      .where(eq(schedule.id, existing.scheduleId))
+      .get();
+    if (owningSchedule?.status === "published") {
+      return NextResponse.json(
+        { error: "Cannot modify assignments on a published schedule. Unpublish it first to make changes." },
+        { status: 409 }
+      );
+    }
+  }
 
   // Clean up holiday tracking if this was a holiday assignment
   if (existing) {

@@ -6,6 +6,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.22] - 2026-06-12
+
+### Added
+
+- **Published-schedule guards**: A published schedule is the version of record staff were
+  notified about, but the system allowed it to be silently mutated. Two new guards return
+  HTTP 409 with an "unpublish first" message: (1) `POST /api/scenarios/generate` refuses to
+  regenerate a published schedule (regeneration deletes every assignment, including manual
+  fills and callout replacements); (2) `POST`/`DELETE /api/schedules/[id]/assignments`
+  refuse to add or remove assignments on a published schedule.
+
+### Fixed
+
+- **Superseded rule evaluators activatable via Rules UI**: `overtime-cost` (replaced by
+  `overtime-v2`) and `weekend-fairness` (replaced by `weekend-count` +
+  `consecutive-weekends`) were still registered in the evaluator registry. An admin adding a
+  rule row pointing at either old evaluator would double-penalize the same hours/weekends
+  with conflicting math (`overtime-cost` treats all FTE-excess hours as overtime;
+  `weekend-fairness` counts Sat+Sun of one weekend as two rotations). Both are now
+  deregistered; the evaluator files remain for reference.
+
+- **`npm run build` wiped production data**: The build script ran `db:seed`, which deletes
+  ALL data and inserts test data. Rebuilding the app on a production machine destroyed real
+  schedules and staff records. Seeding is now an explicit, opt-in operation only
+  (`npm run db:seed`).
+
+- **Excel import could leave the database empty**: `deleteAllData()` and `importData()` ran
+  as separate auto-committed statements. If the import threw partway (malformed sheet,
+  constraint failure), the delete had already committed — all schedules, staff, and audit
+  history were gone with no recovery path. Both steps now run inside a single
+  `db.transaction()`, so a failed import rolls back to the pre-import state.
+
+### Files Modified
+
+- `src/lib/engine/rules/index.ts` — deregistered superseded `overtime-cost` and `weekend-fairness`
+- `package.json` — removed `db:seed` from the `build` script
+- `src/app/api/scenarios/generate/route.ts` — 409 guard for published schedules
+- `src/app/api/schedules/[id]/assignments/route.ts` — 409 guards on POST and DELETE for published schedules
+- `src/app/api/import/route.ts` — transaction-wrapped delete + import
+- `src/__tests__/rules/registry.test.ts` — new (registry exclusions)
+- `src/__tests__/scenarios/generate-published-guard.test.ts` — new
+- `src/__tests__/schedules/assignments-published-guard.test.ts` — new
+- `src/__tests__/import/import-transaction.test.ts` — new
+
+---
+
 ## [1.7.21] - 2026-03-27
 
 ### Fixed

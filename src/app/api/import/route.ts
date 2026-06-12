@@ -372,11 +372,13 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // Delete all existing data
-    deleteAllData();
-
-    // Import new data
-    importData(result);
+    // Replace destructively but atomically: if any insert fails partway, the
+    // delete rolls back too, so a malformed file can never leave the database
+    // empty (previously this wiped schedules/staff/audit with no recovery).
+    db.transaction(() => {
+      deleteAllData();
+      importData(result);
+    });
 
     // Return success
     return NextResponse.json({

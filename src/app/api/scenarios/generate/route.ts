@@ -18,6 +18,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Schedule not found" }, { status: 404 });
   }
 
+  // Regeneration deletes every assignment on the schedule (including manual
+  // fills and callout replacements). Staff are relying on a published
+  // schedule, so require an explicit unpublish first.
+  if (scheduleRecord.status === "published") {
+    return NextResponse.json(
+      { error: "Cannot regenerate a published schedule. Unpublish it first to make changes." },
+      { status: 409 }
+    );
+  }
+
   // Reject if a job is already running for this schedule
   const existingJob = db
     .select()
