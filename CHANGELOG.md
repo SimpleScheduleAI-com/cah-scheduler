@@ -6,6 +6,64 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.24] - 2026-06-12
+
+### Fixed
+
+- **Hard rules now enforced on every manual path, not just generation.** The scheduler's
+  eligibility checks were airtight, but four other doors into the schedule bypassed them:
+  - **Swap approval** never checked the 60h rolling 7-day cap or max-consecutive-days. A
+    nurse at 48h could be swapped into 12 more hours. `validateSwapSide` now runs both
+    checks (all 7 rolling windows, run-bridging consecutive count) from a new
+    `windowAssignments` input the route supplies.
+  - **Swap approval on dead assignments**: a pending swap could be approved after one
+    party's assignment had been cancelled (e.g. by leave approval) — the swap then mutated
+    a cancelled row and both nurses silently vanished from the grid. Approval now returns
+    422 when either assignment is no longer `assigned` (directed and open swaps).
+  - **Open-shift approve/fill and callout fill** inserted assignments based on
+    recommendations computed possibly hours earlier. Both routes now re-run
+    `checkStaffAvailability` (leave, overlap, same-day rest, 60h cap, on-call limits) at
+    the moment of fill and return 422 with the reason when it fails.
+  - **Manual-assignment OT flag** counted hours from called-out and cancelled assignments,
+    producing phantom OT badges; the weekly-hours query now filters them (matching swap
+    approval and find-candidates).
+
+- **Schedule-boundary blindness (7-consecutive-days bug).** Every generation started from a
+  blank slate, so a nurse who worked the last days of the prior period could be scheduled
+  into a 6th/7th consecutive day, a <10h rest gap, or an over-60h window at the start of
+  the new period — and the evaluator couldn't see it either. `buildContext` now loads the
+  7 days of assignments before `scheduleStartDate` as `priorAssignments`; the scheduler
+  seeds them into every state build (greedy, repair, local search — synthetic shiftIds,
+  never in results), and the `max-consecutive` + `rest-hours` evaluators count across the
+  boundary while only flagging current-schedule dates. The historical weekend-count window
+  now ends where the prior window begins so the final pre-schedule weekend isn't counted
+  twice.
+
+- **ICU/ER unit-name matching unified.** The `icu-competency` evaluator exact-matched
+  `"ICU"`/`"ER"` while the scheduler's eligibility gate also recognised `"ED"`,
+  `"Emergency"`, and compound names ("ICU-Stepdown"). A Level 1 manual assignment on an
+  "ED" unit passed evaluation the generator would have blocked. Both now share
+  `isICUUnit()` from `src/lib/engine/unit-utils.ts`.
+
+### Files Modified
+
+- `src/lib/swap/validate-swap.ts` — 60h rolling-window + max-consecutive checks (`windowAssignments`)
+- `src/app/api/swap-requests/[id]/route.ts` — stale-assignment 422 guards; `getWindowAssignments` helper; durations fetched pre-validation
+- `src/app/api/open-shifts/[id]/route.ts` — `recheckAvailabilityAtFill` on approve + fill
+- `src/app/api/callouts/[id]/route.ts` — availability re-check before any mutation
+- `src/app/api/schedules/[id]/assignments/route.ts` — OT query excludes called_out/cancelled
+- `src/lib/coverage/find-candidates.ts` — `checkStaffAvailability` + `ShiftDetails` exported
+- `src/lib/engine/unit-utils.ts` — new shared `isICUUnit`
+- `src/lib/engine/scheduler/eligibility.ts`, `src/lib/engine/rules/icu-competency.ts` — use shared matcher
+- `src/lib/engine/rules/types.ts`, `src/lib/engine/scheduler/types.ts` — `priorAssignments` context fields
+- `src/lib/engine/rule-engine.ts` — prior-window query; UTC-safe historical weekend lookback
+- `src/lib/engine/scheduler/index.ts` — prior drafts mapped into SchedulerContext
+- `src/lib/engine/scheduler/greedy.ts`, `repair.ts`, `local-search.ts` — prior seed in all state builds
+- `src/lib/engine/rules/max-consecutive.ts`, `rest-hours.ts` — cross-boundary evaluation
+- Tests: `swap/validate-swap` (+7), `swap/approve-stale-assignment` (new), `coverage/fill-time-recheck` (new), `rules/prior-schedule-boundary` (new), `rules/icu-competency` (+5), `scheduler/greedy` (+3), `schedules/assignments-published-guard` (+1); `callouts/fill-audit` mocks updated for the new guard
+
+---
+
 ## [1.7.23] - 2026-06-12
 
 ### Fixed

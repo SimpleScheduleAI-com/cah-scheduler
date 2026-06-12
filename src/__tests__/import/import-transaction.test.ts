@@ -148,7 +148,7 @@ describe("POST /api/import — atomic replace", () => {
   });
 
   it("wraps the destructive replace in a single transaction", async () => {
-    const res = (await POST(makeImportRequest())) as { status: number; _data: unknown };
+    const res = (await POST(makeImportRequest())) as unknown as { status: number; _data: unknown };
     expect(res.status).toBe(200);
     expect(txState.transactionCalls).toBe(1);
   });

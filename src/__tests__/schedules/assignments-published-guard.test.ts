@@ -156,4 +156,22 @@ describe("assignments route — published-schedule guard", () => {
     expect((res as { status: number }).status).toBe(200);
     expect(mockDeleteRun).toHaveBeenCalled();
   });
+
+  it("POST excludes called-out and cancelled assignments from the weekly OT hours", async () => {
+    // The isOvertime computation must not count hours from assignments the
+    // nurse is no longer working (called out / cancelled) — otherwise a nurse
+    // who called out Monday gets a phantom OT badge on Thursday.
+    tableGets.schedule.mockReturnValue({ id: SCHEDULE_ID, status: "draft" });
+    const { ne } = await import("drizzle-orm");
+    const schema = await import("@/db/schema");
+    await POST(makePost({ shiftId: "shift-001", staffId: "staff-001" }), {
+      params: makeParams(),
+    });
+    const neCalls = (ne as unknown as ReturnType<typeof vi.fn>).mock.calls;
+    const statusArgs = neCalls
+      .filter((c: unknown[]) => c[0] === schema.assignment.status)
+      .map((c: unknown[]) => c[1]);
+    expect(statusArgs).toContain("called_out");
+    expect(statusArgs).toContain("cancelled");
+  });
 });

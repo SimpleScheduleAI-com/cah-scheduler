@@ -41,7 +41,8 @@ vi.mock("drizzle-orm", () => ({
 vi.mock("@/db/schema", () => ({
   callout:    { id: "callout$id",    staffId: "callout$staffId" },
   assignment: { id: "assign$id",     isChargeNurse: "assign$isChargeNurse" },
-  shift:      { id: "shift$id",      scheduleId: "shift$scheduleId", date: "shift$date" },
+  shift:      { id: "shift$id",      scheduleId: "shift$scheduleId", date: "shift$date", shiftDefinitionId: "shift$defId" },
+  shiftDefinition: { id: "def$id",   startTime: "def$startTime", endTime: "def$endTime", durationHours: "def$durationHours", unit: "def$unit", shiftType: "def$shiftType" },
   schedule:   { id: "sched$id",      unit: "sched$unit" },
   staff:      { id: "staff$id",      firstName: "staff$firstName", lastName: "staff$lastName", homeUnit: "staff$homeUnit" },
 }));
@@ -56,11 +57,12 @@ vi.mock("@/db", () => ({
         }),
       }),
     }),
-    select: () => ({
-      from: () => ({
-        where: () => ({ get: mockSelectGet }),
-      }),
-    }),
+    select: () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const chain: any = { where: () => ({ get: mockSelectGet }) };
+      chain.innerJoin = () => chain;
+      return { from: () => chain };
+    },
     insert: () => ({
       values: () => ({ run: mockInsertRun }),
     }),
@@ -69,6 +71,12 @@ vi.mock("@/db", () => ({
 
 vi.mock("@/lib/audit/logger", () => ({ logAuditEvent: mockLogAuditEvent }));
 vi.mock("@/lib/callout/escalation", () => ({ getEscalationOptions: vi.fn(() => []) }));
+// Fill-time availability re-check (v1.7.24): always available in these tests —
+// the audit-trail invariants under test are downstream of the guard.
+vi.mock("@/lib/coverage/find-candidates", () => ({
+  checkStaffAvailability: vi.fn(async () => ({ available: true, hoursThisWeek: 0 })),
+  findCandidatesForShift: vi.fn(async () => ({ candidates: [], escalationStepsChecked: [] })),
+}));
 
 // ─── Import SUT after mocks ───────────────────────────────────────────────────
 
@@ -112,6 +120,17 @@ function makeUpdatedCallout(overrides: Record<string, unknown> = {}) {
  */
 function setupSelectQueue() {
   mockSelectGet
+    // 0a/0b: fill-time availability guard (v1.7.24) — callout fetch + shift details
+    .mockReturnValueOnce(makeUpdatedCallout({ status: "open" }))
+    .mockReturnValueOnce({
+      date: "2026-03-10",
+      startTime: "07:00",
+      endTime: "19:00",
+      durationHours: 12,
+      unit: "ICU",
+      shiftType: "day",
+      scheduleId: SCHED_ID,
+    })
     .mockReturnValueOnce({ isChargeNurse: false })                         // 1
     .mockReturnValueOnce({ firstName: "Bob", lastName: "Smith" })          // 2
     .mockReturnValueOnce({ scheduleId: SCHED_ID, date: "2026-03-10" })     // 3

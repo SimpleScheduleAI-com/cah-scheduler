@@ -170,6 +170,115 @@ describe("validateSwapSide", () => {
 // validateSwap — both sides together
 // ---------------------------------------------------------------------------
 
+describe("validateSwapSide — 60h rolling window", () => {
+  it("flags when taking the shift would exceed 60h in a rolling 7-day window", () => {
+    // 48h already worked Mar 5–8; taking a 13h shift on Mar 10 = 61h in the
+    // window Mar 5–11.
+    const side = makeSide({
+      takesShift: {
+        date: "2026-03-10",
+        startTime: "07:00",
+        endTime: "20:00",
+        isChargeNurse: false,
+        unit: "ICU",
+      },
+      takesShiftDurationHours: 13,
+      windowAssignments: [
+        { date: "2026-03-05", durationHours: 12 },
+        { date: "2026-03-06", durationHours: 12 },
+        { date: "2026-03-07", durationHours: 12 },
+        { date: "2026-03-08", durationHours: 12 },
+      ],
+    });
+    const violations = validateSwapSide(side);
+    expect(violations.some((v) => v.ruleId === "max-hours-60")).toBe(true);
+  });
+
+  it("passes at exactly 60h in the worst window", () => {
+    const side = makeSide({
+      takesShiftDurationHours: 12,
+      windowAssignments: [
+        { date: "2026-03-05", durationHours: 12 },
+        { date: "2026-03-06", durationHours: 12 },
+        { date: "2026-03-07", durationHours: 12 },
+        { date: "2026-03-08", durationHours: 12 },
+      ],
+    });
+    const violations = validateSwapSide(side);
+    expect(violations.some((v) => v.ruleId === "max-hours-60")).toBe(false);
+  });
+
+  it("catches a forward window that starts on the taken shift's date", () => {
+    // Nothing before Mar 10, but 52h already scheduled Mar 11–16 — adding 12h
+    // on Mar 10 makes the window Mar 10–16 total 64h.
+    const side = makeSide({
+      takesShiftDurationHours: 12,
+      windowAssignments: [
+        { date: "2026-03-11", durationHours: 12 },
+        { date: "2026-03-12", durationHours: 12 },
+        { date: "2026-03-13", durationHours: 12 },
+        { date: "2026-03-14", durationHours: 8 },
+        { date: "2026-03-16", durationHours: 8 },
+      ],
+    });
+    const violations = validateSwapSide(side);
+    expect(violations.some((v) => v.ruleId === "max-hours-60")).toBe(true);
+  });
+
+  it("does not flag when window data is not provided (backward compatibility)", () => {
+    const violations = validateSwapSide(makeSide());
+    expect(violations.some((v) => v.ruleId === "max-hours-60")).toBe(false);
+  });
+});
+
+describe("validateSwapSide — max consecutive days", () => {
+  it("flags when taking the shift would create a 6th consecutive working day", () => {
+    const side = makeSide({
+      windowAssignments: [
+        { date: "2026-03-05", durationHours: 8 },
+        { date: "2026-03-06", durationHours: 8 },
+        { date: "2026-03-07", durationHours: 8 },
+        { date: "2026-03-08", durationHours: 8 },
+        { date: "2026-03-09", durationHours: 8 },
+      ],
+      takesShiftDurationHours: 8,
+    });
+    const violations = validateSwapSide(side);
+    expect(violations.some((v) => v.ruleId === "max-consecutive")).toBe(true);
+  });
+
+  it("flags when the taken shift bridges two runs into an over-limit streak", () => {
+    // Worked Mar 7–9 and Mar 11–13; taking Mar 10 creates a 7-day run.
+    const side = makeSide({
+      windowAssignments: [
+        { date: "2026-03-07", durationHours: 8 },
+        { date: "2026-03-08", durationHours: 8 },
+        { date: "2026-03-09", durationHours: 8 },
+        { date: "2026-03-11", durationHours: 8 },
+        { date: "2026-03-12", durationHours: 8 },
+        { date: "2026-03-13", durationHours: 8 },
+      ],
+      takesShiftDurationHours: 8,
+    });
+    const violations = validateSwapSide(side);
+    expect(violations.some((v) => v.ruleId === "max-consecutive")).toBe(true);
+  });
+
+  it("passes a 5-day streak (at the limit)", () => {
+    const side = makeSide({
+      windowAssignments: [
+        { date: "2026-03-06", durationHours: 8 },
+        { date: "2026-03-07", durationHours: 8 },
+        { date: "2026-03-08", durationHours: 8 },
+        { date: "2026-03-09", durationHours: 8 },
+      ],
+      takesShiftDurationHours: 8,
+    });
+    const violations = validateSwapSide(side);
+    expect(violations.some((v) => v.ruleId === "max-consecutive")).toBe(false);
+  });
+});
+
 describe("validateSwap", () => {
   it("passes when both sides are fully eligible", () => {
     const requesting = makeSide({

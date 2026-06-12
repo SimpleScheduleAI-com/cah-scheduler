@@ -26,7 +26,9 @@ import type {
   PRNAvailabilityInfo,
   StaffLeaveInfo,
   PublicHolidayInfo,
+  PriorAssignmentInfo,
 } from "./rules/types";
+import { addDays, utcDayOfWeek, getWeekendId } from "@/lib/engine/scheduler/state";
 
 export function buildContext(scheduleId: string): RuleContext {
   // Fetch the schedule to get unit and date range
@@ -267,11 +269,15 @@ export function buildContext(scheduleId: string): RuleContext {
   // are deprioritised for weekend slots in the new period, preventing the same staff from
   // always landing on weekends in every successive schedule generation.
   const historicalWeekendCounts = new Map<string, number>();
+  const priorAssignments: PriorAssignmentInfo[] = [];
   if (scheduleStartDate) {
     const lookbackWeeks = unitConfig?.schedulePeriodWeeks ?? 6;
-    const lookbackStart = new Date(scheduleStartDate);
-    lookbackStart.setDate(lookbackStart.getDate() - lookbackWeeks * 7);
-    const lookbackStartStr = lookbackStart.toISOString().slice(0, 10);
+    const lookbackStartStr = addDays(scheduleStartDate, -lookbackWeeks * 7);
+    // The 7 days immediately before the schedule are returned as
+    // priorAssignments (and seeded into the scheduler's state), so the
+    // historical weekend window stops where the prior window begins —
+    // otherwise the last pre-schedule weekend would be counted twice.
+    const priorWindowStart = addDays(scheduleStartDate, -7);
 
     const histRows = db
       .select({ staffId: assignment.staffId, date: shift.date })
@@ -279,7 +285,7 @@ export function buildContext(scheduleId: string): RuleContext {
       .innerJoin(shift, eq(assignment.shiftId, shift.id))
       .where(and(
         gte(shift.date, lookbackStartStr),
-        lt(shift.date, scheduleStartDate),
+        lt(shift.date, priorWindowStart),
         ne(assignment.status, "called_out"),
         ne(assignment.status, "cancelled")
       ))
@@ -291,12 +297,9 @@ export function buildContext(scheduleId: string): RuleContext {
     // of the same weekend counts as 1, not 2.
     const historicalWeekendIds = new Map<string, Set<string>>();
     for (const row of histRows) {
-      const day = new Date(row.date).getDay();
+      const day = utcDayOfWeek(row.date);
       if (day === 0 || day === 6) {
-        // Anchor Sunday back to its Saturday date (same logic as getWeekendId())
-        const satObj = new Date(row.date);
-        if (satObj.getDay() === 0) satObj.setDate(satObj.getDate() - 1);
-        const weekendId = satObj.toISOString().slice(0, 10);
+        const weekendId = getWeekendId(row.date);
         const ids = historicalWeekendIds.get(row.staffId) ?? new Set<string>();
         ids.add(weekendId);
         historicalWeekendIds.set(row.staffId, ids);
@@ -305,6 +308,30 @@ export function buildContext(scheduleId: string): RuleContext {
     for (const [staffId, ids] of historicalWeekendIds) {
       historicalWeekendCounts.set(staffId, ids.size);
     }
+
+    // Prior-period assignments (last 7 days before the schedule, any schedule)
+    // so boundary-sensitive hard rules see across the schedule boundary.
+    const priorRows = db
+      .select({
+        staffId: assignment.staffId,
+        date: shift.date,
+        startTime: shiftDefinition.startTime,
+        endTime: shiftDefinition.endTime,
+        durationHours: shiftDefinition.durationHours,
+        shiftType: shiftDefinition.shiftType,
+        unit: shiftDefinition.unit,
+      })
+      .from(assignment)
+      .innerJoin(shift, eq(assignment.shiftId, shift.id))
+      .innerJoin(shiftDefinition, eq(shift.shiftDefinitionId, shiftDefinition.id))
+      .where(and(
+        gte(shift.date, priorWindowStart),
+        lt(shift.date, scheduleStartDate),
+        ne(assignment.status, "called_out"),
+        ne(assignment.status, "cancelled")
+      ))
+      .all();
+    priorAssignments.push(...priorRows);
   }
 
   return {
@@ -321,6 +348,7 @@ export function buildContext(scheduleId: string): RuleContext {
     scheduleUnit,
     ruleParameters: {},
     historicalWeekendCounts,
+    priorAssignments,
   };
 }
 

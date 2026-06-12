@@ -2,6 +2,45 @@ import { db } from "@/db";
 import { openShift, assignment, shift, shiftDefinition, exceptionLog } from "@/db/schema";
 import { eq, and, gte, lte, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { checkStaffAvailability } from "@/lib/coverage/find-candidates";
+
+/**
+ * Re-run the availability hard checks (leave, overlap, same-day rest, 60h cap,
+ * on-call limits) for `staffId` against the open shift's details at the moment
+ * of fill. The stored recommendations may be hours old; the candidate may have
+ * gained conflicting assignments since (two managers filling in parallel is
+ * normal at shift change). Returns an error message, or null when clear.
+ */
+async function recheckAvailabilityAtFill(
+  staffId: string,
+  shiftId: string,
+  scheduleId: string
+): Promise<string | null> {
+  const details = db
+    .select({
+      date: shift.date,
+      startTime: shiftDefinition.startTime,
+      endTime: shiftDefinition.endTime,
+      durationHours: shiftDefinition.durationHours,
+      unit: shiftDefinition.unit,
+      shiftType: shiftDefinition.shiftType,
+    })
+    .from(shift)
+    .innerJoin(shiftDefinition, eq(shift.shiftDefinitionId, shiftDefinition.id))
+    .where(eq(shift.id, shiftId))
+    .get();
+  if (!details) return null; // shift lookup failures are handled by callers
+
+  const availability = await checkStaffAvailability(staffId, {
+    id: shiftId,
+    scheduleId,
+    ...details,
+  });
+  if (!availability.available) {
+    return `Cannot fill: staff member no longer passes hard rules — ${availability.reason ?? "unavailable"}.`;
+  }
+  return null;
+}
 
 /**
  * Compute the total scheduled hours for a staff member in the Mon-Sun week
@@ -130,6 +169,16 @@ export async function PUT(
       return NextResponse.json(updated);
     }
 
+    // Hard-rule re-check at the moment of approval (recommendations may be stale)
+    const approveBlockReason = await recheckAvailabilityAtFill(
+      body.selectedStaffId,
+      existing.shiftId,
+      shiftRecord.scheduleId
+    );
+    if (approveBlockReason) {
+      return NextResponse.json({ error: approveBlockReason }, { status: 422 });
+    }
+
     // Check if the original nurse was the charge nurse so the replacement inherits the role.
     // Without this, every coverage approval for a charge nurse creates a hard "Charge Nurse Required" violation.
     const originalAssignment = existing.originalStaffId
@@ -208,6 +257,16 @@ export async function PUT(
 
     if (!shiftRecord) {
       return NextResponse.json({ error: "Shift not found" }, { status: 404 });
+    }
+
+    // Hard-rule re-check at the moment of fill (same rationale as approve)
+    const fillBlockReason = await recheckAvailabilityAtFill(
+      body.filledByStaffId,
+      existing.shiftId,
+      shiftRecord.scheduleId
+    );
+    if (fillBlockReason) {
+      return NextResponse.json({ error: fillBlockReason }, { status: 422 });
     }
 
     // Inherit charge role from original assignment (same reason as approve action above)

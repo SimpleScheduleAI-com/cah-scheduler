@@ -121,6 +121,12 @@ export function greedyConstruct(
   weights: WeightProfile
 ): GenerationResult {
   const state = new SchedulerState();
+  // Seed the prior period's final week so rest-hours, consecutive-days, and
+  // 60h-window checks see across the schedule boundary. These drafts live
+  // only in state (synthetic shiftIds) — never in the returned assignments.
+  for (const p of context.priorAssignments ?? []) {
+    state.addAssignment(p);
+  }
   const assignments: AssignmentDraft[] = [];
   const understaffed: GenerationResult["understaffed"] = [];
 

@@ -68,6 +68,11 @@ export interface SchedulerContext {
   /** Weekend shifts worked per staff in the prior schedule period.
    *  Seeded into scoring so nurses with recent high weekend load are deprioritised. */
   historicalWeekendCounts?: Map<string, number>;
+  /** Worked assignments from the 7 days before the schedule period, mapped to
+   *  draft shape with synthetic shiftIds. Seeded into SchedulerState (but never
+   *  returned in results) so rest-hours, consecutive-days, and 60h-window hard
+   *  checks see across the schedule boundary. */
+  priorAssignments?: AssignmentDraft[];
 }
 
 // Re-export types from rules for convenience

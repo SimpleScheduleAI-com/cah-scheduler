@@ -89,3 +89,36 @@ describe("icu-competency rule", () => {
     expect(icuCompetencyRule.evaluate(ctx)).toHaveLength(0);
   });
 });
+
+describe("icu-competency rule — unit name variants", () => {
+  // Must match the scheduler's eligibility matcher (isICUUnit): "ED",
+  // "Emergency", and compound names like "ICU-Stepdown" are supervised units.
+  // Exact-match ("ICU"/"ER" only) lets a Level 1 manual assignment on an "ED"
+  // unit pass evaluation that the generator would have blocked.
+  const lowLevelStaff = () => {
+    const staff = makeStaff({ id: "staff-1", icuCompetencyLevel: 1 });
+    return new Map([["staff-1", staff]]);
+  };
+
+  for (const unit of ["ED", "Emergency", "ICU-Stepdown", "er"]) {
+    it(`flags a Level 1 nurse on a "${unit}" unit shift`, () => {
+      const shift = makeShift({ id: "shift-1", unit });
+      const ctx = makeContext({
+        assignments: [makeAssignment({ id: "a1", staffId: "staff-1" })],
+        staffMap: lowLevelStaff(),
+        shiftMap: new Map([["shift-1", shift]]),
+      });
+      expect(icuCompetencyRule.evaluate(ctx)).toHaveLength(1);
+    });
+  }
+
+  it("does not flag a Level 1 nurse on a Med-Surg shift", () => {
+    const shift = makeShift({ id: "shift-1", unit: "Med-Surg" });
+    const ctx = makeContext({
+      assignments: [makeAssignment({ id: "a1", staffId: "staff-1" })],
+      staffMap: lowLevelStaff(),
+      shiftMap: new Map([["shift-1", shift]]),
+    });
+    expect(icuCompetencyRule.evaluate(ctx)).toHaveLength(0);
+  });
+});

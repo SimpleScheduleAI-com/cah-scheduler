@@ -1,9 +1,10 @@
 import { db } from "@/db";
-import { callout, assignment, shift, schedule, staff } from "@/db/schema";
+import { callout, assignment, shift, shiftDefinition, schedule, staff } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { logAuditEvent } from "@/lib/audit/logger";
 import { getEscalationOptions } from "@/lib/callout/escalation";
+import { checkStaffAvailability } from "@/lib/coverage/find-candidates";
 
 export async function GET(
   _request: Request,
@@ -36,6 +37,45 @@ export async function PUT(
 ) {
   const { id } = await params;
   const body = await request.json();
+
+  // Re-run the availability hard checks for the replacement at the moment of
+  // fill, BEFORE any state is mutated. The escalation options shown to the
+  // manager may be stale — the nurse may have gained a conflicting assignment
+  // (overlap, rest hours, 60h cap, leave) since the dialog was opened.
+  if (body.replacementStaffId) {
+    const existingCallout = db.select().from(callout).where(eq(callout.id, id)).get();
+    if (!existingCallout) {
+      return NextResponse.json({ error: "Callout not found" }, { status: 404 });
+    }
+    const details = db
+      .select({
+        date: shift.date,
+        startTime: shiftDefinition.startTime,
+        endTime: shiftDefinition.endTime,
+        durationHours: shiftDefinition.durationHours,
+        unit: shiftDefinition.unit,
+        shiftType: shiftDefinition.shiftType,
+        scheduleId: shift.scheduleId,
+      })
+      .from(shift)
+      .innerJoin(shiftDefinition, eq(shift.shiftDefinitionId, shiftDefinition.id))
+      .where(eq(shift.id, existingCallout.shiftId))
+      .get();
+    if (details) {
+      const availability = await checkStaffAvailability(body.replacementStaffId, {
+        id: existingCallout.shiftId,
+        ...details,
+      });
+      if (!availability.available) {
+        return NextResponse.json(
+          {
+            error: `Cannot fill: staff member no longer passes hard rules — ${availability.reason ?? "unavailable"}.`,
+          },
+          { status: 422 }
+        );
+      }
+    }
+  }
 
   const updated = db
     .update(callout)

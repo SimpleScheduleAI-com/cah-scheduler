@@ -1,4 +1,5 @@
 import type { RuleEvaluator, RuleContext, RuleViolation } from "./types";
+import { isICUUnit } from "@/lib/engine/unit-utils";
 
 export const icuCompetencyRule: RuleEvaluator = {
   id: "icu-competency",
@@ -18,8 +19,9 @@ export const icuCompetencyRule: RuleEvaluator = {
       // — that is governed by the level1-preceptor rule, not this one.
       const shift = context.shiftMap.get(a.shiftId);
       if (!shift) continue;
-      const unit = shift.unit?.toUpperCase() ?? "";
-      if (unit !== "ICU" && unit !== "ER") continue;
+      // Shared matcher with the scheduler's eligibility gate — catches "ED",
+      // "Emergency", and compound names like "ICU-Stepdown" too.
+      if (!isICUUnit(shift.unit ?? "")) continue;
 
       if (staff.icuCompetencyLevel < minLevel) {
         violations.push({

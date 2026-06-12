@@ -531,6 +531,8 @@ export function localSearch(
   // Build state once — updated incrementally on every accepted swap
   const state = new SchedulerState();
   for (const a of assignments) state.addAssignment(a);
+  // Prior-period seed: keeps boundary rest/consecutive/60h checks valid in swaps
+  for (const p of context.priorAssignments ?? []) state.addAssignment(p);
 
   let currentPenalty = computeTotalPenalty(assignments, state, context, weights);
 
@@ -656,6 +658,8 @@ export function overtimeReductionSweep(
   // Build state once — updated incrementally on each accepted swap
   const state = new SchedulerState();
   for (const a of assignments) state.addAssignment(a);
+  // Prior-period seed: keeps boundary rest/consecutive/60h checks valid in swaps
+  for (const p of context.priorAssignments ?? []) state.addAssignment(p);
 
   let currentPenalty = computeTotalPenalty(assignments, state, context, weights);
   let madeProgress = true;
@@ -821,6 +825,8 @@ export function weekendRedistributionSweep(
   // Build state once — updated incrementally on each accepted swap
   const state = new SchedulerState();
   for (const a of assignments) state.addAssignment(a);
+  // Prior-period seed: keeps boundary rest/consecutive/60h checks valid in swaps
+  for (const p of context.priorAssignments ?? []) state.addAssignment(p);
 
   let currentPenalty = computeTotalPenalty(assignments, state, context, weights);
   let madeProgress = true;

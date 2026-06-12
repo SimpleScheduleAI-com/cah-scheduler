@@ -9,13 +9,23 @@ export const maxConsecutiveRule: RuleEvaluator = {
     const violations: RuleViolation[] = [];
     const maxDays = (context.ruleParameters.maxConsecutiveDays as number) ?? 5;
 
-    // Group assignments by staff
+    // Group assignments by staff — include the prior period's worked dates so
+    // runs spanning the schedule boundary are counted. Violations are only
+    // emitted for dates inside the current schedule (see gate below).
     const staffAssignments = new Map<string, Set<string>>();
     for (const a of context.assignments) {
       const dates = staffAssignments.get(a.staffId) ?? new Set();
       dates.add(a.date);
       staffAssignments.set(a.staffId, dates);
     }
+    for (const p of context.priorAssignments ?? []) {
+      // Prior dates only extend runs for staff with current assignments —
+      // purely-prior patterns were the previous schedule's concern.
+      const dates = staffAssignments.get(p.staffId);
+      if (dates) dates.add(p.date);
+    }
+
+    const scheduleStart = context.scheduleStartDate;
 
     for (const [staffId, dateSet] of staffAssignments) {
       const staff = context.staffMap.get(staffId);
@@ -25,13 +35,14 @@ export const maxConsecutiveRule: RuleEvaluator = {
       let streakStart = dates[0];
 
       for (let i = 1; i < dates.length; i++) {
-        const prev = new Date(dates[i - 1]);
-        const curr = new Date(dates[i]);
+        const prev = new Date(dates[i - 1] + "T00:00:00Z");
+        const curr = new Date(dates[i] + "T00:00:00Z");
         const diffDays = (curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24);
 
         if (diffDays === 1) {
           consecutive++;
-          if (consecutive > maxDays) {
+          // Gate: only flag days inside the current schedule period.
+          if (consecutive > maxDays && (!scheduleStart || dates[i] >= scheduleStart)) {
             violations.push({
               ruleId: "max-consecutive",
               ruleName: "Maximum Consecutive Days",

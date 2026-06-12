@@ -1,7 +1,7 @@
 # CAH Scheduler - Complete Rules Specification
 
-**Document Version:** 1.6.13
-**Last Updated:** June 12, 2026 (v1.6.13)
+**Document Version:** 1.6.15
+**Last Updated:** June 12, 2026 (v1.6.15)
 **Purpose:** This document describes all scheduling rules and logic implemented in the CAH Scheduler application. Please review and mark any rules that need modification.
 
 ---
@@ -544,7 +544,7 @@ Please review each section and note any changes needed:
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.6.14 | Jun 12, 2026 | **On-call limits (§3.12) evaluator aligned with scheduler:** weeks are now identified by their Monday date (Mon–Sun), closing a gap where two on-call shifts in the Dec 28 – Jan 3 week were never flagged; weekends are identified by Saturday date so Sat+Sun of one weekend counts as ONE weekend toward the monthly limit. **Timezone safety:** all date-only arithmetic (week starts, weekend IDs, rolling 60h windows, shift-day enumeration, holiday year) is now UTC-based; previously, deployment on a server west of UTC (e.g. America/Chicago) shifted week boundaries and duplicated the DST spring-forward day's shifts. No intended rule semantics changed. |
+| 1.6.15 | Jun 12, 2026 | **Hard rules enforced on manual paths (§3):** swap approval now checks the 60h rolling window (§3.13) and max consecutive days (§3.5), and refuses swaps whose underlying assignments were cancelled or called out; open-shift approval/fill and callout fill re-run the availability hard checks at the moment of fill. **Cross-boundary enforcement (§3.4, §3.5, §3.13):** the scheduler and the rest-hours/max-consecutive evaluators now see the 7 days of assignments before the schedule period starts, closing the gap where a nurse could work 6+ consecutive days or get <10h rest across a schedule boundary. **ICU/ER unit matching (§3.6, §3.8):** evaluators and scheduler share one matcher; "ED", "Emergency", and compound unit names are now consistently treated as supervised units. | **On-call limits (§3.12) evaluator aligned with scheduler:** weeks are now identified by their Monday date (Mon–Sun), closing a gap where two on-call shifts in the Dec 28 – Jan 3 week were never flagged; weekends are identified by Saturday date so Sat+Sun of one weekend counts as ONE weekend toward the monthly limit. **Timezone safety:** all date-only arithmetic (week starts, weekend IDs, rolling 60h windows, shift-day enumeration, holiday year) is now UTC-based; previously, deployment on a server west of UTC (e.g. America/Chicago) shifted week boundaries and duplicated the DST spring-forward day's shifts. No intended rule semantics changed. |
 | 1.6.13 | Jun 12, 2026 | **Superseded evaluators deregistered:** `overtime-cost` (§4.1) and `weekend-fairness` (§4.2) can no longer be activated via rule rows — they were replaced by `overtime-v2` and `weekend-count`/`consecutive-weekends` and would have double-penalized the same hours/weekends if re-enabled. **Published-schedule guards:** regenerating a schedule or adding/removing assignments now requires the schedule to be unpublished first (HTTP 409 otherwise). No active rule behavior changed. |
 | 1.0 | Feb 2026 | Initial document with all rules and configuration options |
 | 1.1 | Feb 13, 2026 | Added Section 11 (Application UI Guide) documenting all available pages: Leave Management, Shift Swaps, PRN Availability, Unit Configuration, and Holidays Management |

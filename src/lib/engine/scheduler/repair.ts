@@ -5,9 +5,14 @@ import { passesHardRules, isICUUnit } from "./eligibility";
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
-function buildStateFrom(assignments: AssignmentDraft[]): SchedulerState {
+function buildStateFrom(
+  assignments: AssignmentDraft[],
+  priorAssignments?: AssignmentDraft[]
+): SchedulerState {
   const s = new SchedulerState();
   for (const a of assignments) s.addAssignment(a);
+  // Prior-period seed: keeps boundary rest/consecutive/60h checks valid
+  for (const p of priorAssignments ?? []) s.addAssignment(p);
   return s;
 }
 
@@ -76,7 +81,7 @@ function findViolations(
   assignments: AssignmentDraft[],
   context: SchedulerContext
 ): ViolatedShift[] {
-  const state = buildStateFrom(assignments);
+  const state = buildStateFrom(assignments, context.priorAssignments);
   const result: ViolatedShift[] = [];
 
   for (const shift of context.shifts) {
@@ -121,7 +126,7 @@ function tryDirect(
   assignments: AssignmentDraft[],
   context: SchedulerContext
 ): AssignmentDraft[] | null {
-  const state = buildStateFrom(assignments);
+  const state = buildStateFrom(assignments, context.priorAssignments);
   const onShift = new Set(state.getShiftAssignments(shift.id).map((a) => a.staffId));
 
   const candidates = context.staffList.filter((s) => {
@@ -194,7 +199,7 @@ function trySwap(
 
     // Build temporary state without the donor assignment
     const tempAssignments = assignments.filter((a) => a !== donor);
-    const tempState = buildStateFrom(tempAssignments);
+    const tempState = buildStateFrom(tempAssignments, context.priorAssignments);
 
     // Can this nurse fill the violated shift in this new state?
     const staff = context.staffMap.get(donor.staffId)!;
@@ -232,7 +237,7 @@ function trySwap(
 
     // Back-fill the vacated donor slot (best-effort)
     // This restores the donor shift's staffing so it doesn't stay understaffed.
-    const backfillState = buildStateFrom(result);
+    const backfillState = buildStateFrom(result, context.priorAssignments);
     const donorOnShift = new Set(
       backfillState.getShiftAssignments(donorShift.id).map((a) => a.staffId)
     );
@@ -332,7 +337,7 @@ export function repairHardViolations(
   }
 
   // Rebuild the final understaffed list from the actual post-repair state
-  const finalState = buildStateFrom(assignments);
+  const finalState = buildStateFrom(assignments, context.priorAssignments);
   const finalUnderstaffed = context.shifts.flatMap((shift) => {
     const sa = finalState.getShiftAssignments(shift.id);
     const required = shift.requiredStaffCount + shift.acuityExtraStaff;

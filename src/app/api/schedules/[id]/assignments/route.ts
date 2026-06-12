@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { assignment, schedule, shift, shiftDefinition, staff, publicHoliday, staffHolidayAssignment } from "@/db/schema";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and, gte, lte, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { logAuditEvent } from "@/lib/audit/logger";
 import { getWeekStart } from "@/lib/engine/scheduler/state";
@@ -68,7 +68,11 @@ export async function POST(
         and(
           eq(assignment.staffId, body.staffId),
           gte(shift.date, weekStart),
-          lte(shift.date, weekEnd)
+          lte(shift.date, weekEnd),
+          // Hours the nurse is no longer working must not count toward OT —
+          // matches the filters used by swap approval and find-candidates.
+          ne(assignment.status, "called_out"),
+          ne(assignment.status, "cancelled")
         )
       )
       .all();

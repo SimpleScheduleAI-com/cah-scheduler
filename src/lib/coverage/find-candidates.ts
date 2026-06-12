@@ -38,7 +38,7 @@ export interface CandidateRecommendation {
   consecutiveDaysBeforeShift: number;
 }
 
-interface ShiftDetails {
+export interface ShiftDetails {
   id: string;
   date: string;
   startTime: string;
@@ -502,7 +502,7 @@ interface AvailabilityResult {
   calloutWarning?: string;
 }
 
-async function checkStaffAvailability(
+export async function checkStaffAvailability(
   staffId: string,
   shiftDetails: ShiftDetails
 ): Promise<AvailabilityResult> {

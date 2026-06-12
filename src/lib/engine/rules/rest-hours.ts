@@ -14,12 +14,33 @@ export const restHoursRule: RuleEvaluator = {
     const violations: RuleViolation[] = [];
     const minRestHours = (context.ruleParameters.minRestHours as number) ?? 10;
 
-    // Group assignments by staff
-    const staffAssignments = new Map<string, typeof context.assignments>();
+    // Group assignments by staff. Prior-period assignments (the 7 days before
+    // the schedule starts) are merged in as pseudo-entries so the gap between
+    // the prior period's last shift and this period's first shift is checked.
+    // They are flagged `isPrior` so violations are only attached to current
+    // assignments (a `next` that is prior means both shifts predate this
+    // schedule — the previous schedule's concern, not ours).
+    type Entry = (typeof context.assignments)[number] & { isPrior?: boolean };
+    const staffAssignments = new Map<string, Entry[]>();
     for (const a of context.assignments) {
       const list = staffAssignments.get(a.staffId) ?? [];
       list.push(a);
       staffAssignments.set(a.staffId, list);
+    }
+    for (const p of context.priorAssignments ?? []) {
+      const list = staffAssignments.get(p.staffId);
+      if (!list) continue; // no current assignments — nothing to protect
+      list.push({
+        id: `prior-${p.staffId}-${p.date}-${p.startTime}`,
+        shiftId: "",
+        staffId: p.staffId,
+        date: p.date,
+        startTime: p.startTime,
+        endTime: p.endTime,
+        durationHours: p.durationHours,
+        shiftType: p.shiftType,
+        isPrior: true,
+      } as Entry);
     }
 
     for (const [staffId, assignments] of staffAssignments) {
@@ -50,7 +71,7 @@ export const restHoursRule: RuleEvaluator = {
         const nextStart = parseTime(next.date, next.startTime);
         const restHours = (nextStart - endTime) / (1000 * 60 * 60);
 
-        if (restHours < minRestHours && restHours >= 0) {
+        if (restHours < minRestHours && restHours >= 0 && !next.isPrior) {
           violations.push({
             ruleId: "rest-hours",
             ruleName: "Minimum Rest Between Shifts",

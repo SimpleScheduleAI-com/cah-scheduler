@@ -42,6 +42,26 @@ export function buildSchedulerContext(scheduleId: string): SchedulerContext {
     }
   }
 
+  // Map prior-period assignments (last 7 days before the schedule) to draft
+  // shape with synthetic shiftIds. Seeded into SchedulerState by the greedy /
+  // repair / local-search phases so rest-hours, consecutive-days, and
+  // 60h-window hard checks see across the schedule boundary; never included
+  // in generation results.
+  const priorAssignments = (ruleContext.priorAssignments ?? []).map((p, i) => ({
+    shiftId: `prior:${p.staffId}:${p.date}:${i}`,
+    staffId: p.staffId,
+    date: p.date,
+    shiftType: p.shiftType,
+    startTime: p.startTime,
+    endTime: p.endTime,
+    durationHours: p.durationHours,
+    unit: p.unit,
+    isChargeNurse: false,
+    isOvertime: false,
+    isFloat: false,
+    floatFromUnit: null,
+  }));
+
   return {
     scheduleId,
     shifts,
@@ -54,6 +74,7 @@ export function buildSchedulerContext(scheduleId: string): SchedulerContext {
     scheduleUnit: ruleContext.scheduleUnit,
     publicHolidays: ruleContext.publicHolidays,
     historicalWeekendCounts: ruleContext.historicalWeekendCounts,
+    priorAssignments,
   };
 }
 
