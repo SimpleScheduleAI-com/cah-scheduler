@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.26] - 2026-06-12
+
+### Added
+
+- **Weekend-exempt soft rule** (product decision: soft for now, may become hard later).
+  Previously `weekendExempt` only exempted staff from the weekend quota — the generator
+  would still freely schedule them on weekends with no signal anywhere. Now:
+  (1) the scheduler applies a deterrent penalty (`preference × 1.5`) when considering an
+  exempt nurse for a weekend slot, making them the last resort while still allowing
+  coverage of a critically short shift; (2) a new `weekend-exempt` soft evaluator surfaces
+  any such assignment in the violations panel so the manager can judge it. The rule row is
+  seeded for new installs (weight 4.0); EXISTING databases need the rule added once via
+  the Rules UI (evaluator id: `weekend-exempt`) or a re-import.
+
+### Fixed
+
+- **Remaining local-time date math in scoring.ts** (missed by the v1.7.23 sweep): weekend
+  detection (`getDay`), Saturday anchoring, and the consecutive-weekend streak walk now
+  use the shared UTC helpers — on a server west of UTC these misidentified which day is a
+  weekend, silently disabling weekend-equity scoring.
+
+### Files Modified
+
+- `src/lib/engine/rules/weekend-exempt.ts` — new soft evaluator
+- `src/lib/engine/rules/index.ts` — registered
+- `src/lib/engine/scheduler/scoring.ts` — weekend-exempt deterrent; UTC-safe weekend math
+- `src/app/api/import/route.ts`, `src/db/seed.ts` — default rule row
+- `src/__tests__/rules/weekend-exempt.test.ts` — new
+- `src/__tests__/scheduler/scoring.test.ts` — deterrent tests; exempt expectation updated
+
+---
+
 ## [1.7.25] - 2026-06-12
 
 ### Fixed

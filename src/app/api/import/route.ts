@@ -121,6 +121,7 @@ function createDefaultRules() {
     { name: "Holiday Fairness", ruleType: "soft" as const, category: "fairness" as const, description: "Fair distribution of holiday shifts", parameters: { evaluator: "holiday-fairness" }, weight: 7.0 },
     { name: "Skill Mix Diversity", ruleType: "soft" as const, category: "skill" as const, description: "Each shift should have mix of experience levels", parameters: { evaluator: "skill-mix" }, weight: 3.0 },
     { name: "Minimize Float Assignments", ruleType: "soft" as const, category: "preference" as const, description: "Minimize floating staff to other units", parameters: { evaluator: "float-penalty" }, weight: 4.0 },
+    { name: "Weekend-Exempt Staff Protection", ruleType: "soft" as const, category: "preference" as const, description: "Weekend-exempt staff should only be scheduled on weekends as a last resort", parameters: { evaluator: "weekend-exempt" }, weight: 4.0 },
     { name: "Charge Nurse Distribution", ruleType: "soft" as const, category: "skill" as const, description: "Distribute charge nurses across shifts", parameters: { evaluator: "charge-clustering" }, weight: 4.0 },
   ];
 

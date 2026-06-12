@@ -23,6 +23,7 @@ import {
 } from "./weekend-holiday-fairness";
 import { floatPenaltyRule } from "./float-penalty";
 import { chargeClusteringRule } from "./charge-clustering";
+import { weekendExemptRule } from "./weekend-exempt";
 import { overtimeRulesV2 } from "./overtime-v2";
 
 const evaluatorRegistry: Map<string, RuleEvaluator> = new Map();
@@ -53,6 +54,7 @@ const evaluatorRegistry: Map<string, RuleEvaluator> = new Map();
   holidayFairnessRule,
   floatPenaltyRule,
   chargeClusteringRule,
+  weekendExemptRule,
   overtimeRulesV2,
 ].forEach((rule) => {
   evaluatorRegistry.set(rule.id, rule);
