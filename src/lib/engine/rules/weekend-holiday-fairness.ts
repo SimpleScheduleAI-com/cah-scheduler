@@ -194,9 +194,11 @@ export const holidayFairnessRule: RuleEvaluator = {
 
     if (context.publicHolidays.length === 0) return violations;
 
-    // Get the year from the schedule
+    // Get the year from the schedule. Parse from the string directly:
+    // new Date("2026-01-01").getFullYear() returns 2025 on a server west of
+    // UTC, pointing the holiday-history query at the wrong year.
     const scheduleYear = context.scheduleStartDate
-      ? new Date(context.scheduleStartDate).getFullYear()
+      ? parseInt(context.scheduleStartDate.slice(0, 4), 10)
       : new Date().getFullYear();
 
     // Build a map of holiday dates to their logical names (merging Christmas)

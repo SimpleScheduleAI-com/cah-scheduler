@@ -17,25 +17,45 @@ export function shiftEndDateTime(
   return new Date(start.getTime() + durationHours * 60 * 60 * 1000);
 }
 
+/**
+ * Parse a YYYY-MM-DD string as UTC midnight.
+ *
+ * All date-only arithmetic in this module MUST go through parseUTC/addDays/
+ * utcDayOfWeek. Bare `new Date(dateStr)` parses as UTC but local-time methods
+ * (getDay/setDate) then operate in the server timezone — on any server west
+ * of UTC (e.g. America/Chicago) that shifts every date one day back, breaking
+ * week starts, weekend pairing, and DST-adjacent iteration.
+ */
+function parseUTC(dateStr: string): Date {
+  return new Date(dateStr + "T00:00:00Z");
+}
+
+/** Add `days` to a YYYY-MM-DD string, returning YYYY-MM-DD (UTC arithmetic). */
+export function addDays(dateStr: string, days: number): string {
+  const d = parseUTC(dateStr);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Day of week for a YYYY-MM-DD string: 0=Sun … 6=Sat (timezone-independent). */
+export function utcDayOfWeek(dateStr: string): number {
+  return parseUTC(dateStr).getUTCDay();
+}
+
 export function getWeekStart(dateStr: string): string {
-  const date = new Date(dateStr);
-  const day = date.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  const day = utcDayOfWeek(dateStr); // 0=Sun, 1=Mon, ..., 6=Sat
   const diff = day === 0 ? -6 : 1 - day; // days to preceding Monday
-  date.setDate(date.getDate() + diff);
-  return date.toISOString().slice(0, 10);
+  return addDays(dateStr, diff);
 }
 
 function getWeekEnd(weekStart: string): string {
-  const date = new Date(weekStart);
-  date.setDate(date.getDate() + 6);
-  return date.toISOString().slice(0, 10);
+  return addDays(weekStart, 6);
 }
 
-function getWeekendId(dateStr: string): string {
+export function getWeekendId(dateStr: string): string {
   // Anchor Sunday back to Saturday so both share the same weekend identifier
-  const date = new Date(dateStr);
-  if (date.getDay() === 0) date.setDate(date.getDate() - 1);
-  return date.toISOString().slice(0, 10); // Saturday date as the ID
+  if (utcDayOfWeek(dateStr) === 0) return addDays(dateStr, -1);
+  return dateStr; // Saturday date as the ID
 }
 
 // ─── SchedulerState ──────────────────────────────────────────────────────────
@@ -128,21 +148,16 @@ export class SchedulerState {
    */
   wouldExceedConsecutiveDays(staffId: string, targetDate: string, maxConsecutive: number): boolean {
     const dates = this.workedDatesByStaff.get(staffId) ?? new Set<string>();
-    const d = new Date(targetDate);
     let count = 1; // the target day itself
 
     // Count backwards
     for (let i = 1; i <= maxConsecutive; i++) {
-      const prev = new Date(d);
-      prev.setDate(prev.getDate() - i);
-      if (dates.has(prev.toISOString().slice(0, 10))) count++;
+      if (dates.has(addDays(targetDate, -i))) count++;
       else break;
     }
     // Count forwards
     for (let i = 1; i <= maxConsecutive; i++) {
-      const next = new Date(d);
-      next.setDate(next.getDate() + i);
-      if (dates.has(next.toISOString().slice(0, 10))) count++;
+      if (dates.has(addDays(targetDate, i))) count++;
       else break;
     }
 
@@ -180,9 +195,7 @@ export class SchedulerState {
 
   /** Hours worked in the rolling 7-day window ending on (and including) `date`. */
   getRolling7DayHours(staffId: string, date: string): number {
-    const startDate = new Date(date);
-    startDate.setDate(startDate.getDate() - 6);
-    const startStr = startDate.toISOString().slice(0, 10);
+    const startStr = addDays(date, -6);
     return (this.assignmentsByStaff.get(staffId) ?? [])
       .filter((a) => a.date >= startStr && a.date <= date)
       .reduce((sum, a) => sum + a.durationHours, 0);
@@ -204,17 +217,12 @@ export class SchedulerState {
     durationHours: number,
     limit: number
   ): boolean {
-    const dateObj = new Date(date);
     const assignments = this.assignmentsByStaff.get(staffId) ?? [];
 
     // Windows containing `date` start from (date − 6) through date itself
     for (let offset = 0; offset <= 6; offset++) {
-      const windowStart = new Date(dateObj);
-      windowStart.setDate(windowStart.getDate() - offset);
-      const windowEnd = new Date(windowStart);
-      windowEnd.setDate(windowEnd.getDate() + 6);
-      const startStr = windowStart.toISOString().slice(0, 10);
-      const endStr = windowEnd.toISOString().slice(0, 10);
+      const startStr = addDays(date, -offset);
+      const endStr = addDays(startStr, 6);
 
       const existing = assignments
         .filter((a) => a.date >= startStr && a.date <= endStr)
@@ -243,16 +251,11 @@ export class SchedulerState {
     futureDuration: number,
     limit: number
   ): boolean {
-    const futureDateObj = new Date(futureDate);
     const assignments = this.assignmentsByStaff.get(staffId) ?? [];
 
     for (let offset = 0; offset <= 6; offset++) {
-      const windowStart = new Date(futureDateObj);
-      windowStart.setDate(windowStart.getDate() - offset);
-      const windowEnd = new Date(windowStart);
-      windowEnd.setDate(windowEnd.getDate() + 6);
-      const startStr = windowStart.toISOString().slice(0, 10);
-      const endStr = windowEnd.toISOString().slice(0, 10);
+      const startStr = addDays(futureDate, -offset);
+      const endStr = addDays(startStr, 6);
 
       const existing = assignments
         .filter((a) => a.date >= startStr && a.date <= endStr)
@@ -271,17 +274,12 @@ export class SchedulerState {
    * Used to build human-readable rejection messages.
    */
   getPeak7DayHours(staffId: string, date: string): number {
-    const dateObj = new Date(date);
     const assignments = this.assignmentsByStaff.get(staffId) ?? [];
     let peak = 0;
 
     for (let offset = 0; offset <= 6; offset++) {
-      const windowStart = new Date(dateObj);
-      windowStart.setDate(windowStart.getDate() - offset);
-      const windowEnd = new Date(windowStart);
-      windowEnd.setDate(windowEnd.getDate() + 6);
-      const startStr = windowStart.toISOString().slice(0, 10);
-      const endStr = windowEnd.toISOString().slice(0, 10);
+      const startStr = addDays(date, -offset);
+      const endStr = addDays(startStr, 6);
 
       const hours = assignments
         .filter((a) => a.date >= startStr && a.date <= endStr)
@@ -311,7 +309,7 @@ export class SchedulerState {
   getWeekendCount(staffId: string): number {
     const weekendIds = new Set<string>();
     for (const a of this.assignmentsByStaff.get(staffId) ?? []) {
-      const day = new Date(a.date).getDay();
+      const day = utcDayOfWeek(a.date);
       if (day === 0 || day === 6) {
         weekendIds.add(getWeekendId(a.date));
       }
@@ -334,7 +332,7 @@ export class SchedulerState {
     const weekendIds = new Set<string>();
     for (const a of this.assignmentsByStaff.get(staffId) ?? []) {
       if (!a.date.startsWith(month) || a.shiftType !== "on_call") continue;
-      const d = new Date(a.date).getDay();
+      const d = utcDayOfWeek(a.date);
       if (d === 0 || d === 6) weekendIds.add(getWeekendId(a.date));
     }
     return weekendIds.size;

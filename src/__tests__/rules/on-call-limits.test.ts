@@ -60,6 +60,36 @@ describe("on-call-limits rule", () => {
     });
     expect(onCallLimitsRule.evaluate(ctx)).toHaveLength(0);
   });
+
+  it("flags 2 on-calls in the same Mon-Sun week spanning a year boundary", () => {
+    // Mon 2026-12-28 … Sun 2027-01-03 is ONE week. Calendar-year week numbers
+    // split it into 2026-W53 and 2027-W1, hiding the violation.
+    const { assignment: a1, shift: s1 } = makeOnCallAssignment("2026-12-30", "a1"); // Wednesday
+    const { assignment: a2, shift: s2 } = makeOnCallAssignment("2027-01-02", "a2"); // Saturday
+    const ctx = makeContext({
+      assignments: [a1, a2],
+      shiftMap: new Map([[s1.id, s1], [s2.id, s2]]),
+      staffMap,
+    });
+    const violations = onCallLimitsRule.evaluate(ctx);
+    expect(violations.length).toBeGreaterThan(0);
+    expect(violations[0].description).toContain("exceeding limit of 1");
+  });
+
+  it("treats Sat+Sun of one weekend as a single weekend for the monthly limit", () => {
+    // Sat 2026-02-07 + Sun 2026-02-08 = one weekend; with limit 1 this passes.
+    const { assignment: a1, shift: s1 } = makeOnCallAssignment("2026-02-07", "a1");
+    const { assignment: a2, shift: s2 } = makeOnCallAssignment("2026-02-08", "a2");
+    const ctx = makeContext({
+      assignments: [a1, a2],
+      shiftMap: new Map([[s1.id, s1], [s2.id, s2]]),
+      staffMap,
+      ruleParameters: { maxOnCallPerWeek: 2 }, // isolate the weekend check
+    });
+    const violations = onCallLimitsRule.evaluate(ctx);
+    const weekendViolations = violations.filter((v) => v.description.includes("weekend"));
+    expect(weekendViolations).toHaveLength(0);
+  });
 });
 
 describe("max-hours-60 rule", () => {

@@ -133,7 +133,9 @@ export async function POST(
 
     if (holidayRecord) {
       const logicalHolidayName = getLogicalHolidayName(holidayRecord.name);
-      const year = new Date(shiftRecord.date).getFullYear();
+      // Parse year from the string: Date().getFullYear() returns the previous
+      // year for Jan 1 dates on servers west of UTC.
+      const year = parseInt(shiftRecord.date.slice(0, 4), 10);
 
       // Check if we already have a record for this staff/holiday/year
       const existing = db
@@ -208,7 +210,9 @@ export async function DELETE(request: Request) {
 
       if (holidayRecord) {
         const logicalHolidayName = getLogicalHolidayName(holidayRecord.name);
-        const year = new Date(shiftRecord.date).getFullYear();
+        // Parse year from the string: Date().getFullYear() returns the previous
+      // year for Jan 1 dates on servers west of UTC.
+      const year = parseInt(shiftRecord.date.slice(0, 4), 10);
 
         // Delete the holiday tracking record
         db.delete(staffHolidayAssignment)

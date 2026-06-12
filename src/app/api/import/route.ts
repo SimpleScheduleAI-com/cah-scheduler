@@ -420,7 +420,9 @@ export async function GET() {
  */
 function summarisePRNDates(dates: string[]): string {
   if (dates.length === 0) return "";
-  const daySet = new Set(dates.map((d) => new Date(d).getDay()));
+  // getUTCDay: local getDay() shifts the day-of-week one back on servers west
+  // of UTC (date strings parse as UTC midnight), corrupting export summaries.
+  const daySet = new Set(dates.map((d) => new Date(d + "T00:00:00Z").getUTCDay()));
   const allDays = [0, 1, 2, 3, 4, 5, 6];
   const weekdays = [1, 2, 3, 4, 5];
   const weekend = [0, 6];

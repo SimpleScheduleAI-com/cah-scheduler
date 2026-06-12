@@ -6,6 +6,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.23] - 2026-06-12
+
+### Fixed
+
+- **Date arithmetic broke on servers west of UTC (timezone/DST sweep)**: Schedule dates are
+  YYYY-MM-DD strings, which JavaScript parses as UTC midnight. Local-time methods
+  (`getDay`/`setDate`/`getFullYear`) then operate in the server's timezone — on a Texas
+  hospital server (America/Chicago) UTC midnight is 6pm the previous local day, so:
+  - `getWeekStart` returned the wrong Monday, shifting weekly-hours/OT windows
+  - `getWeekendId` gave Saturday and Sunday of the same weekend different IDs, breaking
+    weekend-count and consecutive-weekend tracking
+  - `buildShiftInserts` emitted DUPLICATE shifts for the DST spring-forward day
+    (2026-03-08), double-staffing that day
+  - Holiday-fairness year resolved to the previous year for January 1 schedules, querying
+    the wrong year's history
+  - PRN export day-of-week summaries shifted one day back
+  All date-only arithmetic in `state.ts` and `build-shifts.ts` now goes through UTC-safe
+  helpers (`addDays`, `utcDayOfWeek`, `parseUTC`); years are parsed from the string.
+  Note: these failures cannot be reproduced on a Windows dev machine (Node on Windows
+  ignores the TZ env var, and east-of-UTC offsets round-trip stably); the new
+  `date-utc.test.ts` suite acts as a regression lock and reproduces the original failures
+  when run on a Linux host with `TZ=America/Chicago`.
+
+- **On-call weekly limit missed violations in the Dec 28 – Jan 3 week**: the evaluator
+  keyed weeks by calendar-year week number, splitting the year-spanning week into
+  `YYYY-W53` and `YYYY+1-W1`. Two on-call shifts in that single Mon-Sun week were counted
+  as one per "week" and never flagged. The evaluator now keys weeks by the Monday date
+  (same as the scheduler's eligibility check), and identifies weekends by `getWeekendId`
+  so Sat+Sun of one weekend counts as a single weekend toward the monthly limit.
+
+### Files Modified
+
+- `src/lib/engine/scheduler/state.ts` — UTC-safe `parseUTC`/`addDays`/`utcDayOfWeek` helpers; all week/window/weekend math converted; `getWeekendId` exported
+- `src/lib/schedules/build-shifts.ts` — UTC day-iteration loop
+- `src/lib/engine/rules/on-call-limits.ts` — Monday-keyed weeks, weekend-ID dedup, UTC window iteration in `max-hours-60`
+- `src/lib/engine/rules/weekend-holiday-fairness.ts` — holiday year parsed from string
+- `src/app/api/schedules/[id]/assignments/route.ts` — holiday-tracking year parsed from string (POST + DELETE)
+- `src/app/api/import/route.ts` — `summarisePRNDates` uses UTC day-of-week
+- `src/__tests__/scheduler/date-utc.test.ts` — new (timezone regression locks)
+- `src/__tests__/rules/on-call-limits.test.ts` — year-boundary week + Sat/Sun weekend dedup tests
+
+---
+
 ## [1.7.22] - 2026-06-12
 
 ### Added

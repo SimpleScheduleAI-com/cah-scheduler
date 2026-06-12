@@ -1,4 +1,5 @@
 import type { RuleEvaluator, RuleContext, RuleViolation } from "./types";
+import { addDays, getWeekStart, getWeekendId, utcDayOfWeek } from "@/lib/engine/scheduler/state";
 
 /**
  * On-Call Limits Rule (Hard)
@@ -40,24 +41,19 @@ export const onCallLimitsRule: RuleEvaluator = {
       staffOnCalls.set(a.staffId, existing);
     }
 
-    // Helper to get week number
-    const getWeekNumber = (dateStr: string): string => {
-      const date = new Date(dateStr);
-      const startOfYear = new Date(date.getFullYear(), 0, 1);
-      const days = Math.floor((date.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
-      const weekNum = Math.ceil((days + startOfYear.getDay() + 1) / 7);
-      return `${date.getFullYear()}-W${weekNum}`;
-    };
+    // Week identity = Monday of the Mon-Sun week (matches the scheduler's
+    // getOnCallCountThisWeek). Calendar-year week numbers split the week that
+    // spans Dec 28 – Jan 3 into two keys, hiding violations there.
+    const getWeekKey = getWeekStart;
 
     // Helper to get month
     const getMonth = (dateStr: string): string => {
       return dateStr.substring(0, 7); // YYYY-MM
     };
 
-    // Helper to check if date is weekend
+    // Helper to check if date is weekend (UTC — immune to server timezone)
     const isWeekend = (dateStr: string): boolean => {
-      const date = new Date(dateStr);
-      const day = date.getDay();
+      const day = utcDayOfWeek(dateStr);
       return day === 0 || day === 6;
     };
 
@@ -71,7 +67,7 @@ export const onCallLimitsRule: RuleEvaluator = {
       // Count on-calls per week
       const weekCounts = new Map<string, number>();
       for (const a of assignments) {
-        const week = getWeekNumber(a.date);
+        const week = getWeekKey(a.date);
         weekCounts.set(week, (weekCounts.get(week) ?? 0) + 1);
       }
 
@@ -84,17 +80,18 @@ export const onCallLimitsRule: RuleEvaluator = {
             ruleType: "hard",
             shiftId: assignments[0].shiftId,
             staffId,
-            description: `${staffName} has ${count} on-call shifts in week ${week}, exceeding limit of ${maxPerWeek}`,
+            description: `${staffName} has ${count} on-call shifts in week of ${week}, exceeding limit of ${maxPerWeek}`,
           });
         }
       }
 
-      // Count weekend on-calls per month
+      // Count weekend on-calls per month — Sat+Sun of one weekend share a
+      // weekend ID (the Saturday date), so a full weekend counts once.
       const monthWeekendCounts = new Map<string, Set<string>>();
       for (const a of assignments) {
         if (!isWeekend(a.date)) continue;
         const month = getMonth(a.date);
-        const weekend = getWeekNumber(a.date); // Use week to identify unique weekends
+        const weekend = getWeekendId(a.date);
         const existing = monthWeekendCounts.get(month) ?? new Set();
         existing.add(weekend);
         monthWeekendCounts.set(month, existing);
@@ -168,22 +165,21 @@ export const maxHoursRule: RuleEvaluator = {
         dateHours.set(a.date, current + a.durationHours);
       }
 
-      // Check each possible 7-day window
-      const startDate = new Date(sortedDates[0]);
-      const endDate = new Date(sortedDates[sortedDates.length - 1]);
+      // Check each possible 7-day window (UTC string arithmetic — immune to
+      // server timezone and DST transitions)
+      const firstDate = sortedDates[0];
+      const lastDate = sortedDates[sortedDates.length - 1];
 
       for (
-        let windowStart = new Date(startDate);
-        windowStart <= endDate;
-        windowStart.setDate(windowStart.getDate() + 1)
+        let windowStart = firstDate;
+        windowStart <= lastDate;
+        windowStart = addDays(windowStart, 1)
       ) {
         let totalHours = 0;
         const windowDates: string[] = [];
 
         for (let i = 0; i < 7; i++) {
-          const checkDate = new Date(windowStart);
-          checkDate.setDate(checkDate.getDate() + i);
-          const dateStr = checkDate.toISOString().split("T")[0];
+          const dateStr = addDays(windowStart, i);
           windowDates.push(dateStr);
           totalHours += dateHours.get(dateStr) ?? 0;
         }
