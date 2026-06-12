@@ -266,6 +266,7 @@ export async function PUT(
         );
       }
       if (requestingAssignment) {
+        db.transaction(() => {
         // Mark the requesting assignment as swapped so it's hidden from the grid
         db.update(assignment)
           .set({ status: "swapped", updatedAt: new Date().toISOString() })
@@ -295,6 +296,7 @@ export async function PUT(
             performedBy: body.reviewedBy || "nurse_manager",
           })
           .run();
+        });
       }
     } else {
       // -----------------------------------------------------------------------
@@ -510,41 +512,44 @@ export async function PUT(
           const tgtIsOvertime =
             computeWeeklyHours(existing.targetStaffId, reqShiftDetails.date) + tgtNewDuration > 40;
 
-          // Perform the swap
-          db.update(assignment)
-            .set({
-              staffId: existing.targetStaffId,
-              assignmentSource: "swap",
-              isOvertime: reqIsOvertime,
-              updatedAt: new Date().toISOString(),
-            })
-            .where(eq(assignment.id, requestingAssignment.id))
-            .run();
+          // Perform the swap atomically — a crash between the two updates
+          // would otherwise leave both shifts assigned to the same nurse.
+          db.transaction(() => {
+            db.update(assignment)
+              .set({
+                staffId: existing.targetStaffId,
+                assignmentSource: "swap",
+                isOvertime: reqIsOvertime,
+                updatedAt: new Date().toISOString(),
+              })
+              .where(eq(assignment.id, requestingAssignment.id))
+              .run();
 
-          db.update(assignment)
-            .set({
-              staffId: existing.requestingStaffId,
-              assignmentSource: "swap",
-              isOvertime: tgtIsOvertime,
-              updatedAt: new Date().toISOString(),
-            })
-            .where(eq(assignment.id, targetAssignment.id))
-            .run();
+            db.update(assignment)
+              .set({
+                staffId: existing.requestingStaffId,
+                assignmentSource: "swap",
+                isOvertime: tgtIsOvertime,
+                updatedAt: new Date().toISOString(),
+              })
+              .where(eq(assignment.id, targetAssignment.id))
+              .run();
 
-          db.insert(exceptionLog)
-            .values({
-              entityType: "swap_request",
-              entityId: id,
-              action: "swap_approved",
-              description: `Swap approved between ${reqName} and ${tgtName}`,
-              previousState: {
-                requestingAssignmentId: existing.requestingAssignmentId,
-                targetAssignmentId: existing.targetAssignmentId,
-              },
-              newState: { status: "approved" },
-              performedBy: body.reviewedBy || "nurse_manager",
-            })
-            .run();
+            db.insert(exceptionLog)
+              .values({
+                entityType: "swap_request",
+                entityId: id,
+                action: "swap_approved",
+                description: `Swap approved between ${reqName} and ${tgtName}`,
+                previousState: {
+                  requestingAssignmentId: existing.requestingAssignmentId,
+                  targetAssignmentId: existing.targetAssignmentId,
+                },
+                newState: { status: "approved" },
+                performedBy: body.reviewedBy || "nurse_manager",
+              })
+              .run();
+          });
         }
       }
     }

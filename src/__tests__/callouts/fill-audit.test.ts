@@ -66,6 +66,7 @@ vi.mock("@/db", () => ({
     insert: () => ({
       values: () => ({ run: mockInsertRun }),
     }),
+    transaction: (fn: () => unknown) => fn(),
   },
 }));
 

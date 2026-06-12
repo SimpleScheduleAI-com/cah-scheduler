@@ -19,6 +19,7 @@ const mockScheduleGet = vi.hoisted(() => vi.fn());
 const mockJobsAll = vi.hoisted(() => vi.fn());
 const mockInsertReturningGet = vi.hoisted(() => vi.fn());
 const mockRunGenerationJob = vi.hoisted(() => vi.fn(async () => undefined));
+const mockUpdateSet = vi.hoisted(() => vi.fn());
 
 vi.mock("next/server", () => ({
   NextResponse: {
@@ -53,6 +54,12 @@ vi.mock("@/db", () => ({
       values: () => ({
         returning: () => ({ get: mockInsertReturningGet }),
       }),
+    }),
+    update: () => ({
+      set: (vals: Record<string, unknown>) => {
+        mockUpdateSet(vals);
+        return { where: () => ({ run: vi.fn() }) };
+      },
     }),
   },
 }));
@@ -106,11 +113,41 @@ describe("POST /api/scenarios/generate — published-schedule guard", () => {
 
   it("still creates a generation job for a draft schedule", async () => {
     mockScheduleGet.mockReturnValue({ id: SCHEDULE_ID, status: "draft" });
-    const res = (await POST(makeRequest({ scheduleId: SCHEDULE_ID }))) as {
+    const res = (await POST(makeRequest({ scheduleId: SCHEDULE_ID }))) as unknown as {
       _data: { jobId: string };
       status: number;
     };
     expect(res.status).toBe(200);
     expect(res._data.jobId).toBe("job-001");
+  });
+
+  it("reclaims a stale running job (process died) and proceeds with generation", async () => {
+    // A job stuck in 'running' for 20 minutes means the process died mid-job.
+    // Without reclamation the hospital is permanently blocked from generating.
+    mockScheduleGet.mockReturnValue({ id: SCHEDULE_ID, status: "draft" });
+    const staleTime = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+    mockJobsAll.mockReturnValue([
+      { id: "job-stale", scheduleId: SCHEDULE_ID, status: "running", startedAt: staleTime, createdAt: staleTime },
+    ]);
+    const res = (await POST(makeRequest({ scheduleId: SCHEDULE_ID }))) as unknown as {
+      status: number;
+      _data: { jobId?: string };
+    };
+    expect(res.status).toBe(200);
+    expect(res._data.jobId).toBe("job-001");
+    const failedUpdates = mockUpdateSet.mock.calls.filter(
+      (c) => (c[0] as { status?: string }).status === "failed"
+    );
+    expect(failedUpdates.length).toBe(1);
+  });
+
+  it("still returns 409 for a recent running job", async () => {
+    mockScheduleGet.mockReturnValue({ id: SCHEDULE_ID, status: "draft" });
+    const recentTime = new Date(Date.now() - 60 * 1000).toISOString();
+    mockJobsAll.mockReturnValue([
+      { id: "job-live", scheduleId: SCHEDULE_ID, status: "running", startedAt: recentTime, createdAt: recentTime },
+    ]);
+    const res = await POST(makeRequest({ scheduleId: SCHEDULE_ID }));
+    expect((res as { status: number }).status).toBe(409);
   });
 });

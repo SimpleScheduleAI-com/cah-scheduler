@@ -6,6 +6,59 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.25] - 2026-06-12
+
+### Fixed
+
+- **Leave approval now voids pending swaps on cancelled assignments.** Approving leave
+  cancels the nurse's assignments, but pending swap requests still referenced those
+  assignment IDs — approving one later mutated a dead assignment and both nurses silently
+  vanished from the grid. Leave approval now auto-denies such swaps (with reason and
+  `swap_denied` audit event). Combined with v1.7.24's stale-assignment guard, this closes
+  the leave↔swap interaction gap from both sides.
+
+- **Leave double-approval race.** Two rapid approval requests (double-click, retry) could
+  both pass the side-effect guard and create duplicate coverage requests — two replacements
+  hired for one vacancy. The leave UPDATE now carries an optimistic lock
+  (`WHERE status = <status we read>`); the loser gets 409.
+
+- **Stuck generation jobs permanently blocked regeneration.** If the process died mid-job,
+  the `generation_job` row stayed `running` forever and every new generate request got 409
+  — unrecoverable without manual DB surgery. Jobs stuck in pending/running for >10 minutes
+  are now reclaimed (marked failed) at the next generate request.
+
+- **Multi-step writes made atomic.** Swap approval (two assignment updates), callout fill
+  (callout + original assignment + replacement + audits), open-shift approve/fill, and each
+  leave-approval coverage action now run inside `db.transaction()` — a crash mid-sequence
+  previously left half-applied state (e.g. callout marked "filled" with no replacement
+  assignment). The callout UNIQUE-constraint tolerance (v1.4.31 invariant) is preserved:
+  the inner try/catch keeps the transaction alive. Candidate search runs before the
+  transaction (async work can't run inside better-sqlite3's synchronous transactions).
+
+- **PRN availability deletion guard + audit.** Deleting a PRN availability record while the
+  nurse had active assignments on submitted dates orphaned those assignments (the
+  PRN-availability hard rule would flag them) and removed the nurse from coverage candidate
+  lists. DELETE now returns 409 while active assignments exist on submitted dates, and the
+  deletion is audit-logged (previously it wasn't — violating the audit-everything
+  convention).
+
+- **FK pragma hardening in the generation runner.** `foreign_keys = OFF` is now restored in
+  a `finally` block (a throw between the pragmas previously left FK enforcement off for the
+  connection's lifetime), and the two deletes it protects run in one transaction.
+
+### Files Modified
+
+- `src/app/api/staff-leave/[id]/route.ts` — optimistic lock; swap voiding; per-assignment transactions; candidate search hoisted out of transaction
+- `src/app/api/scenarios/generate/route.ts` — stale-job reclaim (10-minute threshold)
+- `src/app/api/swap-requests/[id]/route.ts` — directed + open swap mutations transactional
+- `src/app/api/callouts/[id]/route.ts` — fill mutations transactional
+- `src/app/api/open-shifts/[id]/route.ts` — approve + fill mutations transactional
+- `src/app/api/prn-availability/[id]/route.ts` — DELETE guard + audit log
+- `src/lib/engine/scheduler/runner.ts` — try/finally + transaction around FK-off deletes
+- Tests: `leave/voids-pending-swaps` (new), `scenarios/generate-published-guard` (+2 reclaim cases); transaction/`shiftSwapRequest` mocks added to `leave/approval-audit`, `leave/denial-validation`, `callouts/fill-audit`, `coverage/fill-time-recheck`, `swap/approve-stale-assignment`
+
+---
+
 ## [1.7.24] - 2026-06-12
 
 ### Fixed

@@ -232,10 +232,20 @@ export async function runGenerationJob(jobId: string, scheduleId: string): Promi
     // CASCADE / SET NULL) do not block the deletion of old assignments.
     // The stale IDs in those records remain as audit trail; they simply
     // no longer point to a live row.
-    db.$client.pragma("foreign_keys = OFF");
-    db.delete(assignment).where(eq(assignment.scheduleId, scheduleId)).run();
-    db.delete(scenario).where(eq(scenario.scheduleId, scheduleId)).run();
-    db.$client.pragma("foreign_keys = ON");
+    // try/finally guarantees FK enforcement is restored even if a delete
+    // throws — otherwise the connection would silently accept FK-violating
+    // writes for the rest of the process lifetime. The transaction makes the
+    // two deletes atomic so a crash can't leave scenarios pointing at
+    // deleted assignments.
+    try {
+      db.$client.pragma("foreign_keys = OFF");
+      db.transaction(() => {
+        db.delete(assignment).where(eq(assignment.scheduleId, scheduleId)).run();
+        db.delete(scenario).where(eq(scenario.scheduleId, scheduleId)).run();
+      });
+    } finally {
+      db.$client.pragma("foreign_keys = ON");
+    }
 
     // ── 2. Generate BALANCED variant ──────────────────────────────────────
     setProgress(jobId, 10, "Building Balanced schedule");

@@ -70,6 +70,7 @@ vi.mock("@/db", () => {
       select: () => ({ from: (table: { _table?: string }) => makeChain(table) }),
       update: () => ({ set: () => ({ where: () => ({ run: mockUpdateRun }) }) }),
       insert: () => ({ values: () => ({ run: mockInsertRun }) }),
+      transaction: (fn: () => unknown) => fn(),
     },
   };
 });

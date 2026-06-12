@@ -41,6 +41,7 @@ vi.mock("next/server", () => ({
 vi.mock("drizzle-orm", () => ({
   eq:  vi.fn((a: unknown, b: unknown) => ({ _eq:  [a, b] })),
   and: vi.fn((...args: unknown[]) => ({ _and: args })),
+  or:  vi.fn((...args: unknown[]) => ({ _or: args })),
   gte: vi.fn((a: unknown, b: unknown) => ({ _gte: [a, b] })),
   lte: vi.fn((a: unknown, b: unknown) => ({ _lte: [a, b] })),
 }));
@@ -61,6 +62,12 @@ vi.mock("@/db/schema", () => ({
   openShift: { id: "os$id" },
   callout:   { id: "co$id" },
   staff:     { id: "staff$id", firstName: "staff$firstName", lastName: "staff$lastName" },
+  shiftSwapRequest: {
+    id: "ssr$id",
+    status: "ssr$status",
+    requestingAssignmentId: "ssr$reqAssign",
+    targetAssignmentId: "ssr$tgtAssign",
+  },
 }));
 
 vi.mock("@/db", () => {
@@ -98,6 +105,7 @@ vi.mock("@/db", () => {
         }),
       }),
       delete: () => ({ where: () => ({ run: vi.fn() }) }),
+      transaction: (fn: () => unknown) => fn(),
     },
   };
 });

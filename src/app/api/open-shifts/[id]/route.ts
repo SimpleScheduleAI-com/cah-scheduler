@@ -189,6 +189,10 @@ export async function PUT(
       : null;
     const inheritChargeRole = originalAssignment?.isChargeNurse === true;
 
+    // Fill mutations commit atomically — a crash mid-sequence previously left
+    // a replacement assigned with the coverage request still pending (or vice
+    // versa), desynchronizing the Coverage page from the grid.
+    const updated = db.transaction(() => {
     // Create new assignment for the approved staff
     const newAssignment = db
       .insert(assignment)
@@ -218,7 +222,7 @@ export async function PUT(
     }
 
     // Update coverage request as filled
-    const updated = db
+    const updatedRow = db
       .update(openShift)
       .set({
         status: "filled",
@@ -247,6 +251,9 @@ export async function PUT(
         createdAt: new Date().toISOString(),
       })
       .run();
+
+    return updatedRow;
+    });
 
     return NextResponse.json(updated);
   }
@@ -291,6 +298,8 @@ export async function PUT(
     const fillShiftDuration = fillShiftDetails?.durationHours ?? 0;
     const fillIsOvertime = fillWeekHours + fillShiftDuration > 40;
 
+    // Same atomic-commit rationale as the approve action above.
+    const updated = db.transaction(() => {
     // Create new assignment for the staff filling the shift
     const newAssignment = db
       .insert(assignment)
@@ -320,7 +329,7 @@ export async function PUT(
     }
 
     // Update coverage request as filled
-    const updated = db
+    const updatedRow = db
       .update(openShift)
       .set({
         status: "filled",
@@ -345,6 +354,9 @@ export async function PUT(
         createdAt: new Date().toISOString(),
       })
       .run();
+
+    return updatedRow;
+    });
 
     return NextResponse.json(updated);
   }

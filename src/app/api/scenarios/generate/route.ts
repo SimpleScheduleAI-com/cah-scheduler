@@ -28,13 +28,35 @@ export async function POST(request: Request) {
     );
   }
 
-  // Reject if a job is already running for this schedule
-  const existingJob = db
+  // Reject if a job is already running for this schedule — but first reclaim
+  // jobs stuck in pending/running for >10 minutes. A generation takes well
+  // under a minute; a stuck job means the process died mid-run (server
+  // restart, crash), and without reclamation the schedule is PERMANENTLY
+  // blocked from regenerating — unrecoverable for a hospital without IT.
+  const STALE_JOB_MS = 10 * 60 * 1000;
+  const activeJobs = db
     .select()
     .from(generationJob)
     .where(eq(generationJob.scheduleId, scheduleId))
     .all()
-    .find((j) => j.status === "pending" || j.status === "running");
+    .filter((j) => j.status === "pending" || j.status === "running");
+
+  let existingJob: (typeof activeJobs)[number] | undefined;
+  for (const job of activeJobs) {
+    const startedMs = new Date(job.startedAt ?? job.createdAt).getTime();
+    if (Date.now() - startedMs > STALE_JOB_MS) {
+      db.update(generationJob)
+        .set({
+          status: "failed",
+          error: "Reclaimed: generation did not complete (process restarted?)",
+          completedAt: new Date().toISOString(),
+        })
+        .where(eq(generationJob.id, job.id))
+        .run();
+    } else {
+      existingJob = job;
+    }
+  }
 
   if (existingJob) {
     return NextResponse.json(

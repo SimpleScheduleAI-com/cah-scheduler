@@ -97,6 +97,7 @@ vi.mock("@/db", () => {
         }),
       }),
       delete: () => ({ where: () => ({ run: vi.fn() }) }),
+      transaction: (fn: () => unknown) => fn(),
     },
   };
 });
