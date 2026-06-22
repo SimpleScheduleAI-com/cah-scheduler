@@ -1,4 +1,5 @@
 import type { RuleEvaluator, RuleContext, RuleViolation, AssignmentInfo } from "./types";
+import { getWeekStart } from "@/lib/date/week";
 
 /**
  * Overtime Rules V2 (Soft)
@@ -26,15 +27,9 @@ export const overtimeRulesV2: RuleEvaluator = {
     const actualOtPenaltyWeight = (context.ruleParameters.actualOtPenaltyWeight as number) ?? 1.0;
     const extraHoursPenaltyWeight = (context.ruleParameters.extraHoursPenaltyWeight as number) ?? 0.3;
 
-    // Group assignments by staff and week
-    // Week is Monday-Sunday
-    const getWeekStart = (dateStr: string): string => {
-      const date = new Date(dateStr);
-      const day = date.getDay();
-      const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
-      const monday = new Date(date.setDate(diff));
-      return monday.toISOString().split("T")[0];
-    };
+    // Group assignments by staff and week (Monday–Sunday) using the canonical
+    // UTC-safe getWeekStart — an earlier local-time copy here mis-bucketed
+    // shifts into the wrong week on servers west of UTC.
 
     // Group assignments by staff → week → list (to be sorted chronologically)
     const staffWeekAssignments = new Map<string, Map<string, AssignmentInfo[]>>();
@@ -106,6 +101,10 @@ export const overtimeRulesV2: RuleEvaluator = {
             const shiftExtraHours = prevCumulative >= standardHours
               ? a.durationHours                    // already above FTE — full shift is extra
               : cumulativeHours - standardHours;   // partial crossing — only excess portion
+            // Total surplus over contract this week (so far). The penalty uses the
+            // marginal shiftExtraHours so per-shift shares sum to this total without
+            // double-counting, but the message leads with the total a manager expects.
+            const totalAboveContract = cumulativeHours - standardHours;
             const penaltyScore = (shiftExtraHours / 12) * extraHoursPenaltyWeight;
 
             violations.push({
@@ -114,7 +113,7 @@ export const overtimeRulesV2: RuleEvaluator = {
               ruleType: "soft",
               shiftId: a.shiftId,
               staffId,
-              description: `${staffName} (${staffInfo.fte} FTE, ${standardHours}h/week) reaches ${cumulativeHours.toFixed(1)}h in week of ${weekStart} — this shift adds ${shiftExtraHours.toFixed(1)}h above contracted hours`,
+              description: `${staffName} (${staffInfo.fte} FTE, ${standardHours}h/week) reaches ${cumulativeHours.toFixed(1)}h in week of ${weekStart} — ${totalAboveContract.toFixed(1)}h above contracted hours (${shiftExtraHours.toFixed(1)}h from this shift)`,
               penaltyScore,
             });
           }

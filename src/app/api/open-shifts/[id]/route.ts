@@ -3,6 +3,7 @@ import { openShift, assignment, shift, shiftDefinition, exceptionLog } from "@/d
 import { eq, and, gte, lte, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { checkStaffAvailability } from "@/lib/coverage/find-candidates";
+import { weekBounds } from "@/lib/date/week";
 
 /**
  * Re-run the availability hard checks (leave, overlap, same-day rest, 60h cap,
@@ -48,15 +49,7 @@ async function recheckAvailabilityAtFill(
  * Sunday land in the same week window — matching the assignment-dialog display.
  */
 function computeWeeklyHours(staffId: string, shiftDate: string): number {
-  const d = new Date(shiftDate + "T00:00:00Z");
-  const day = d.getUTCDay(); // 0=Sun, 1=Mon, …, 6=Sat
-  const daysFromMonday = day === 0 ? 6 : day - 1; // Mon=0, …, Sun=6
-  const weekStart = new Date(d);
-  weekStart.setUTCDate(d.getUTCDate() - daysFromMonday);
-  const weekEnd = new Date(weekStart);
-  weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
-
-  const fmt = (dt: Date) => dt.toISOString().slice(0, 10);
+  const { weekStart, weekEnd } = weekBounds(shiftDate);
 
   const rows = db
     .select({ durationHours: shiftDefinition.durationHours })
@@ -66,8 +59,8 @@ function computeWeeklyHours(staffId: string, shiftDate: string): number {
     .where(
       and(
         eq(assignment.staffId, staffId),
-        gte(shift.date, fmt(weekStart)),
-        lte(shift.date, fmt(weekEnd)),
+        gte(shift.date, weekStart),
+        lte(shift.date, weekEnd),
         ne(assignment.status, "called_out"),
         ne(assignment.status, "cancelled")
       )

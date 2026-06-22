@@ -1,9 +1,15 @@
 import { db } from "@/db";
-import { staff, staffLeave, assignment, shift, shiftDefinition, schedule } from "@/db/schema";
+import { staff, staffLeave, assignment, shift, shiftDefinition } from "@/db/schema";
 import { eq, and, ne, gte, lte } from "drizzle-orm";
+import { weekBounds } from "@/lib/date/week";
+import {
+  ROLE_RANK,
+  countWeekendsInSchedulePeriod,
+  countConsecutiveDaysBefore,
+} from "@/lib/coverage/staff-history";
 
-// Role hierarchy: replacement must have equal or higher rank than the called-out nurse
-const ROLE_RANK: Record<string, number> = { RN: 3, LPN: 2, CNA: 1 };
+// Re-export so callers that import weekBounds from this module keep working.
+export { weekBounds };
 
 // Max candidates returned (eligible first, then ineligible for visibility)
 const MAX_ELIGIBLE = 3;
@@ -42,72 +48,6 @@ function offsetDate(date: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Sunday-based week containing `date` */
-function weekBounds(date: string): { weekStart: string; weekEnd: string } {
-  const d = new Date(date + "T00:00:00Z");
-  const dayOfWeek = d.getUTCDay(); // 0 = Sunday
-  const weekStart = new Date(d);
-  weekStart.setUTCDate(d.getUTCDate() - dayOfWeek);
-  const weekEnd = new Date(weekStart);
-  weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
-  return {
-    weekStart: weekStart.toISOString().slice(0, 10),
-    weekEnd: weekEnd.toISOString().slice(0, 10),
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Helpers for weekend count and consecutive days
-// ---------------------------------------------------------------------------
-
-function countWeekendsInSchedulePeriod(staffId: string, scheduleId: string): number {
-  const sched = db.select({ startDate: schedule.startDate, endDate: schedule.endDate })
-    .from(schedule).where(eq(schedule.id, scheduleId)).get();
-  if (!sched) return 0;
-
-  const rows = db
-    .select({ date: shift.date })
-    .from(assignment)
-    .innerJoin(shift, eq(assignment.shiftId, shift.id))
-    .where(
-      and(
-        eq(assignment.staffId, staffId),
-        gte(shift.date, sched.startDate),
-        lte(shift.date, sched.endDate),
-        ne(assignment.status, "cancelled")
-      )
-    )
-    .all();
-
-  return rows.filter((r) => {
-    const day = new Date(r.date + "T00:00:00Z").getUTCDay();
-    return day === 0 || day === 6; // Sunday or Saturday
-  }).length;
-}
-
-function countConsecutiveDaysBefore(staffId: string, shiftDate: string): number {
-  let count = 0;
-  for (let i = 1; i <= 7; i++) {
-    const d = new Date(shiftDate + "T00:00:00Z");
-    d.setUTCDate(d.getUTCDate() - i);
-    const dateStr = d.toISOString().slice(0, 10);
-    const hasShift = db
-      .select({ id: assignment.id })
-      .from(assignment)
-      .innerJoin(shift, eq(assignment.shiftId, shift.id))
-      .where(
-        and(
-          eq(assignment.staffId, staffId),
-          eq(shift.date, dateStr),
-          ne(assignment.status, "cancelled")
-        )
-      )
-      .get();
-    if (!hasShift) break;
-    count++;
-  }
-  return count;
-}
 
 export function getEscalationOptions(
   shiftId: string,

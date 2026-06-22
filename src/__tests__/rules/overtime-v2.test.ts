@@ -105,6 +105,27 @@ describe("overtime-v2 rule", () => {
     expect(otViolation!.penaltyScore!).toBeGreaterThan(extraHoursViolation!.penaltyScore!);
   });
 
+  it("shows both the total gap above contract and this shift's share for a part-timer already over FTE", () => {
+    // 0.5 FTE = 20h standard. Three 12h shifts = 36h.
+    // Total above contract = 36 − 20 = 16h. The 3rd shift (already over 20h before it)
+    // contributes its full 12h. The message must surface BOTH numbers so a manager
+    // does not mistake the per-shift share (12h) for the real surplus (16h).
+    const staff = makeStaff({ id: "staff-1", fte: 0.5 });
+    const { shifts, assignments } = makeWeekShifts([12, 12, 12]);
+    const ctx = makeContext({
+      assignments,
+      shiftMap: new Map(shifts.map(s => [s.id, s])),
+      staffMap: new Map([["staff-1", staff]]),
+    });
+    const violations = overtimeRulesV2.evaluate(ctx);
+    const lastShift = violations.find(v => v.shiftId === "s2" && v.ruleId === "extra-hours");
+    expect(lastShift).toBeDefined();
+    // Headline number is the TOTAL gap above contract, not the per-shift marginal.
+    expect(lastShift!.description).toContain("16.0h above contracted hours");
+    // The per-shift contribution is shown alongside it.
+    expect(lastShift!.description).toContain("12.0h from this shift");
+  });
+
   it("does not flag shifts not counting toward staffing", () => {
     const staff = makeStaff({ id: "staff-1", fte: 1.0 });
     // 6 x 12h = 72h but none count toward staffing

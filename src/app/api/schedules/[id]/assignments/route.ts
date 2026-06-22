@@ -3,7 +3,7 @@ import { assignment, schedule, shift, shiftDefinition, staff, publicHoliday, sta
 import { eq, and, gte, lte, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { logAuditEvent } from "@/lib/audit/logger";
-import { getWeekStart } from "@/lib/engine/scheduler/state";
+import { weekBounds } from "@/lib/date/week";
 
 /**
  * Holiday groups - maps individual holiday names to logical holiday groups.
@@ -54,10 +54,7 @@ export async function POST(
       .get();
     const shiftDuration = shiftDef?.durationHours ?? 0;
 
-    const weekStart = getWeekStart(shiftRecord.date);
-    const weekEndDate = new Date(weekStart);
-    weekEndDate.setDate(weekEndDate.getDate() + 6);
-    const weekEnd = weekEndDate.toISOString().slice(0, 10);
+    const { weekStart, weekEnd } = weekBounds(shiftRecord.date);
 
     const existingRows = db
       .select({ durationHours: shiftDefinition.durationHours })

@@ -1,14 +1,13 @@
 import { db } from "@/db";
-import { staff, assignment, shift, shiftDefinition, staffLeave, prnAvailability, schedule } from "@/db/schema";
+import { staff, assignment, shift, shiftDefinition, staffLeave, prnAvailability } from "@/db/schema";
 import { eq, and, ne, gte, lte, or } from "drizzle-orm";
-import { addDays, parseISO, format, startOfWeek, endOfWeek } from "date-fns";
-
-// ---------------------------------------------------------------------------
-// Role hierarchy — replacement must have equal or higher rank than the original
-// nurse. A CNA cannot perform RN duties regardless of availability; showing
-// them at all creates confusion for the manager.
-// ---------------------------------------------------------------------------
-const ROLE_RANK: Record<string, number> = { RN: 3, LPN: 2, CNA: 1 };
+import { addDays, parseISO, format } from "date-fns";
+import { weekBounds } from "@/lib/date/week";
+import {
+  ROLE_RANK,
+  countWeekendsInSchedulePeriod,
+  countConsecutiveDaysBefore,
+} from "@/lib/coverage/staff-history";
 
 // Source preference bonus — kept small relative to competency so a large
 // level mismatch can override tier preference. A non-OT regular nurse at the
@@ -59,58 +58,6 @@ interface VacancyContext {
   chargeRequired: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Helpers for weekend count and consecutive days
-// ---------------------------------------------------------------------------
-
-function countWeekendsInSchedulePeriod(staffId: string, scheduleId: string): number {
-  const sched = db.select({ startDate: schedule.startDate, endDate: schedule.endDate })
-    .from(schedule).where(eq(schedule.id, scheduleId)).get();
-  if (!sched) return 0;
-
-  const rows = db
-    .select({ date: shift.date })
-    .from(assignment)
-    .innerJoin(shift, eq(assignment.shiftId, shift.id))
-    .where(
-      and(
-        eq(assignment.staffId, staffId),
-        gte(shift.date, sched.startDate),
-        lte(shift.date, sched.endDate),
-        ne(assignment.status, "cancelled")
-      )
-    )
-    .all();
-
-  return rows.filter((r) => {
-    const day = new Date(r.date + "T00:00:00Z").getUTCDay();
-    return day === 0 || day === 6;
-  }).length;
-}
-
-function countConsecutiveDaysBefore(staffId: string, shiftDate: string): number {
-  let count = 0;
-  for (let i = 1; i <= 7; i++) {
-    const d = new Date(shiftDate + "T00:00:00Z");
-    d.setUTCDate(d.getUTCDate() - i);
-    const dateStr = d.toISOString().slice(0, 10);
-    const hasShift = db
-      .select({ id: assignment.id })
-      .from(assignment)
-      .innerJoin(shift, eq(assignment.shiftId, shift.id))
-      .where(
-        and(
-          eq(assignment.staffId, staffId),
-          eq(shift.date, dateStr),
-          ne(assignment.status, "cancelled")
-        )
-      )
-      .get();
-    if (!hasShift) break;
-    count++;
-  }
-  return count;
-}
 
 // ---------------------------------------------------------------------------
 // Public entry point
@@ -507,9 +454,8 @@ export async function checkStaffAvailability(
   shiftDetails: ShiftDetails
 ): Promise<AvailabilityResult> {
   const shiftDate = parseISO(shiftDetails.date);
-  // Use Monday as week start so Sat + Sun land in the same window (matches assignment dialog)
-  const weekStart = startOfWeek(shiftDate, { weekStartsOn: 1 });
-  const weekEnd = endOfWeek(shiftDate, { weekStartsOn: 1 });
+  // Monday–Sunday week (canonical, UTC-safe). weekStart/weekEnd are YYYY-MM-DD strings.
+  const { weekStart, weekEnd } = weekBounds(shiftDetails.date);
 
   // 1. Approved leave
   const leaveRecords = db
@@ -575,8 +521,8 @@ export async function checkStaffAvailability(
     .where(
       and(
         eq(assignment.staffId, staffId),
-        gte(shift.date, format(weekStart, "yyyy-MM-dd")),
-        lte(shift.date, format(weekEnd, "yyyy-MM-dd")),
+        gte(shift.date, weekStart),
+        lte(shift.date, weekEnd),
         ne(assignment.status, "cancelled")
       )
     )
@@ -598,8 +544,8 @@ export async function checkStaffAvailability(
       and(
         eq(assignment.staffId, staffId),
         eq(shiftDefinition.shiftType, "on_call"),
-        gte(shift.date, format(weekStart, "yyyy-MM-dd")),
-        lte(shift.date, format(weekEnd, "yyyy-MM-dd")),
+        gte(shift.date, weekStart),
+        lte(shift.date, weekEnd),
         ne(assignment.status, "cancelled"),
         ne(assignment.status, "called_out")
       )
@@ -726,8 +672,8 @@ export async function checkStaffAvailability(
       and(
         eq(assignment.staffId, staffId),
         eq(assignment.assignmentSource, "callout_replacement"),
-        gte(shift.date, format(weekStart, "yyyy-MM-dd")),
-        lte(shift.date, format(weekEnd, "yyyy-MM-dd")),
+        gte(shift.date, weekStart),
+        lte(shift.date, weekEnd),
         ne(assignment.status, "cancelled"),
         ne(assignment.status, "called_out")
       )

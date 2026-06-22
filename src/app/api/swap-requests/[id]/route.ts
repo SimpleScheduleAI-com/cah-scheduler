@@ -10,6 +10,7 @@ import {
   exceptionLog,
 } from "@/db/schema";
 import { eq, and, ne, lte, gte } from "drizzle-orm";
+import { weekBounds } from "@/lib/date/week";
 import { NextResponse } from "next/server";
 import { validateSwap, type SwapSideParams, type SwapViolation } from "@/lib/swap/validate-swap";
 
@@ -40,14 +41,7 @@ export async function GET(
 // dialog display so isOvertime flags stay consistent.
 // ---------------------------------------------------------------------------
 function computeWeeklyHours(staffId: string, shiftDate: string): number {
-  const d = new Date(shiftDate + "T00:00:00Z");
-  const day = d.getUTCDay(); // 0=Sun, 1=Mon, …, 6=Sat
-  const daysFromMonday = day === 0 ? 6 : day - 1;
-  const weekStart = new Date(d);
-  weekStart.setUTCDate(d.getUTCDate() - daysFromMonday);
-  const weekEnd = new Date(weekStart);
-  weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
-  const fmt = (dt: Date) => dt.toISOString().slice(0, 10);
+  const { weekStart, weekEnd } = weekBounds(shiftDate);
   const rows = db
     .select({ durationHours: shiftDefinition.durationHours })
     .from(assignment)
@@ -56,8 +50,8 @@ function computeWeeklyHours(staffId: string, shiftDate: string): number {
     .where(
       and(
         eq(assignment.staffId, staffId),
-        gte(shift.date, fmt(weekStart)),
-        lte(shift.date, fmt(weekEnd)),
+        gte(shift.date, weekStart),
+        lte(shift.date, weekEnd),
         ne(assignment.status, "called_out"),
         ne(assignment.status, "cancelled")
       )

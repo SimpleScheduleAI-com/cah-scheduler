@@ -1,4 +1,15 @@
 import type { AssignmentDraft } from "./types";
+import {
+  addDays,
+  utcDayOfWeek,
+  getWeekStart,
+  getWeekEnd,
+  getWeekendId,
+} from "@/lib/date/week";
+
+// Canonical Mon–Sun, UTC-safe week helpers live in @/lib/date/week. Re-exported
+// here so existing importers of these names from this module keep working.
+export { addDays, utcDayOfWeek, getWeekStart, getWeekendId };
 
 // ─── Date / time helpers ─────────────────────────────────────────────────────
 
@@ -15,47 +26,6 @@ export function shiftEndDateTime(
 ): Date {
   const start = toDateTime(date, startTime);
   return new Date(start.getTime() + durationHours * 60 * 60 * 1000);
-}
-
-/**
- * Parse a YYYY-MM-DD string as UTC midnight.
- *
- * All date-only arithmetic in this module MUST go through parseUTC/addDays/
- * utcDayOfWeek. Bare `new Date(dateStr)` parses as UTC but local-time methods
- * (getDay/setDate) then operate in the server timezone — on any server west
- * of UTC (e.g. America/Chicago) that shifts every date one day back, breaking
- * week starts, weekend pairing, and DST-adjacent iteration.
- */
-function parseUTC(dateStr: string): Date {
-  return new Date(dateStr + "T00:00:00Z");
-}
-
-/** Add `days` to a YYYY-MM-DD string, returning YYYY-MM-DD (UTC arithmetic). */
-export function addDays(dateStr: string, days: number): string {
-  const d = parseUTC(dateStr);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-/** Day of week for a YYYY-MM-DD string: 0=Sun … 6=Sat (timezone-independent). */
-export function utcDayOfWeek(dateStr: string): number {
-  return parseUTC(dateStr).getUTCDay();
-}
-
-export function getWeekStart(dateStr: string): string {
-  const day = utcDayOfWeek(dateStr); // 0=Sun, 1=Mon, ..., 6=Sat
-  const diff = day === 0 ? -6 : 1 - day; // days to preceding Monday
-  return addDays(dateStr, diff);
-}
-
-function getWeekEnd(weekStart: string): string {
-  return addDays(weekStart, 6);
-}
-
-export function getWeekendId(dateStr: string): string {
-  // Anchor Sunday back to Saturday so both share the same weekend identifier
-  if (utcDayOfWeek(dateStr) === 0) return addDays(dateStr, -1);
-  return dateStr; // Saturday date as the ID
 }
 
 // ─── SchedulerState ──────────────────────────────────────────────────────────
