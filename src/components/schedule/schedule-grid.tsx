@@ -161,7 +161,7 @@ function ShiftCell({
   return (
     <button
       onClick={onClick}
-      className={`w-full rounded-lg border-2 ${borderColor} bg-card p-3 text-left transition-all duration-200 hover:bg-accent hover:shadow-md hover:scale-[1.02]`}
+      className={`w-full rounded-lg border-2 ${borderColor} bg-card p-3 text-left transition-colors duration-200 hover:bg-accent hover:shadow-sm`}
     >
       <div className="mb-1 flex items-center justify-between">
         <span className="text-xs text-muted-foreground">

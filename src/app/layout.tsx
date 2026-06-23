@@ -21,7 +21,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "CAH Scheduler",
+  title: "SimpleScheduleAI",
   description: "ICU Nurse Scheduling for Critical Access Hospitals",
 };
 
