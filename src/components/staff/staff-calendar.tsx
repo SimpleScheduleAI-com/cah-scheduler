@@ -166,11 +166,11 @@ export function StaffCalendar({ staffId, defaultDate }: StaffCalendarProps) {
       {/* Legend */}
       <div className="mt-4 flex flex-wrap gap-3 text-xs">
         <div className="flex items-center gap-1">
-          <div className="h-3 w-3 rounded bg-blue-500" />
+          <div className="h-3 w-3 rounded bg-[#2d5a4a]" />
           <span>Day Shift</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="h-3 w-3 rounded bg-purple-500" />
+          <div className="h-3 w-3 rounded bg-[#1a2332]" />
           <span>Night Shift</span>
         </div>
         <div className="flex items-center gap-1">
@@ -221,8 +221,8 @@ function DayCell({
             <div
               key={shift.assignmentId}
               className={`rounded px-1 py-0.5 text-[10px] text-white ${
-                shift.shiftType === "day" ? "bg-blue-500" :
-                shift.shiftType === "night" ? "bg-purple-500" : "bg-gray-500"
+                shift.shiftType === "day" ? "bg-[#2d5a4a]" :
+                shift.shiftType === "night" ? "bg-[#1a2332]" : "bg-gray-500"
               }`}
             >
               <div className="flex items-center gap-0.5">

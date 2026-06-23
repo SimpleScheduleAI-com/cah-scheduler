@@ -199,7 +199,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <Link href={`/schedule/${data.scheduleInfo.id}`}>
-                  <Button variant="secondary" className="!bg-white !text-primary hover:!bg-white/90 shadow-xl hover:shadow-2xl hover:scale-105 transition-all">
+                  <Button variant="secondary" className="!bg-white !text-primary hover:!bg-white/90 shadow-sm hover:shadow-md transition-shadow">
                     Open Schedule Builder →
                   </Button>
                 </Link>
@@ -216,7 +216,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 <Link href="/schedule">
-                  <Button variant="secondary" className="!bg-white !text-primary hover:!bg-white/90 shadow-xl hover:shadow-2xl hover:scale-105 transition-all">
+                  <Button variant="secondary" className="!bg-white !text-primary hover:!bg-white/90 shadow-sm hover:shadow-md transition-shadow">
                     Create Schedule →
                   </Button>
                 </Link>
@@ -306,7 +306,7 @@ export default function DashboardPage() {
                       {item.text}
                     </p>
                   </div>
-                  <div className={`flex items-center justify-center h-8 w-8 rounded-lg transition-all group-hover:scale-110 ${
+                  <div className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${
                     item.urgent
                       ? "bg-red-100 dark:bg-red-900/30"
                       : item.info

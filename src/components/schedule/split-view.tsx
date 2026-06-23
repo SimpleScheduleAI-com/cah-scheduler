@@ -51,12 +51,12 @@ export function SplitView({
           <h2 className="text-lg font-semibold">Split View Comparison</h2>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-blue-500" />
+              <div className="w-3 h-3 rounded-full bg-[#2d5a4a]" />
               <span>{leftTitle}</span>
             </div>
             <span>vs</span>
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-purple-500" />
+              <div className="w-3 h-3 rounded-full bg-[#c68a4e]" />
               <span>{rightTitle}</span>
             </div>
           </div>
@@ -72,12 +72,12 @@ export function SplitView({
       <div className="flex h-[calc(100vh-3.5rem)]">
         {/* Left panel */}
         <div
-          className="overflow-auto border-r-2 border-blue-500/30 bg-gradient-to-br from-blue-50/30 to-transparent dark:from-blue-950/10"
+          className="overflow-auto border-r-2 border-[#2d5a4a]/30 bg-gradient-to-br from-[#2d5a4a]/[0.06] to-transparent"
           style={{ width: `${dividerPosition}%` }}
         >
           <div className="p-6">
             <div className="mb-4 flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-blue-500" />
+              <div className="w-3 h-3 rounded-full bg-[#2d5a4a]" />
               <h3 className="font-semibold">{leftTitle}</h3>
             </div>
             {leftContent}
@@ -101,12 +101,12 @@ export function SplitView({
 
         {/* Right panel */}
         <div
-          className="overflow-auto border-l-2 border-purple-500/30 bg-gradient-to-bl from-purple-50/30 to-transparent dark:from-purple-950/10"
+          className="overflow-auto border-l-2 border-[#c68a4e]/40 bg-gradient-to-bl from-[#c68a4e]/[0.10] to-transparent"
           style={{ width: `${100 - dividerPosition}%` }}
         >
           <div className="p-6">
             <div className="mb-4 flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-purple-500" />
+              <div className="w-3 h-3 rounded-full bg-[#c68a4e]" />
               <h3 className="font-semibold">{rightTitle}</h3>
             </div>
             {rightContent}

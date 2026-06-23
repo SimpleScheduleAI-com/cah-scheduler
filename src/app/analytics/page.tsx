@@ -331,7 +331,7 @@ export default function AnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-purple-600" />
+              <Calendar className="h-5 w-5 text-primary" />
               Weekend Distribution
             </CardTitle>
             <CardDescription>Weekend assignments per staff — {periodLabel}</CardDescription>
