@@ -132,7 +132,7 @@ export function Sidebar() {
       {/* Mobile Toggle Button */}
       <button
         onClick={() => setMobileOpen(!mobileOpen)}
-        className="fixed top-4 left-4 z-40 md:hidden gradient-primary text-white p-2 rounded-lg shadow-lg"
+        className="fixed top-4 left-4 z-40 md:hidden bg-primary text-primary-foreground p-2 rounded-lg shadow-sm"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/>
@@ -172,10 +172,10 @@ export function Sidebar() {
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                      "relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors duration-200",
                       isActive
-                        ? "bg-primary text-primary-foreground shadow-sm before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r-full before:bg-primary-foreground/30"
-                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground hover:translate-x-0.5 hover:shadow-sm before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0 before:rounded-r-full before:bg-primary before:transition-all hover:before:w-1"
+                        ? "bg-primary text-primary-foreground before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-1 before:rounded-r-full before:bg-primary-foreground/40"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0 before:rounded-r-full before:bg-primary before:transition-all hover:before:w-1"
                     )}
                   >
                     {Icon && <Icon />}
