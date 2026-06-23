@@ -10,7 +10,7 @@ This file provides context and conventions for Claude Code when working in this 
 
 - **Current version:** 1.7.0
 - **GitHub:** https://github.com/SimpleScheduleAIApp/cah-scheduler
-- **Local path:** D:\Pradeep\Personal\Projects\Nurse-scheduling
+- **Local path:** D:\Pradeep\Personal\Projects\Nurse-scheduling new
 
 ---
 
