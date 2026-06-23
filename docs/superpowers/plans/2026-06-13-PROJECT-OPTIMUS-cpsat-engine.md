@@ -23,6 +23,44 @@ means one engine rewrite, not two. See the MOSAIC section below.
 - Generation time becomes a configurable budget (anytime solver), not an emergent property.
 - Strengthens the "AI engine" marketing claim with optimization guarantees.
 
+## Reinforcing evidence (2026-06-23 investigation)
+
+A read-only investigation into longer-schedule behaviour (full data in
+`docs/scheduler-longer-horizon-findings.md`) produced new evidence that the greedy +
+local-search + sweeps core is structurally shaky — precisely what CP-SAT removes:
+
+- **More optimization makes schedules WORSE.** On a 28-day schedule, soft violations rose
+  with local-search effort: 500→43, 1500→105, 6000→171, 20000→176. The search objective
+  (`softPenalty`) is misaligned with the reported soft-rule metric (`evaluateSchedule`).
+- **Non-reproducible quality.** Same 28-day schedule, 5 seeds → [73, 84, 97, 103, 105]
+  violations (~40% spread). A CP-SAT solve is deterministic for a fixed seed + budget.
+- **Generation time is pathological (reinforces Trigger 3):** `weekendRedistributionSweep`
+  takes 17–115 s per 28-day generation (hits its 500-iteration cap). CP-SAT makes time a
+  configurable budget instead of an emergent property.
+- **Cross-schedule equity is weekends-only** (6-week rolling lookback); hours/preferences are
+  not balanced across schedules, and `flexHoursYearToDate` is read but never written.
+
+These join the existing variant-inversion probe (`scripts/variant-sanity-probe.ts`) as
+decision context.
+
+### Secondary work tracked separately (fold into OPTIMUS, or do standalone)
+
+- **Cross-schedule equity beyond weekends** + `flexHoursYearToDate` ownership (task_167618ab).
+  A CP-SAT model can carry cumulative equity as objective terms — natural to fold in.
+- **`weekendRedistributionSweep` performance** (task_bb78d1f4). Largely mooted if the sweeps
+  are replaced by a solver.
+- **Local `getDay()` weekend-detection UTC audit** across scoring/rules (task_d5fd0d9a).
+  Independent of the engine choice — still needed either way.
+
+### Near-term alternative to a full rewrite
+
+The "more effort → more violations" misalignment is independently fixable in the heuristic
+engine: it is contained to `softPenalty()` in `src/lib/engine/scheduler/scoring.ts`
+(consecutive-weekend + weekend-equity terms penalize per-assignment where the rules penalize
+per-staff / per-excess-shift; a per-nurse load term has no rule equivalent). Estimated
+**MEDIUM** (~1 file, 40–60 LOC, ~10–20 scoring-test updates). It does NOT fix the seed
+variance and may be throwaway if OPTIMUS lands — decide before investing.
+
 ## Triggers (any one)
 
 1. Pitching the scheduler/service where the three-variant story must be defensible.
