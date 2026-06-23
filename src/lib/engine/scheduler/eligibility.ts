@@ -2,12 +2,11 @@ import type { StaffInfo, ShiftInfo } from "@/lib/engine/rules/types";
 import type { SchedulerContext } from "./types";
 import { SchedulerState, toDateTime, shiftEndDateTime } from "./state";
 
-const SUPERVISED_UNITS = ["ICU", "ER", "ED", "EMERGENCY"];
+import { isICUUnit } from "@/lib/engine/unit-utils";
 
-export function isICUUnit(unitName: string): boolean {
-  const words = unitName.toUpperCase().split(/[\s\-_]+/);
-  return SUPERVISED_UNITS.some((u) => words.includes(u));
-}
+// Re-exported so existing imports keep working; the implementation now lives
+// in unit-utils.ts and is shared with the rule evaluators.
+export { isICUUnit };
 
 /**
  * Returns true if assigning `staffInfo` to `shiftInfo` passes every hard rule.

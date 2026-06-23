@@ -178,12 +178,12 @@ describe("softPenalty", () => {
     expect(p).toBeLessThan(0);
   });
 
-  it("does not give weekend incentive for weekend-exempt staff", () => {
+  it("applies the weekend-exempt deterrent instead of any weekend incentive", () => {
     const staff = makeStaff({ weekendExempt: true });
     const p = softPenalty(staff, makeShift({ date: "2026-02-14" }), state, BALANCED, [], staffMap, false, defaultUnitConfig);
-    // Weekend incentive is skipped for exempt staff, but capacity-spreading bonus still applies:
-    //   penalty -= 1.5 × 0.1 × (40/40) = −0.15
-    expect(p).toBeCloseTo(-0.15, 5);
+    // Product decision (Jun 2026): exempt staff on weekends is a soft violation.
+    // Deterrent: +preference × 1.5 = +2.25; capacity-spreading bonus −0.15 → 2.1
+    expect(p).toBeCloseTo(2.1, 5);
   });
 
   // ── Float penalty ────────────────────────────────────────────────────────────
@@ -358,5 +358,35 @@ describe("consecutive weekend streak penalty — escalation beyond maxConsecutiv
 
   it("streak=5 penalty strictly exceeds streak=4", () => {
     expect(consecutivePenalty(5)).toBeGreaterThan(consecutivePenalty(4));
+  });
+});
+
+describe("softPenalty — weekend-exempt deterrent", () => {
+  it("penalizes assigning a weekend shift to a weekend-exempt nurse", () => {
+    const state = new SchedulerState();
+    const satShift = makeShift({ id: "s-sat", date: "2026-02-14" }); // Saturday
+    const exempt = makeStaff({ id: "n-ex", weekendExempt: true });
+    const regular = makeStaff({ id: "n-reg", weekendExempt: false });
+    const staffMap = new Map([["n-ex", exempt], ["n-reg", regular]]);
+
+    const pExempt = softPenalty(exempt, satShift, state, BALANCED, [], staffMap, false, defaultUnitConfig);
+    const pRegular = softPenalty(regular, satShift, state, BALANCED, [], staffMap, false, defaultUnitConfig);
+
+    // The regular nurse is below weekend quota (gets a fill bonus); the exempt
+    // nurse must carry a positive deterrent so they are the LAST resort.
+    expect(pExempt).toBeGreaterThan(pRegular);
+    expect(pExempt).toBeGreaterThan(0);
+  });
+
+  it("does not penalize the exempt nurse on weekdays", () => {
+    const state = new SchedulerState();
+    const monShift = makeShift({ id: "s-mon", date: "2026-02-09" }); // Monday
+    const exempt = makeStaff({ id: "n-ex", weekendExempt: true });
+    const regular = makeStaff({ id: "n-reg", weekendExempt: false });
+    const staffMap = new Map([["n-ex", exempt], ["n-reg", regular]]);
+
+    const pExempt = softPenalty(exempt, monShift, state, BALANCED, [], staffMap, false, defaultUnitConfig);
+    const pRegular = softPenalty(regular, monShift, state, BALANCED, [], staffMap, false, defaultUnitConfig);
+    expect(pExempt).toBe(pRegular);
   });
 });

@@ -1,6 +1,6 @@
 import type { StaffInfo, ShiftInfo, UnitConfig } from "@/lib/engine/rules/types";
 import type { AssignmentDraft, WeightProfile } from "./types";
-import { SchedulerState } from "./state";
+import { SchedulerState, addDays, getWeekendId, utcDayOfWeek } from "./state";
 import { isICUUnit } from "./eligibility";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -87,7 +87,8 @@ export function softPenalty(
   // A nurse who hit their quota last period starts this period already "at quota"
   // and is penalised for more weekends, while a nurse who was light last period
   // starts below quota and gets the assignment bonus.
-  const dayOfWeek = new Date(shiftInfo.date).getDay();
+  // UTC day-of-week — local getDay() shifts a day back on servers west of UTC
+  const dayOfWeek = utcDayOfWeek(shiftInfo.date);
   const isWeekendShift = dayOfWeek === 0 || dayOfWeek === 6;
   if (isWeekendShift && !staffInfo.weekendExempt) {
     const historicalWeekends = historicalWeekendCounts.get(staffInfo.id) ?? 0;
@@ -101,6 +102,16 @@ export function softPenalty(
       const excess = weekendCount - required;
       penalty += weights.weekendCount * (0.4 + excess * 0.3);
     }
+  }
+
+  // ── 3a. Weekend-exempt deterrent ─────────────────────────────────────────────
+  // Product decision (Jun 2026): weekendExempt is a quota exemption, not a hard
+  // ban — but assigning these staff to weekends is a soft violation. A positive
+  // penalty (scaled by the preference weight) makes them the LAST resort: any
+  // non-exempt alternative scores better, yet a critically short weekend shift
+  // can still be covered. Mirrored post-hoc by the weekend-exempt evaluator.
+  if (isWeekendShift && staffInfo.weekendExempt) {
+    penalty += weights.preference * 1.5;
   }
 
   // ── 3b. Consecutive weekend penalty ─────────────────────────────────────────
@@ -125,15 +136,9 @@ export function softPenalty(
   if (isWeekendShift && !staffInfo.weekendExempt) {
     const maxConsecutive = unitConfig?.maxConsecutiveWeekends ?? 2;
 
-    // Compute the Saturday of the proposed shift
-    const newSatObj = new Date(shiftInfo.date);
-    if (newSatObj.getDay() === 0) newSatObj.setDate(newSatObj.getDate() - 1);
-    const newSatStr = newSatObj.toISOString().slice(0, 10);
-
-    // Compute Sunday of proposed weekend
-    const newSunObj = new Date(newSatObj);
-    newSunObj.setDate(newSunObj.getDate() + 1);
-    const newSunStr = newSunObj.toISOString().slice(0, 10);
+    // Saturday/Sunday of the proposed weekend (UTC-safe shared helpers)
+    const newSatStr = getWeekendId(shiftInfo.date);
+    const newSunStr = addDays(newSatStr, 1);
 
     // Skip if staff already works this same weekend (Sat or Sun already assigned)
     const alreadyThisWeekend =
@@ -147,15 +152,11 @@ export function softPenalty(
       // as streak=3 — underestimating the penalty by 33–50%.
       const streakLookBound = unitConfig?.schedulePeriodWeeks ?? 6;
 
-      // Count consecutive weekends backward
+      // Count consecutive weekends backward (UTC string arithmetic)
       let back = 0;
       for (let i = 1; i <= streakLookBound; i++) {
-        const prevSat = new Date(newSatObj);
-        prevSat.setDate(prevSat.getDate() - 7 * i);
-        const prevSatStr = prevSat.toISOString().slice(0, 10);
-        const prevSun = new Date(prevSat);
-        prevSun.setDate(prevSun.getDate() + 1);
-        const prevSunStr = prevSun.toISOString().slice(0, 10);
+        const prevSatStr = addDays(newSatStr, -7 * i);
+        const prevSunStr = addDays(prevSatStr, 1);
         if (state.hasWorkedDate(staffInfo.id, prevSatStr) || state.hasWorkedDate(staffInfo.id, prevSunStr)) {
           back++;
         } else {
@@ -166,12 +167,8 @@ export function softPenalty(
       // Count consecutive weekends forward
       let fwd = 0;
       for (let i = 1; i <= streakLookBound; i++) {
-        const nextSat = new Date(newSatObj);
-        nextSat.setDate(nextSat.getDate() + 7 * i);
-        const nextSatStr = nextSat.toISOString().slice(0, 10);
-        const nextSun = new Date(nextSat);
-        nextSun.setDate(nextSun.getDate() + 1);
-        const nextSunStr = nextSun.toISOString().slice(0, 10);
+        const nextSatStr = addDays(newSatStr, 7 * i);
+        const nextSunStr = addDays(nextSatStr, 1);
         if (state.hasWorkedDate(staffInfo.id, nextSatStr) || state.hasWorkedDate(staffInfo.id, nextSunStr)) {
           fwd++;
         } else {

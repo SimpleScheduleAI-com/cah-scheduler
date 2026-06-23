@@ -63,7 +63,7 @@ vi.mock("@/db", () => ({ db: { select: () => chain } }));
 
 // ─── SUT (imported after mocks) ────────────────────────────────────────────
 
-import { getEscalationOptions } from "@/lib/callout/escalation";
+import { getEscalationOptions, weekBounds } from "@/lib/callout/escalation";
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -185,6 +185,24 @@ function setupQueues({
 }
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
+
+describe("weekBounds — Monday–Sunday week (must match scheduler getWeekStart + find-candidates)", () => {
+  // Regression for the callout weekly-hours undercount: a Sunday-based week
+  // (Sun–Sat) ended Saturday and pushed the trailing Sunday shift into the next
+  // week, so a nurse working Mon+Wed+Sun (36h) showed as 24h in the callout panel.
+  it("includes the trailing Sunday for a Friday callout shift", () => {
+    // Callout on Fri 2026-06-26 → week must be Mon 06-22 … Sun 06-28.
+    expect(weekBounds("2026-06-26")).toEqual({ weekStart: "2026-06-22", weekEnd: "2026-06-28" });
+  });
+
+  it("keeps a Sunday in its own Mon–Sun week, not the next", () => {
+    expect(weekBounds("2026-06-28")).toEqual({ weekStart: "2026-06-22", weekEnd: "2026-06-28" });
+  });
+
+  it("maps a Monday to itself as the week start", () => {
+    expect(weekBounds("2026-06-22")).toEqual({ weekStart: "2026-06-22", weekEnd: "2026-06-28" });
+  });
+});
 
 describe("getEscalationOptions — weekendsThisPeriod", () => {
   beforeEach(() => vi.clearAllMocks());

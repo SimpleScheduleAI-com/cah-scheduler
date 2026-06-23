@@ -10,6 +10,7 @@ import {
   exceptionLog,
 } from "@/db/schema";
 import { eq, and, ne, lte, gte } from "drizzle-orm";
+import { weekBounds } from "@/lib/date/week";
 import { NextResponse } from "next/server";
 import { validateSwap, type SwapSideParams, type SwapViolation } from "@/lib/swap/validate-swap";
 
@@ -40,14 +41,7 @@ export async function GET(
 // dialog display so isOvertime flags stay consistent.
 // ---------------------------------------------------------------------------
 function computeWeeklyHours(staffId: string, shiftDate: string): number {
-  const d = new Date(shiftDate + "T00:00:00Z");
-  const day = d.getUTCDay(); // 0=Sun, 1=Mon, …, 6=Sat
-  const daysFromMonday = day === 0 ? 6 : day - 1;
-  const weekStart = new Date(d);
-  weekStart.setUTCDate(d.getUTCDate() - daysFromMonday);
-  const weekEnd = new Date(weekStart);
-  weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
-  const fmt = (dt: Date) => dt.toISOString().slice(0, 10);
+  const { weekStart, weekEnd } = weekBounds(shiftDate);
   const rows = db
     .select({ durationHours: shiftDefinition.durationHours })
     .from(assignment)
@@ -56,8 +50,8 @@ function computeWeeklyHours(staffId: string, shiftDate: string): number {
     .where(
       and(
         eq(assignment.staffId, staffId),
-        gte(shift.date, fmt(weekStart)),
-        lte(shift.date, fmt(weekEnd)),
+        gte(shift.date, weekStart),
+        lte(shift.date, weekEnd),
         ne(assignment.status, "called_out"),
         ne(assignment.status, "cancelled")
       )
@@ -141,6 +135,38 @@ function addDays(date: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * Helper: fetch a staff member's active assignments within ±6 days of `date`
+ * (excluding the assignment being swapped away). Feeds the 60h rolling-window
+ * and max-consecutive-days hard checks in validateSwapSide.
+ */
+function getWindowAssignments(
+  staffId: string,
+  date: string,
+  excludeAssignmentId: string
+) {
+  return db
+    .select({
+      date: shift.date,
+      durationHours: shiftDefinition.durationHours,
+    })
+    .from(assignment)
+    .innerJoin(shift, eq(assignment.shiftId, shift.id))
+    .innerJoin(shiftDefinition, eq(shift.shiftDefinitionId, shiftDefinition.id))
+    .where(
+      and(
+        eq(assignment.staffId, staffId),
+        gte(shift.date, addDays(date, -6)),
+        lte(shift.date, addDays(date, 6)),
+        ne(assignment.id, excludeAssignmentId),
+        ne(assignment.status, "called_out"),
+        ne(assignment.status, "cancelled"),
+        ne(assignment.status, "swapped")
+      )
+    )
+    .all();
+}
+
 function getAdjacentAssignments(
   staffId: string,
   date: string,
@@ -222,7 +248,19 @@ export async function PUT(
     // OPEN SWAP: no target staff/assignment — create a coverage request
     // -----------------------------------------------------------------------
     if (!existing.targetStaffId || !existing.targetAssignmentId) {
+      // Same staleness guard as directed swaps: the underlying assignment may
+      // have been cancelled/called out since the request was submitted.
+      if (requestingAssignment && requestingAssignment.status !== "assigned") {
+        return NextResponse.json(
+          {
+            error:
+              "The assignment behind this swap request is no longer active — the swap cannot be approved. Deny the request instead.",
+          },
+          { status: 422 }
+        );
+      }
       if (requestingAssignment) {
+        db.transaction(() => {
         // Mark the requesting assignment as swapped so it's hidden from the grid
         db.update(assignment)
           .set({ status: "swapped", updatedAt: new Date().toISOString() })
@@ -252,6 +290,7 @@ export async function PUT(
             performedBy: body.reviewedBy || "nurse_manager",
           })
           .run();
+        });
       }
     } else {
       // -----------------------------------------------------------------------
@@ -264,6 +303,19 @@ export async function PUT(
         .get();
 
       if (requestingAssignment && targetAssignment) {
+        // Guard: either assignment may have been cancelled or called out since
+        // the swap was requested (e.g. leave approval cancels assignments).
+        // Mutating a dead assignment makes both nurses vanish from the grid.
+        if (requestingAssignment.status !== "assigned" || targetAssignment.status !== "assigned") {
+          return NextResponse.json(
+            {
+              error:
+                "One or both assignments are no longer active — the swap cannot be approved. Deny the request instead.",
+            },
+            { status: 422 }
+          );
+        }
+
         // Fetch staff records
         const reqStaffRow = db
           .select({
@@ -345,6 +397,21 @@ export async function PUT(
             targetAssignment.id
           );
 
+          // Shift durations — needed for the 60h rolling-window check and the
+          // post-validation isOvertime computation.
+          const reqNewDuration = db
+            .select({ durationHours: shiftDefinition.durationHours })
+            .from(shift)
+            .innerJoin(shiftDefinition, eq(shift.shiftDefinitionId, shiftDefinition.id))
+            .where(eq(shift.id, targetAssignment.shiftId)) // requesting staff takes target's shift
+            .get()?.durationHours ?? 0;
+          const tgtNewDuration = db
+            .select({ durationHours: shiftDefinition.durationHours })
+            .from(shift)
+            .innerJoin(shiftDefinition, eq(shift.shiftDefinitionId, shiftDefinition.id))
+            .where(eq(shift.id, requestingAssignment.shiftId)) // target staff takes requesting's shift
+            .get()?.durationHours ?? 0;
+
           // Requesting staff takes the TARGET shift
           const requestingSide: SwapSideParams = {
             staff: {
@@ -365,6 +432,12 @@ export async function PUT(
             otherAssignmentsOnDate: reqOtherOnTgtDate,
             adjacentAssignments: reqAdjacentToTgtDate,
             hasApprovedLeave: reqHasLeave,
+            windowAssignments: getWindowAssignments(
+              existing.requestingStaffId,
+              tgtShiftDetails.date,
+              requestingAssignment.id
+            ),
+            takesShiftDurationHours: reqNewDuration,
           };
 
           // Target staff takes the REQUESTING shift
@@ -387,6 +460,12 @@ export async function PUT(
             otherAssignmentsOnDate: tgtOtherOnReqDate,
             adjacentAssignments: tgtAdjacentToReqDate,
             hasApprovedLeave: tgtHasLeave,
+            windowAssignments: getWindowAssignments(
+              existing.targetStaffId,
+              reqShiftDetails.date,
+              targetAssignment.id
+            ),
+            takesShiftDurationHours: tgtNewDuration,
           };
 
           // Role compatibility: RN can only swap with RN, CNA with CNA, etc.
@@ -422,59 +501,49 @@ export async function PUT(
 
           // All checks passed — compute isOvertime for each staff member's new shift
           // before performing the swap, so the DB flag stays in sync with the display.
-          const reqNewDuration = db
-            .select({ durationHours: shiftDefinition.durationHours })
-            .from(shift)
-            .innerJoin(shiftDefinition, eq(shift.shiftDefinitionId, shiftDefinition.id))
-            .where(eq(shift.id, targetAssignment.shiftId)) // requesting staff takes target's shift
-            .get()?.durationHours ?? 0;
-          const tgtNewDuration = db
-            .select({ durationHours: shiftDefinition.durationHours })
-            .from(shift)
-            .innerJoin(shiftDefinition, eq(shift.shiftDefinitionId, shiftDefinition.id))
-            .where(eq(shift.id, requestingAssignment.shiftId)) // target staff takes requesting's shift
-            .get()?.durationHours ?? 0;
-
           const reqIsOvertime =
             computeWeeklyHours(existing.requestingStaffId, tgtShiftDetails.date) + reqNewDuration > 40;
           const tgtIsOvertime =
             computeWeeklyHours(existing.targetStaffId, reqShiftDetails.date) + tgtNewDuration > 40;
 
-          // Perform the swap
-          db.update(assignment)
-            .set({
-              staffId: existing.targetStaffId,
-              assignmentSource: "swap",
-              isOvertime: reqIsOvertime,
-              updatedAt: new Date().toISOString(),
-            })
-            .where(eq(assignment.id, requestingAssignment.id))
-            .run();
+          // Perform the swap atomically — a crash between the two updates
+          // would otherwise leave both shifts assigned to the same nurse.
+          db.transaction(() => {
+            db.update(assignment)
+              .set({
+                staffId: existing.targetStaffId,
+                assignmentSource: "swap",
+                isOvertime: reqIsOvertime,
+                updatedAt: new Date().toISOString(),
+              })
+              .where(eq(assignment.id, requestingAssignment.id))
+              .run();
 
-          db.update(assignment)
-            .set({
-              staffId: existing.requestingStaffId,
-              assignmentSource: "swap",
-              isOvertime: tgtIsOvertime,
-              updatedAt: new Date().toISOString(),
-            })
-            .where(eq(assignment.id, targetAssignment.id))
-            .run();
+            db.update(assignment)
+              .set({
+                staffId: existing.requestingStaffId,
+                assignmentSource: "swap",
+                isOvertime: tgtIsOvertime,
+                updatedAt: new Date().toISOString(),
+              })
+              .where(eq(assignment.id, targetAssignment.id))
+              .run();
 
-          db.insert(exceptionLog)
-            .values({
-              entityType: "swap_request",
-              entityId: id,
-              action: "swap_approved",
-              description: `Swap approved between ${reqName} and ${tgtName}`,
-              previousState: {
-                requestingAssignmentId: existing.requestingAssignmentId,
-                targetAssignmentId: existing.targetAssignmentId,
-              },
-              newState: { status: "approved" },
-              performedBy: body.reviewedBy || "nurse_manager",
-            })
-            .run();
+            db.insert(exceptionLog)
+              .values({
+                entityType: "swap_request",
+                entityId: id,
+                action: "swap_approved",
+                description: `Swap approved between ${reqName} and ${tgtName}`,
+                previousState: {
+                  requestingAssignmentId: existing.requestingAssignmentId,
+                  targetAssignmentId: existing.targetAssignmentId,
+                },
+                newState: { status: "approved" },
+                performedBy: body.reviewedBy || "nurse_manager",
+              })
+              .run();
+          });
         }
       }
     }

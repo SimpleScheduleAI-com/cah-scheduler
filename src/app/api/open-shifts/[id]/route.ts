@@ -2,6 +2,46 @@ import { db } from "@/db";
 import { openShift, assignment, shift, shiftDefinition, exceptionLog } from "@/db/schema";
 import { eq, and, gte, lte, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { checkStaffAvailability } from "@/lib/coverage/find-candidates";
+import { weekBounds } from "@/lib/date/week";
+
+/**
+ * Re-run the availability hard checks (leave, overlap, same-day rest, 60h cap,
+ * on-call limits) for `staffId` against the open shift's details at the moment
+ * of fill. The stored recommendations may be hours old; the candidate may have
+ * gained conflicting assignments since (two managers filling in parallel is
+ * normal at shift change). Returns an error message, or null when clear.
+ */
+async function recheckAvailabilityAtFill(
+  staffId: string,
+  shiftId: string,
+  scheduleId: string
+): Promise<string | null> {
+  const details = db
+    .select({
+      date: shift.date,
+      startTime: shiftDefinition.startTime,
+      endTime: shiftDefinition.endTime,
+      durationHours: shiftDefinition.durationHours,
+      unit: shiftDefinition.unit,
+      shiftType: shiftDefinition.shiftType,
+    })
+    .from(shift)
+    .innerJoin(shiftDefinition, eq(shift.shiftDefinitionId, shiftDefinition.id))
+    .where(eq(shift.id, shiftId))
+    .get();
+  if (!details) return null; // shift lookup failures are handled by callers
+
+  const availability = await checkStaffAvailability(staffId, {
+    id: shiftId,
+    scheduleId,
+    ...details,
+  });
+  if (!availability.available) {
+    return `Cannot fill: staff member no longer passes hard rules — ${availability.reason ?? "unavailable"}.`;
+  }
+  return null;
+}
 
 /**
  * Compute the total scheduled hours for a staff member in the Mon-Sun week
@@ -9,15 +49,7 @@ import { NextResponse } from "next/server";
  * Sunday land in the same week window — matching the assignment-dialog display.
  */
 function computeWeeklyHours(staffId: string, shiftDate: string): number {
-  const d = new Date(shiftDate + "T00:00:00Z");
-  const day = d.getUTCDay(); // 0=Sun, 1=Mon, …, 6=Sat
-  const daysFromMonday = day === 0 ? 6 : day - 1; // Mon=0, …, Sun=6
-  const weekStart = new Date(d);
-  weekStart.setUTCDate(d.getUTCDate() - daysFromMonday);
-  const weekEnd = new Date(weekStart);
-  weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
-
-  const fmt = (dt: Date) => dt.toISOString().slice(0, 10);
+  const { weekStart, weekEnd } = weekBounds(shiftDate);
 
   const rows = db
     .select({ durationHours: shiftDefinition.durationHours })
@@ -27,8 +59,8 @@ function computeWeeklyHours(staffId: string, shiftDate: string): number {
     .where(
       and(
         eq(assignment.staffId, staffId),
-        gte(shift.date, fmt(weekStart)),
-        lte(shift.date, fmt(weekEnd)),
+        gte(shift.date, weekStart),
+        lte(shift.date, weekEnd),
         ne(assignment.status, "called_out"),
         ne(assignment.status, "cancelled")
       )
@@ -130,6 +162,16 @@ export async function PUT(
       return NextResponse.json(updated);
     }
 
+    // Hard-rule re-check at the moment of approval (recommendations may be stale)
+    const approveBlockReason = await recheckAvailabilityAtFill(
+      body.selectedStaffId,
+      existing.shiftId,
+      shiftRecord.scheduleId
+    );
+    if (approveBlockReason) {
+      return NextResponse.json({ error: approveBlockReason }, { status: 422 });
+    }
+
     // Check if the original nurse was the charge nurse so the replacement inherits the role.
     // Without this, every coverage approval for a charge nurse creates a hard "Charge Nurse Required" violation.
     const originalAssignment = existing.originalStaffId
@@ -140,6 +182,10 @@ export async function PUT(
       : null;
     const inheritChargeRole = originalAssignment?.isChargeNurse === true;
 
+    // Fill mutations commit atomically — a crash mid-sequence previously left
+    // a replacement assigned with the coverage request still pending (or vice
+    // versa), desynchronizing the Coverage page from the grid.
+    const updated = db.transaction(() => {
     // Create new assignment for the approved staff
     const newAssignment = db
       .insert(assignment)
@@ -169,7 +215,7 @@ export async function PUT(
     }
 
     // Update coverage request as filled
-    const updated = db
+    const updatedRow = db
       .update(openShift)
       .set({
         status: "filled",
@@ -199,6 +245,9 @@ export async function PUT(
       })
       .run();
 
+    return updatedRow;
+    });
+
     return NextResponse.json(updated);
   }
 
@@ -208,6 +257,16 @@ export async function PUT(
 
     if (!shiftRecord) {
       return NextResponse.json({ error: "Shift not found" }, { status: 404 });
+    }
+
+    // Hard-rule re-check at the moment of fill (same rationale as approve)
+    const fillBlockReason = await recheckAvailabilityAtFill(
+      body.filledByStaffId,
+      existing.shiftId,
+      shiftRecord.scheduleId
+    );
+    if (fillBlockReason) {
+      return NextResponse.json({ error: fillBlockReason }, { status: 422 });
     }
 
     // Inherit charge role from original assignment (same reason as approve action above)
@@ -232,6 +291,8 @@ export async function PUT(
     const fillShiftDuration = fillShiftDetails?.durationHours ?? 0;
     const fillIsOvertime = fillWeekHours + fillShiftDuration > 40;
 
+    // Same atomic-commit rationale as the approve action above.
+    const updated = db.transaction(() => {
     // Create new assignment for the staff filling the shift
     const newAssignment = db
       .insert(assignment)
@@ -261,7 +322,7 @@ export async function PUT(
     }
 
     // Update coverage request as filled
-    const updated = db
+    const updatedRow = db
       .update(openShift)
       .set({
         status: "filled",
@@ -286,6 +347,9 @@ export async function PUT(
         createdAt: new Date().toISOString(),
       })
       .run();
+
+    return updatedRow;
+    });
 
     return NextResponse.json(updated);
   }

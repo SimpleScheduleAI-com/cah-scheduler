@@ -6,6 +6,238 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.26] - 2026-06-12
+
+### Added
+
+- **Weekend-exempt soft rule** (product decision: soft for now, may become hard later).
+  Previously `weekendExempt` only exempted staff from the weekend quota — the generator
+  would still freely schedule them on weekends with no signal anywhere. Now:
+  (1) the scheduler applies a deterrent penalty (`preference × 1.5`) when considering an
+  exempt nurse for a weekend slot, making them the last resort while still allowing
+  coverage of a critically short shift; (2) a new `weekend-exempt` soft evaluator surfaces
+  any such assignment in the violations panel so the manager can judge it. The rule row is
+  seeded for new installs (weight 4.0); EXISTING databases need the rule added once via
+  the Rules UI (evaluator id: `weekend-exempt`) or a re-import.
+
+### Fixed
+
+- **Remaining local-time date math in scoring.ts** (missed by the v1.7.23 sweep): weekend
+  detection (`getDay`), Saturday anchoring, and the consecutive-weekend streak walk now
+  use the shared UTC helpers — on a server west of UTC these misidentified which day is a
+  weekend, silently disabling weekend-equity scoring.
+
+### Files Modified
+
+- `src/lib/engine/rules/weekend-exempt.ts` — new soft evaluator
+- `src/lib/engine/rules/index.ts` — registered
+- `src/lib/engine/scheduler/scoring.ts` — weekend-exempt deterrent; UTC-safe weekend math
+- `src/app/api/import/route.ts`, `src/db/seed.ts` — default rule row
+- `src/__tests__/rules/weekend-exempt.test.ts` — new
+- `src/__tests__/scheduler/scoring.test.ts` — deterrent tests; exempt expectation updated
+
+---
+
+## [1.7.25] - 2026-06-12
+
+### Fixed
+
+- **Leave approval now voids pending swaps on cancelled assignments.** Approving leave
+  cancels the nurse's assignments, but pending swap requests still referenced those
+  assignment IDs — approving one later mutated a dead assignment and both nurses silently
+  vanished from the grid. Leave approval now auto-denies such swaps (with reason and
+  `swap_denied` audit event). Combined with v1.7.24's stale-assignment guard, this closes
+  the leave↔swap interaction gap from both sides.
+
+- **Leave double-approval race.** Two rapid approval requests (double-click, retry) could
+  both pass the side-effect guard and create duplicate coverage requests — two replacements
+  hired for one vacancy. The leave UPDATE now carries an optimistic lock
+  (`WHERE status = <status we read>`); the loser gets 409.
+
+- **Stuck generation jobs permanently blocked regeneration.** If the process died mid-job,
+  the `generation_job` row stayed `running` forever and every new generate request got 409
+  — unrecoverable without manual DB surgery. Jobs stuck in pending/running for >10 minutes
+  are now reclaimed (marked failed) at the next generate request.
+
+- **Multi-step writes made atomic.** Swap approval (two assignment updates), callout fill
+  (callout + original assignment + replacement + audits), open-shift approve/fill, and each
+  leave-approval coverage action now run inside `db.transaction()` — a crash mid-sequence
+  previously left half-applied state (e.g. callout marked "filled" with no replacement
+  assignment). The callout UNIQUE-constraint tolerance (v1.4.31 invariant) is preserved:
+  the inner try/catch keeps the transaction alive. Candidate search runs before the
+  transaction (async work can't run inside better-sqlite3's synchronous transactions).
+
+- **PRN availability deletion guard + audit.** Deleting a PRN availability record while the
+  nurse had active assignments on submitted dates orphaned those assignments (the
+  PRN-availability hard rule would flag them) and removed the nurse from coverage candidate
+  lists. DELETE now returns 409 while active assignments exist on submitted dates, and the
+  deletion is audit-logged (previously it wasn't — violating the audit-everything
+  convention).
+
+- **FK pragma hardening in the generation runner.** `foreign_keys = OFF` is now restored in
+  a `finally` block (a throw between the pragmas previously left FK enforcement off for the
+  connection's lifetime), and the two deletes it protects run in one transaction.
+
+### Files Modified
+
+- `src/app/api/staff-leave/[id]/route.ts` — optimistic lock; swap voiding; per-assignment transactions; candidate search hoisted out of transaction
+- `src/app/api/scenarios/generate/route.ts` — stale-job reclaim (10-minute threshold)
+- `src/app/api/swap-requests/[id]/route.ts` — directed + open swap mutations transactional
+- `src/app/api/callouts/[id]/route.ts` — fill mutations transactional
+- `src/app/api/open-shifts/[id]/route.ts` — approve + fill mutations transactional
+- `src/app/api/prn-availability/[id]/route.ts` — DELETE guard + audit log
+- `src/lib/engine/scheduler/runner.ts` — try/finally + transaction around FK-off deletes
+- Tests: `leave/voids-pending-swaps` (new), `scenarios/generate-published-guard` (+2 reclaim cases); transaction/`shiftSwapRequest` mocks added to `leave/approval-audit`, `leave/denial-validation`, `callouts/fill-audit`, `coverage/fill-time-recheck`, `swap/approve-stale-assignment`
+
+---
+
+## [1.7.24] - 2026-06-12
+
+### Fixed
+
+- **Hard rules now enforced on every manual path, not just generation.** The scheduler's
+  eligibility checks were airtight, but four other doors into the schedule bypassed them:
+  - **Swap approval** never checked the 60h rolling 7-day cap or max-consecutive-days. A
+    nurse at 48h could be swapped into 12 more hours. `validateSwapSide` now runs both
+    checks (all 7 rolling windows, run-bridging consecutive count) from a new
+    `windowAssignments` input the route supplies.
+  - **Swap approval on dead assignments**: a pending swap could be approved after one
+    party's assignment had been cancelled (e.g. by leave approval) — the swap then mutated
+    a cancelled row and both nurses silently vanished from the grid. Approval now returns
+    422 when either assignment is no longer `assigned` (directed and open swaps).
+  - **Open-shift approve/fill and callout fill** inserted assignments based on
+    recommendations computed possibly hours earlier. Both routes now re-run
+    `checkStaffAvailability` (leave, overlap, same-day rest, 60h cap, on-call limits) at
+    the moment of fill and return 422 with the reason when it fails.
+  - **Manual-assignment OT flag** counted hours from called-out and cancelled assignments,
+    producing phantom OT badges; the weekly-hours query now filters them (matching swap
+    approval and find-candidates).
+
+- **Schedule-boundary blindness (7-consecutive-days bug).** Every generation started from a
+  blank slate, so a nurse who worked the last days of the prior period could be scheduled
+  into a 6th/7th consecutive day, a <10h rest gap, or an over-60h window at the start of
+  the new period — and the evaluator couldn't see it either. `buildContext` now loads the
+  7 days of assignments before `scheduleStartDate` as `priorAssignments`; the scheduler
+  seeds them into every state build (greedy, repair, local search — synthetic shiftIds,
+  never in results), and the `max-consecutive` + `rest-hours` evaluators count across the
+  boundary while only flagging current-schedule dates. The historical weekend-count window
+  now ends where the prior window begins so the final pre-schedule weekend isn't counted
+  twice.
+
+- **ICU/ER unit-name matching unified.** The `icu-competency` evaluator exact-matched
+  `"ICU"`/`"ER"` while the scheduler's eligibility gate also recognised `"ED"`,
+  `"Emergency"`, and compound names ("ICU-Stepdown"). A Level 1 manual assignment on an
+  "ED" unit passed evaluation the generator would have blocked. Both now share
+  `isICUUnit()` from `src/lib/engine/unit-utils.ts`.
+
+### Files Modified
+
+- `src/lib/swap/validate-swap.ts` — 60h rolling-window + max-consecutive checks (`windowAssignments`)
+- `src/app/api/swap-requests/[id]/route.ts` — stale-assignment 422 guards; `getWindowAssignments` helper; durations fetched pre-validation
+- `src/app/api/open-shifts/[id]/route.ts` — `recheckAvailabilityAtFill` on approve + fill
+- `src/app/api/callouts/[id]/route.ts` — availability re-check before any mutation
+- `src/app/api/schedules/[id]/assignments/route.ts` — OT query excludes called_out/cancelled
+- `src/lib/coverage/find-candidates.ts` — `checkStaffAvailability` + `ShiftDetails` exported
+- `src/lib/engine/unit-utils.ts` — new shared `isICUUnit`
+- `src/lib/engine/scheduler/eligibility.ts`, `src/lib/engine/rules/icu-competency.ts` — use shared matcher
+- `src/lib/engine/rules/types.ts`, `src/lib/engine/scheduler/types.ts` — `priorAssignments` context fields
+- `src/lib/engine/rule-engine.ts` — prior-window query; UTC-safe historical weekend lookback
+- `src/lib/engine/scheduler/index.ts` — prior drafts mapped into SchedulerContext
+- `src/lib/engine/scheduler/greedy.ts`, `repair.ts`, `local-search.ts` — prior seed in all state builds
+- `src/lib/engine/rules/max-consecutive.ts`, `rest-hours.ts` — cross-boundary evaluation
+- Tests: `swap/validate-swap` (+7), `swap/approve-stale-assignment` (new), `coverage/fill-time-recheck` (new), `rules/prior-schedule-boundary` (new), `rules/icu-competency` (+5), `scheduler/greedy` (+3), `schedules/assignments-published-guard` (+1); `callouts/fill-audit` mocks updated for the new guard
+
+---
+
+## [1.7.23] - 2026-06-12
+
+### Fixed
+
+- **Date arithmetic broke on servers west of UTC (timezone/DST sweep)**: Schedule dates are
+  YYYY-MM-DD strings, which JavaScript parses as UTC midnight. Local-time methods
+  (`getDay`/`setDate`/`getFullYear`) then operate in the server's timezone — on a Texas
+  hospital server (America/Chicago) UTC midnight is 6pm the previous local day, so:
+  - `getWeekStart` returned the wrong Monday, shifting weekly-hours/OT windows
+  - `getWeekendId` gave Saturday and Sunday of the same weekend different IDs, breaking
+    weekend-count and consecutive-weekend tracking
+  - `buildShiftInserts` emitted DUPLICATE shifts for the DST spring-forward day
+    (2026-03-08), double-staffing that day
+  - Holiday-fairness year resolved to the previous year for January 1 schedules, querying
+    the wrong year's history
+  - PRN export day-of-week summaries shifted one day back
+  All date-only arithmetic in `state.ts` and `build-shifts.ts` now goes through UTC-safe
+  helpers (`addDays`, `utcDayOfWeek`, `parseUTC`); years are parsed from the string.
+  Note: these failures cannot be reproduced on a Windows dev machine (Node on Windows
+  ignores the TZ env var, and east-of-UTC offsets round-trip stably); the new
+  `date-utc.test.ts` suite acts as a regression lock and reproduces the original failures
+  when run on a Linux host with `TZ=America/Chicago`.
+
+- **On-call weekly limit missed violations in the Dec 28 – Jan 3 week**: the evaluator
+  keyed weeks by calendar-year week number, splitting the year-spanning week into
+  `YYYY-W53` and `YYYY+1-W1`. Two on-call shifts in that single Mon-Sun week were counted
+  as one per "week" and never flagged. The evaluator now keys weeks by the Monday date
+  (same as the scheduler's eligibility check), and identifies weekends by `getWeekendId`
+  so Sat+Sun of one weekend counts as a single weekend toward the monthly limit.
+
+### Files Modified
+
+- `src/lib/engine/scheduler/state.ts` — UTC-safe `parseUTC`/`addDays`/`utcDayOfWeek` helpers; all week/window/weekend math converted; `getWeekendId` exported
+- `src/lib/schedules/build-shifts.ts` — UTC day-iteration loop
+- `src/lib/engine/rules/on-call-limits.ts` — Monday-keyed weeks, weekend-ID dedup, UTC window iteration in `max-hours-60`
+- `src/lib/engine/rules/weekend-holiday-fairness.ts` — holiday year parsed from string
+- `src/app/api/schedules/[id]/assignments/route.ts` — holiday-tracking year parsed from string (POST + DELETE)
+- `src/app/api/import/route.ts` — `summarisePRNDates` uses UTC day-of-week
+- `src/__tests__/scheduler/date-utc.test.ts` — new (timezone regression locks)
+- `src/__tests__/rules/on-call-limits.test.ts` — year-boundary week + Sat/Sun weekend dedup tests
+
+---
+
+## [1.7.22] - 2026-06-12
+
+### Added
+
+- **Published-schedule guards**: A published schedule is the version of record staff were
+  notified about, but the system allowed it to be silently mutated. Two new guards return
+  HTTP 409 with an "unpublish first" message: (1) `POST /api/scenarios/generate` refuses to
+  regenerate a published schedule (regeneration deletes every assignment, including manual
+  fills and callout replacements); (2) `POST`/`DELETE /api/schedules/[id]/assignments`
+  refuse to add or remove assignments on a published schedule.
+
+### Fixed
+
+- **Superseded rule evaluators activatable via Rules UI**: `overtime-cost` (replaced by
+  `overtime-v2`) and `weekend-fairness` (replaced by `weekend-count` +
+  `consecutive-weekends`) were still registered in the evaluator registry. An admin adding a
+  rule row pointing at either old evaluator would double-penalize the same hours/weekends
+  with conflicting math (`overtime-cost` treats all FTE-excess hours as overtime;
+  `weekend-fairness` counts Sat+Sun of one weekend as two rotations). Both are now
+  deregistered; the evaluator files remain for reference.
+
+- **`npm run build` wiped production data**: The build script ran `db:seed`, which deletes
+  ALL data and inserts test data. Rebuilding the app on a production machine destroyed real
+  schedules and staff records. Seeding is now an explicit, opt-in operation only
+  (`npm run db:seed`).
+
+- **Excel import could leave the database empty**: `deleteAllData()` and `importData()` ran
+  as separate auto-committed statements. If the import threw partway (malformed sheet,
+  constraint failure), the delete had already committed — all schedules, staff, and audit
+  history were gone with no recovery path. Both steps now run inside a single
+  `db.transaction()`, so a failed import rolls back to the pre-import state.
+
+### Files Modified
+
+- `src/lib/engine/rules/index.ts` — deregistered superseded `overtime-cost` and `weekend-fairness`
+- `package.json` — removed `db:seed` from the `build` script
+- `src/app/api/scenarios/generate/route.ts` — 409 guard for published schedules
+- `src/app/api/schedules/[id]/assignments/route.ts` — 409 guards on POST and DELETE for published schedules
+- `src/app/api/import/route.ts` — transaction-wrapped delete + import
+- `src/__tests__/rules/registry.test.ts` — new (registry exclusions)
+- `src/__tests__/scenarios/generate-published-guard.test.ts` — new
+- `src/__tests__/schedules/assignments-published-guard.test.ts` — new
+- `src/__tests__/import/import-transaction.test.ts` — new
+
+---
+
 ## [1.7.21] - 2026-03-27
 
 ### Fixed

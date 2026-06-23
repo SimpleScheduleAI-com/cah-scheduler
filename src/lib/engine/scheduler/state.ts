@@ -1,4 +1,15 @@
 import type { AssignmentDraft } from "./types";
+import {
+  addDays,
+  utcDayOfWeek,
+  getWeekStart,
+  getWeekEnd,
+  getWeekendId,
+} from "@/lib/date/week";
+
+// Canonical Mon–Sun, UTC-safe week helpers live in @/lib/date/week. Re-exported
+// here so existing importers of these names from this module keep working.
+export { addDays, utcDayOfWeek, getWeekStart, getWeekendId };
 
 // ─── Date / time helpers ─────────────────────────────────────────────────────
 
@@ -15,27 +26,6 @@ export function shiftEndDateTime(
 ): Date {
   const start = toDateTime(date, startTime);
   return new Date(start.getTime() + durationHours * 60 * 60 * 1000);
-}
-
-export function getWeekStart(dateStr: string): string {
-  const date = new Date(dateStr);
-  const day = date.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-  const diff = day === 0 ? -6 : 1 - day; // days to preceding Monday
-  date.setDate(date.getDate() + diff);
-  return date.toISOString().slice(0, 10);
-}
-
-function getWeekEnd(weekStart: string): string {
-  const date = new Date(weekStart);
-  date.setDate(date.getDate() + 6);
-  return date.toISOString().slice(0, 10);
-}
-
-function getWeekendId(dateStr: string): string {
-  // Anchor Sunday back to Saturday so both share the same weekend identifier
-  const date = new Date(dateStr);
-  if (date.getDay() === 0) date.setDate(date.getDate() - 1);
-  return date.toISOString().slice(0, 10); // Saturday date as the ID
 }
 
 // ─── SchedulerState ──────────────────────────────────────────────────────────
@@ -128,21 +118,16 @@ export class SchedulerState {
    */
   wouldExceedConsecutiveDays(staffId: string, targetDate: string, maxConsecutive: number): boolean {
     const dates = this.workedDatesByStaff.get(staffId) ?? new Set<string>();
-    const d = new Date(targetDate);
     let count = 1; // the target day itself
 
     // Count backwards
     for (let i = 1; i <= maxConsecutive; i++) {
-      const prev = new Date(d);
-      prev.setDate(prev.getDate() - i);
-      if (dates.has(prev.toISOString().slice(0, 10))) count++;
+      if (dates.has(addDays(targetDate, -i))) count++;
       else break;
     }
     // Count forwards
     for (let i = 1; i <= maxConsecutive; i++) {
-      const next = new Date(d);
-      next.setDate(next.getDate() + i);
-      if (dates.has(next.toISOString().slice(0, 10))) count++;
+      if (dates.has(addDays(targetDate, i))) count++;
       else break;
     }
 
@@ -180,9 +165,7 @@ export class SchedulerState {
 
   /** Hours worked in the rolling 7-day window ending on (and including) `date`. */
   getRolling7DayHours(staffId: string, date: string): number {
-    const startDate = new Date(date);
-    startDate.setDate(startDate.getDate() - 6);
-    const startStr = startDate.toISOString().slice(0, 10);
+    const startStr = addDays(date, -6);
     return (this.assignmentsByStaff.get(staffId) ?? [])
       .filter((a) => a.date >= startStr && a.date <= date)
       .reduce((sum, a) => sum + a.durationHours, 0);
@@ -204,17 +187,12 @@ export class SchedulerState {
     durationHours: number,
     limit: number
   ): boolean {
-    const dateObj = new Date(date);
     const assignments = this.assignmentsByStaff.get(staffId) ?? [];
 
     // Windows containing `date` start from (date − 6) through date itself
     for (let offset = 0; offset <= 6; offset++) {
-      const windowStart = new Date(dateObj);
-      windowStart.setDate(windowStart.getDate() - offset);
-      const windowEnd = new Date(windowStart);
-      windowEnd.setDate(windowEnd.getDate() + 6);
-      const startStr = windowStart.toISOString().slice(0, 10);
-      const endStr = windowEnd.toISOString().slice(0, 10);
+      const startStr = addDays(date, -offset);
+      const endStr = addDays(startStr, 6);
 
       const existing = assignments
         .filter((a) => a.date >= startStr && a.date <= endStr)
@@ -243,16 +221,11 @@ export class SchedulerState {
     futureDuration: number,
     limit: number
   ): boolean {
-    const futureDateObj = new Date(futureDate);
     const assignments = this.assignmentsByStaff.get(staffId) ?? [];
 
     for (let offset = 0; offset <= 6; offset++) {
-      const windowStart = new Date(futureDateObj);
-      windowStart.setDate(windowStart.getDate() - offset);
-      const windowEnd = new Date(windowStart);
-      windowEnd.setDate(windowEnd.getDate() + 6);
-      const startStr = windowStart.toISOString().slice(0, 10);
-      const endStr = windowEnd.toISOString().slice(0, 10);
+      const startStr = addDays(futureDate, -offset);
+      const endStr = addDays(startStr, 6);
 
       const existing = assignments
         .filter((a) => a.date >= startStr && a.date <= endStr)
@@ -271,17 +244,12 @@ export class SchedulerState {
    * Used to build human-readable rejection messages.
    */
   getPeak7DayHours(staffId: string, date: string): number {
-    const dateObj = new Date(date);
     const assignments = this.assignmentsByStaff.get(staffId) ?? [];
     let peak = 0;
 
     for (let offset = 0; offset <= 6; offset++) {
-      const windowStart = new Date(dateObj);
-      windowStart.setDate(windowStart.getDate() - offset);
-      const windowEnd = new Date(windowStart);
-      windowEnd.setDate(windowEnd.getDate() + 6);
-      const startStr = windowStart.toISOString().slice(0, 10);
-      const endStr = windowEnd.toISOString().slice(0, 10);
+      const startStr = addDays(date, -offset);
+      const endStr = addDays(startStr, 6);
 
       const hours = assignments
         .filter((a) => a.date >= startStr && a.date <= endStr)
@@ -311,7 +279,7 @@ export class SchedulerState {
   getWeekendCount(staffId: string): number {
     const weekendIds = new Set<string>();
     for (const a of this.assignmentsByStaff.get(staffId) ?? []) {
-      const day = new Date(a.date).getDay();
+      const day = utcDayOfWeek(a.date);
       if (day === 0 || day === 6) {
         weekendIds.add(getWeekendId(a.date));
       }
@@ -334,7 +302,7 @@ export class SchedulerState {
     const weekendIds = new Set<string>();
     for (const a of this.assignmentsByStaff.get(staffId) ?? []) {
       if (!a.date.startsWith(month) || a.shiftType !== "on_call") continue;
-      const d = new Date(a.date).getDay();
+      const d = utcDayOfWeek(a.date);
       if (d === 0 || d === 6) weekendIds.add(getWeekendId(a.date));
     }
     return weekendIds.size;

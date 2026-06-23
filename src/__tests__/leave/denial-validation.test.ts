@@ -72,6 +72,7 @@ vi.mock("@/db", () => {
       }),
       insert: () => ({ values: () => ({ run: mockInsertRun, returning: () => ({ get: vi.fn(() => ({ id: "new-id" })) }) }) }),
       delete: () => ({ where: () => ({ run: vi.fn() }) }),
+      transaction: (fn: () => unknown) => fn(),
     },
   };
 });

@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { staffLeave, exceptionLog, assignment, shift, schedule, unit, openShift, callout, staff } from "@/db/schema";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { staffLeave, exceptionLog, assignment, shift, schedule, unit, openShift, callout, staff, shiftSwapRequest } from "@/db/schema";
+import { eq, and, or, gte, lte } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { findCandidatesForShift } from "@/lib/coverage/find-candidates";
 
@@ -43,6 +43,10 @@ export async function PUT(
     );
   }
 
+  // Optimistic lock: only update if the status is still what we read. A
+  // double-click or concurrent approval would otherwise run the approval
+  // side effects twice, creating duplicate coverage requests (two
+  // replacements hired for one vacancy).
   const updated = db
     .update(staffLeave)
     .set({
@@ -55,9 +59,16 @@ export async function PUT(
       approvedBy: body.approvedBy ?? existing.approvedBy,
       denialReason: body.denialReason,
     })
-    .where(eq(staffLeave.id, id))
+    .where(and(eq(staffLeave.id, id), eq(staffLeave.status, existing.status)))
     .returning()
     .get();
+
+  if (!updated) {
+    return NextResponse.json(
+      { error: "Leave request was modified by someone else — refresh and try again." },
+      { status: 409 }
+    );
+  }
 
   // Log status change if status changed
   if (existing.status !== body.status) {
@@ -131,7 +142,7 @@ async function handleLeaveApproval(staffId: string, staffName: string, startDate
     .all();
 
   for (const a of affectedAssignments) {
-    const shiftDate = new Date(a.shiftDate);
+    const shiftDate = new Date(a.shiftDate + "T00:00:00");
     const daysUntilShift = Math.ceil((shiftDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
     // Get unit config for threshold
@@ -142,85 +153,135 @@ async function handleLeaveApproval(staffId: string, staffName: string, startDate
       .get();
 
     const calloutThreshold = unitConfig?.calloutThresholdDays ?? 7;
+    const isUrgent = daysUntilShift <= calloutThreshold;
 
-    // Update assignment status to cancelled
-    db.update(assignment)
-      .set({
-        status: "cancelled",
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(assignment.id, a.assignmentId))
-      .run();
-
-    if (daysUntilShift <= calloutThreshold) {
-      // Create callout (urgent - within threshold)
-      // This follows the existing escalation workflow
-      const newCallout = db.insert(callout)
-        .values({
-          assignmentId: a.assignmentId,
-          staffId: staffId,
-          shiftId: a.shiftId,
-          reason: "other",
-          reasonDetail: "Leave approved - urgent replacement needed",
-          status: "open",
-        })
-        .returning()
-        .get();
-
-      // Log the callout creation
-      db.insert(exceptionLog)
-        .values({
-          entityType: "callout",
-          entityId: newCallout.id,
-          action: "callout_logged",
-          description: `Callout created due to approved leave for ${staffName}, shift on ${a.shiftDate}`,
-          performedBy: "system",
-          createdAt: new Date().toISOString(),
-        })
-        .run();
-    } else {
-      // Beyond threshold: Auto-find replacement candidates
-      const { candidates, escalationStepsChecked } = await findCandidatesForShift(
+    // Candidate search is async — run it BEFORE the transaction below
+    // (better-sqlite3 transactions are synchronous).
+    let candidateResult: Awaited<ReturnType<typeof findCandidatesForShift>> | null = null;
+    if (!isUrgent) {
+      candidateResult = await findCandidatesForShift(
         a.shiftId,
         staffId // Exclude the staff going on leave
       );
-
-      // Determine status based on whether we found candidates
-      const hasRealCandidates = candidates.some(c => c.staffId !== "agency");
-      const status = hasRealCandidates ? "pending_approval" : "no_candidates";
-
-      // Create coverage request with recommendations
-      const newCoverageRequest = db.insert(openShift)
-        .values({
-          shiftId: a.shiftId,
-          originalStaffId: staffId,
-          originalAssignmentId: a.assignmentId,
-          reason: "leave_approved",
-          reasonDetail: `Leave approved - ${candidates.length > 0 ? "replacement candidates found" : "no candidates available"}`,
-          status: status,
-          priority: daysUntilShift > 14 ? "low" : "normal",
-          recommendations: candidates,
-          escalationStepsChecked: escalationStepsChecked,
-        })
-        .returning()
-        .get();
-
-      // Log the coverage request creation
-      db.insert(exceptionLog)
-        .values({
-          entityType: "open_shift",
-          entityId: newCoverageRequest?.id || a.shiftId,
-          action: "open_shift_created",
-          description: `Coverage request created for shift on ${a.shiftDate}. Found ${candidates.length} candidate(s). Status: ${status}`,
-          newState: {
-            candidates: candidates.map(c => ({ staffId: c.staffId, name: c.staffName, source: c.source })),
-            escalationStepsChecked,
-          },
-          performedBy: "system",
-          createdAt: new Date().toISOString(),
-        })
-        .run();
     }
+
+    // All mutations for one affected assignment commit atomically: a crash
+    // mid-loop previously left the assignment cancelled with no coverage
+    // record — the nurse vanished from the grid with nothing to replace her.
+    db.transaction(() => {
+      // Update assignment status to cancelled
+      db.update(assignment)
+        .set({
+          status: "cancelled",
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(assignment.id, a.assignmentId))
+        .run();
+
+      // Void any pending swap requests referencing the cancelled assignment.
+      // Approving such a swap later would mutate a dead assignment — both
+      // nurses silently vanish from the grid and the shift is doubly uncovered.
+      const staleSwaps = db
+        .select()
+        .from(shiftSwapRequest)
+        .where(
+          and(
+            eq(shiftSwapRequest.status, "pending"),
+            or(
+              eq(shiftSwapRequest.requestingAssignmentId, a.assignmentId),
+              eq(shiftSwapRequest.targetAssignmentId, a.assignmentId)
+            )
+          )
+        )
+        .all();
+      for (const s of staleSwaps) {
+        db.update(shiftSwapRequest)
+          .set({
+            status: "denied",
+            denialReason: `Assignment cancelled due to approved leave for ${staffName}`,
+            reviewedAt: new Date().toISOString(),
+            reviewedBy: "system",
+          })
+          .where(eq(shiftSwapRequest.id, s.id))
+          .run();
+        db.insert(exceptionLog)
+          .values({
+            entityType: "swap_request",
+            entityId: s.id,
+            action: "swap_denied",
+            description: `Swap request automatically denied — assignment on ${a.shiftDate} was cancelled by approved leave for ${staffName}`,
+            performedBy: "system",
+            createdAt: new Date().toISOString(),
+          })
+          .run();
+      }
+
+      if (isUrgent) {
+        // Create callout (urgent - within threshold)
+        // This follows the existing escalation workflow
+        const newCallout = db.insert(callout)
+          .values({
+            assignmentId: a.assignmentId,
+            staffId: staffId,
+            shiftId: a.shiftId,
+            reason: "other",
+            reasonDetail: "Leave approved - urgent replacement needed",
+            status: "open",
+          })
+          .returning()
+          .get();
+
+        // Log the callout creation
+        db.insert(exceptionLog)
+          .values({
+            entityType: "callout",
+            entityId: newCallout.id,
+            action: "callout_logged",
+            description: `Callout created due to approved leave for ${staffName}, shift on ${a.shiftDate}`,
+            performedBy: "system",
+            createdAt: new Date().toISOString(),
+          })
+          .run();
+      } else {
+        const { candidates, escalationStepsChecked } = candidateResult!;
+
+        // Determine status based on whether we found candidates
+        const hasRealCandidates = candidates.some(c => c.staffId !== "agency");
+        const status = hasRealCandidates ? "pending_approval" : "no_candidates";
+
+        // Create coverage request with recommendations
+        const newCoverageRequest = db.insert(openShift)
+          .values({
+            shiftId: a.shiftId,
+            originalStaffId: staffId,
+            originalAssignmentId: a.assignmentId,
+            reason: "leave_approved",
+            reasonDetail: `Leave approved - ${candidates.length > 0 ? "replacement candidates found" : "no candidates available"}`,
+            status: status,
+            priority: daysUntilShift > 14 ? "low" : "normal",
+            recommendations: candidates,
+            escalationStepsChecked: escalationStepsChecked,
+          })
+          .returning()
+          .get();
+
+        // Log the coverage request creation
+        db.insert(exceptionLog)
+          .values({
+            entityType: "open_shift",
+            entityId: newCoverageRequest?.id || a.shiftId,
+            action: "open_shift_created",
+            description: `Coverage request created for shift on ${a.shiftDate}. Found ${candidates.length} candidate(s). Status: ${status}`,
+            newState: {
+              candidates: candidates.map(c => ({ staffId: c.staffId, name: c.staffName, source: c.source })),
+              escalationStepsChecked,
+            },
+            performedBy: "system",
+            createdAt: new Date().toISOString(),
+          })
+          .run();
+      }
+    });
   }
 }
 

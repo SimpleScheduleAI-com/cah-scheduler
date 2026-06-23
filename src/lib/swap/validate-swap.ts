@@ -4,6 +4,8 @@
  * Tested independently in src/__tests__/swap/validate-swap.test.ts.
  */
 
+import { addDays } from "@/lib/engine/scheduler/state";
+
 export interface SwapStaffInfo {
   id: string;
   name: string;
@@ -44,6 +46,17 @@ export interface SwapSideParams {
   adjacentAssignments: Array<{ date: string; startTime: string; endTime: string }>;
   /** True when staff has an approved leave record covering takesShift.date */
   hasApprovedLeave: boolean;
+  /**
+   * Staff member's assignments within ±6 days of takesShift.date, EXCLUDING
+   * the assignment being given up in the swap. Drives the 60h rolling-window
+   * and max-consecutive-days hard checks. When omitted, those checks are
+   * skipped (legacy callers).
+   */
+  windowAssignments?: Array<{ date: string; durationHours: number }>;
+  /** Duration of takesShift in hours — required for the 60h check. */
+  takesShiftDurationHours?: number;
+  /** Maximum consecutive working days (defaults to 5). */
+  maxConsecutiveDays?: number;
 }
 
 export interface SwapViolation {
@@ -203,6 +216,56 @@ export function validateSwapSide(side: SwapSideParams): SwapViolation[] {
           description: `${staff.name} would have only ${Math.round(gapMins / 60)}h rest after this shift before their next shift at ${adj.startTime} on ${adj.date} (minimum 10h required).`,
         });
       }
+    }
+  }
+
+  // 7. Max 60 hours in any rolling 7-day window containing takesShift.date.
+  //    Mirrors SchedulerState.wouldExceed7DayHours — all 7 windows are checked,
+  //    not just the backward one, so already-scheduled future shifts count.
+  const windowAssignments = side.windowAssignments;
+  const newDuration = side.takesShiftDurationHours;
+  if (windowAssignments && newDuration !== undefined) {
+    for (let offset = 0; offset <= 6; offset++) {
+      const windowStart = addDays(takesShift.date, -offset);
+      const windowEnd = addDays(windowStart, 6);
+      const existing = windowAssignments
+        .filter((a) => a.date >= windowStart && a.date <= windowEnd)
+        .reduce((sum, a) => sum + a.durationHours, 0);
+      if (existing + newDuration > 60) {
+        violations.push({
+          staffId: staff.id,
+          staffName: staff.name,
+          ruleId: "max-hours-60",
+          severity: "hard",
+          description: `${staff.name} would work ${existing + newDuration}h in the 7 days starting ${windowStart} (maximum 60h).`,
+        });
+        break;
+      }
+    }
+  }
+
+  // 8. Max consecutive working days. Counts the runs adjacent to the taken
+  //    shift's date, including runs the new shift would bridge together.
+  if (windowAssignments) {
+    const maxConsecutive = side.maxConsecutiveDays ?? 5;
+    const workedDates = new Set(windowAssignments.map((a) => a.date));
+    let count = 1; // the taken shift's day itself
+    for (let i = 1; i <= maxConsecutive; i++) {
+      if (workedDates.has(addDays(takesShift.date, -i))) count++;
+      else break;
+    }
+    for (let i = 1; i <= maxConsecutive; i++) {
+      if (workedDates.has(addDays(takesShift.date, i))) count++;
+      else break;
+    }
+    if (count > maxConsecutive) {
+      violations.push({
+        staffId: staff.id,
+        staffName: staff.name,
+        ruleId: "max-consecutive",
+        severity: "hard",
+        description: `${staff.name} would work ${count} consecutive days (maximum ${maxConsecutive}).`,
+      });
     }
   }
 

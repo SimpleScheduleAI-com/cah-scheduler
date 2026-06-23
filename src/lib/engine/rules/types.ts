@@ -111,6 +111,19 @@ export interface PublicHolidayInfo {
   name: string;
 }
 
+/** A worked assignment from the 7 days BEFORE the schedule period starts.
+ *  Lets boundary-sensitive hard rules (max-consecutive, rest-hours) see
+ *  across the schedule boundary instead of starting from a blank slate. */
+export interface PriorAssignmentInfo {
+  staffId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  durationHours: number;
+  shiftType: string;
+  unit: string;
+}
+
 export interface RuleContext {
   assignments: AssignmentInfo[];
   staffMap: Map<string, StaffInfo>;
@@ -128,6 +141,10 @@ export interface RuleContext {
    *  the scheduler's scoring so nurses who already worked many weekends recently
    *  are deprioritised for weekend slots in the new period. */
   historicalWeekendCounts?: Map<string, number>;
+  /** Assignments worked in the 7 days before scheduleStartDate (any schedule).
+   *  Consumed by max-consecutive and rest-hours so cross-boundary violations
+   *  are detected. Optional — absent in legacy callers/tests. */
+  priorAssignments?: PriorAssignmentInfo[];
 }
 
 export interface RuleEvaluator {

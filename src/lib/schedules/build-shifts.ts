@@ -37,10 +37,12 @@ export function buildShiftInserts(
   if (definitions.length === 0) return [];
 
   const result: ShiftInsertValues[] = [];
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  // UTC arithmetic throughout: local setDate() on a server west of UTC
+  // duplicates the DST spring-forward day (two shift sets on one date).
+  const start = new Date(startDate + "T00:00:00Z");
+  const end = new Date(endDate + "T00:00:00Z");
 
-  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+  for (const d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
     const dateStr = d.toISOString().slice(0, 10);
     for (const def of definitions) {
       result.push({

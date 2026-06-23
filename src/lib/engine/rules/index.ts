@@ -5,10 +5,12 @@ import { patientRatioRule } from "./patient-ratio";
 import { restHoursRule } from "./rest-hours";
 import { maxConsecutiveRule } from "./max-consecutive";
 import { icuCompetencyRule } from "./icu-competency";
-import { overtimeCostRule } from "./overtime-cost";
 import { preferenceMatchRule } from "./preference-match";
-import { weekendFairnessRule } from "./weekend-fairness";
 import { skillMixRule } from "./skill-mix";
+// NOTE: overtime-cost and weekend-fairness are superseded (by overtime-v2 and
+// weekend-count/consecutive-weekends respectively) and intentionally NOT
+// registered — activating them alongside their replacements would
+// double-penalize the same hours/weekends with conflicting math.
 // New rules
 import { level1PreceptorRule, level2SupervisionRule } from "./competency-pairing";
 import { noOverlappingShiftsRule } from "./no-overlapping-shifts";
@@ -21,6 +23,7 @@ import {
 } from "./weekend-holiday-fairness";
 import { floatPenaltyRule } from "./float-penalty";
 import { chargeClusteringRule } from "./charge-clustering";
+import { weekendExemptRule } from "./weekend-exempt";
 import { overtimeRulesV2 } from "./overtime-v2";
 
 const evaluatorRegistry: Map<string, RuleEvaluator> = new Map();
@@ -43,9 +46,7 @@ const evaluatorRegistry: Map<string, RuleEvaluator> = new Map();
   onCallLimitsRule,
   maxHoursRule,
   // Original soft rules
-  overtimeCostRule,
   preferenceMatchRule,
-  weekendFairnessRule,
   skillMixRule,
   // New soft rules
   weekendCountRule,
@@ -53,6 +54,7 @@ const evaluatorRegistry: Map<string, RuleEvaluator> = new Map();
   holidayFairnessRule,
   floatPenaltyRule,
   chargeClusteringRule,
+  weekendExemptRule,
   overtimeRulesV2,
 ].forEach((rule) => {
   evaluatorRegistry.set(rule.id, rule);

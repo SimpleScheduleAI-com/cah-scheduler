@@ -304,3 +304,66 @@ describe("greedyConstruct", () => {
     expect(result.understaffed[0].reasons.some((r) => r.includes("leave"))).toBe(true);
   });
 });
+
+describe("greedyConstruct — prior-schedule boundary", () => {
+  const priorDraft = (date: string) => ({
+    shiftId: `prior-${date}`,
+    staffId: "n1",
+    date,
+    shiftType: "day",
+    startTime: "07:00",
+    endTime: "19:00",
+    durationHours: 12,
+    unit: "Med-Surg",
+    isChargeNurse: false,
+    isOvertime: false,
+    isFloat: false,
+    floatFromUnit: null,
+  });
+
+  it("refuses a 6th consecutive day inherited from the prior schedule period", () => {
+    // Nurse n1 worked the last 5 days of the prior period (Feb 25 – Mar 1).
+    // The new period's first shift (Mar 2) must NOT be assigned to them.
+    const shift = makeShift("s1", "2026-03-02", { requiredStaffCount: 1 });
+    const ctx = makeContext([shift], [makeStaff("n1")], {
+      priorAssignments: [
+        priorDraft("2026-02-25"),
+        priorDraft("2026-02-26"),
+        priorDraft("2026-02-27"),
+        priorDraft("2026-02-28"),
+        priorDraft("2026-03-01"),
+      ],
+    });
+    const result = greedyConstruct(ctx, BALANCED);
+    expect(result.assignments.filter((a) => a.staffId === "n1")).toHaveLength(0);
+    expect(result.understaffed).toHaveLength(1);
+  });
+
+  it("refuses a first-day shift that violates rest hours against the prior period's last shift", () => {
+    // Prior night shift ends 07:00 on Mar 2 (started 19:00 Mar 1); a Mar 2 day
+    // shift starting 07:00 would mean 0h rest.
+    const shift = makeShift("s1", "2026-03-02", { requiredStaffCount: 1 });
+    const ctx = makeContext([shift], [makeStaff("n1")], {
+      priorAssignments: [
+        {
+          ...priorDraft("2026-03-01"),
+          shiftType: "night",
+          startTime: "19:00",
+          endTime: "07:00",
+        },
+      ],
+    });
+    const result = greedyConstruct(ctx, BALANCED);
+    expect(result.assignments.filter((a) => a.staffId === "n1")).toHaveLength(0);
+  });
+
+  it("does not include prior assignments in the generation result", () => {
+    const shift = makeShift("s1", "2026-03-02", { requiredStaffCount: 1 });
+    const ctx = makeContext([shift], [makeStaff("n1")], {
+      priorAssignments: [priorDraft("2026-02-20")],
+    });
+    const result = greedyConstruct(ctx, BALANCED);
+    expect(result.assignments.every((a) => !a.shiftId.startsWith("prior-"))).toBe(true);
+    expect(result.assignments).toHaveLength(1); // n1 fills the shift normally
+  });
+});

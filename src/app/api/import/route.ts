@@ -121,6 +121,7 @@ function createDefaultRules() {
     { name: "Holiday Fairness", ruleType: "soft" as const, category: "fairness" as const, description: "Fair distribution of holiday shifts", parameters: { evaluator: "holiday-fairness" }, weight: 7.0 },
     { name: "Skill Mix Diversity", ruleType: "soft" as const, category: "skill" as const, description: "Each shift should have mix of experience levels", parameters: { evaluator: "skill-mix" }, weight: 3.0 },
     { name: "Minimize Float Assignments", ruleType: "soft" as const, category: "preference" as const, description: "Minimize floating staff to other units", parameters: { evaluator: "float-penalty" }, weight: 4.0 },
+    { name: "Weekend-Exempt Staff Protection", ruleType: "soft" as const, category: "preference" as const, description: "Weekend-exempt staff should only be scheduled on weekends as a last resort", parameters: { evaluator: "weekend-exempt" }, weight: 4.0 },
     { name: "Charge Nurse Distribution", ruleType: "soft" as const, category: "skill" as const, description: "Distribute charge nurses across shifts", parameters: { evaluator: "charge-clustering" }, weight: 4.0 },
   ];
 
@@ -372,11 +373,13 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // Delete all existing data
-    deleteAllData();
-
-    // Import new data
-    importData(result);
+    // Replace destructively but atomically: if any insert fails partway, the
+    // delete rolls back too, so a malformed file can never leave the database
+    // empty (previously this wiped schedules/staff/audit with no recovery).
+    db.transaction(() => {
+      deleteAllData();
+      importData(result);
+    });
 
     // Return success
     return NextResponse.json({
@@ -418,7 +421,9 @@ export async function GET() {
  */
 function summarisePRNDates(dates: string[]): string {
   if (dates.length === 0) return "";
-  const daySet = new Set(dates.map((d) => new Date(d).getDay()));
+  // getUTCDay: local getDay() shifts the day-of-week one back on servers west
+  // of UTC (date strings parse as UTC midnight), corrupting export summaries.
+  const daySet = new Set(dates.map((d) => new Date(d + "T00:00:00Z").getUTCDay()));
   const allDays = [0, 1, 2, 3, 4, 5, 6];
   const weekdays = [1, 2, 3, 4, 5];
   const weekend = [0, 6];

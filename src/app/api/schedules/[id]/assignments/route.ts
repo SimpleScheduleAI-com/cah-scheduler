@@ -1,9 +1,9 @@
 import { db } from "@/db";
-import { assignment, shift, shiftDefinition, staff, publicHoliday, staffHolidayAssignment } from "@/db/schema";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { assignment, schedule, shift, shiftDefinition, staff, publicHoliday, staffHolidayAssignment } from "@/db/schema";
+import { eq, and, gte, lte, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { logAuditEvent } from "@/lib/audit/logger";
-import { getWeekStart } from "@/lib/engine/scheduler/state";
+import { weekBounds } from "@/lib/date/week";
 
 /**
  * Holiday groups - maps individual holiday names to logical holiday groups.
@@ -25,6 +25,17 @@ export async function POST(
   const { id: scheduleId } = await params;
   const body = await request.json();
 
+  // A published schedule is the version of record staff were notified about.
+  // Mutating it directly would desynchronize what staff saw from what the
+  // system stores — require an explicit unpublish first.
+  const scheduleRecord = db.select().from(schedule).where(eq(schedule.id, scheduleId)).get();
+  if (scheduleRecord?.status === "published") {
+    return NextResponse.json(
+      { error: "Cannot modify assignments on a published schedule. Unpublish it first to make changes." },
+      { status: 409 }
+    );
+  }
+
   // Look up the shift up front — needed to compute isOvertime and for holiday tracking below
   const shiftRecord = db.select().from(shift).where(eq(shift.id, body.shiftId)).get();
 
@@ -43,10 +54,7 @@ export async function POST(
       .get();
     const shiftDuration = shiftDef?.durationHours ?? 0;
 
-    const weekStart = getWeekStart(shiftRecord.date);
-    const weekEndDate = new Date(weekStart);
-    weekEndDate.setDate(weekEndDate.getDate() + 6);
-    const weekEnd = weekEndDate.toISOString().slice(0, 10);
+    const { weekStart, weekEnd } = weekBounds(shiftRecord.date);
 
     const existingRows = db
       .select({ durationHours: shiftDefinition.durationHours })
@@ -57,7 +65,11 @@ export async function POST(
         and(
           eq(assignment.staffId, body.staffId),
           gte(shift.date, weekStart),
-          lte(shift.date, weekEnd)
+          lte(shift.date, weekEnd),
+          // Hours the nurse is no longer working must not count toward OT —
+          // matches the filters used by swap approval and find-candidates.
+          ne(assignment.status, "called_out"),
+          ne(assignment.status, "cancelled")
         )
       )
       .all();
@@ -122,7 +134,9 @@ export async function POST(
 
     if (holidayRecord) {
       const logicalHolidayName = getLogicalHolidayName(holidayRecord.name);
-      const year = new Date(shiftRecord.date).getFullYear();
+      // Parse year from the string: Date().getFullYear() returns the previous
+      // year for Jan 1 dates on servers west of UTC.
+      const year = parseInt(shiftRecord.date.slice(0, 4), 10);
 
       // Check if we already have a record for this staff/holiday/year
       const existing = db
@@ -169,6 +183,22 @@ export async function DELETE(request: Request) {
     .where(eq(assignment.id, assignmentId))
     .get();
 
+  // Same published-schedule guard as POST: removals on the version of record
+  // must go through unpublish first.
+  if (existing) {
+    const owningSchedule = db
+      .select()
+      .from(schedule)
+      .where(eq(schedule.id, existing.scheduleId))
+      .get();
+    if (owningSchedule?.status === "published") {
+      return NextResponse.json(
+        { error: "Cannot modify assignments on a published schedule. Unpublish it first to make changes." },
+        { status: 409 }
+      );
+    }
+  }
+
   // Clean up holiday tracking if this was a holiday assignment
   if (existing) {
     const shiftRecord = db.select().from(shift).where(eq(shift.id, existing.shiftId)).get();
@@ -181,7 +211,9 @@ export async function DELETE(request: Request) {
 
       if (holidayRecord) {
         const logicalHolidayName = getLogicalHolidayName(holidayRecord.name);
-        const year = new Date(shiftRecord.date).getFullYear();
+        // Parse year from the string: Date().getFullYear() returns the previous
+      // year for Jan 1 dates on servers west of UTC.
+      const year = parseInt(shiftRecord.date.slice(0, 4), 10);
 
         // Delete the holiday tracking record
         db.delete(staffHolidayAssignment)
