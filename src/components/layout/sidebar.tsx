@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 interface NotificationCounts {
@@ -140,7 +140,9 @@ const icons: Record<string, () => React.ReactNode> = {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [counts, setCounts] = useState<NotificationCounts | null>(null);
 
   useEffect(() => {
@@ -231,8 +233,61 @@ export function Sidebar() {
         ))}
       </nav>
       <div className="border-t p-4">
-        <p className="text-xs text-muted-foreground">ICU - CAH Texas</p>
-        <p className="text-xs text-muted-foreground/50">v1.7.17</p>
+        <div className="mb-2 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-muted-foreground">ICU - CAH Texas</p>
+            <p className="text-xs text-muted-foreground/50">v1.7.17</p>
+          </div>
+          {/* Help menu — makes the checklist, ⌘K palette and shortcuts discoverable */}
+          <div className="relative">
+            <button
+              type="button"
+              aria-label="Help"
+              onClick={() => setHelpOpen((v) => !v)}
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-muted-foreground/30 text-sm font-semibold text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+            >
+              ?
+            </button>
+            {helpOpen && (
+              <div className="absolute bottom-9 right-0 z-50 w-56 rounded-md border bg-popover p-1 text-sm shadow-md">
+                <button
+                  type="button"
+                  className="flex w-full items-center rounded px-2.5 py-2 text-left hover:bg-accent hover:text-accent-foreground"
+                  onClick={() => {
+                    localStorage.removeItem("gettingStartedDismissed");
+                    window.dispatchEvent(new Event("reopen-getting-started"));
+                    setHelpOpen(false);
+                    router.push("/dashboard");
+                  }}
+                >
+                  Getting-started checklist
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded px-2.5 py-2 text-left hover:bg-accent hover:text-accent-foreground"
+                  onClick={() => {
+                    window.dispatchEvent(new Event("open-command-palette"));
+                    setHelpOpen(false);
+                  }}
+                >
+                  Quick navigation
+                  <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px]">⌘K</kbd>
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded px-2.5 py-2 text-left hover:bg-accent hover:text-accent-foreground"
+                  onClick={() => {
+                    window.dispatchEvent(new Event("open-keyboard-shortcuts"));
+                    setHelpOpen(false);
+                  }}
+                >
+                  Keyboard shortcuts
+                  <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px]">?</kbd>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </aside>
     </>

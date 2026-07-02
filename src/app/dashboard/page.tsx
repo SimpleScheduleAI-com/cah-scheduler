@@ -45,6 +45,7 @@ interface DashboardData {
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [gettingStartedDismissed, setGettingStartedDismissed] = useState(false);
+  const [onboarding, setOnboarding] = useState<{ scheduleCount: number; publishedCount: number } | null>(null);
 
   // Mock sparkline data (in production, fetch from API)
   const sparklineData = {
@@ -59,7 +60,16 @@ export default function DashboardPage() {
     fetch("/api/dashboard")
       .then((r) => r.json())
       .then(setData);
+    // Onboarding counts (generate/publish progress) for the Getting Started card.
+    fetch("/api/notifications")
+      .then((r) => r.json())
+      .then((j) => setOnboarding(j.onboarding ?? null))
+      .catch(() => {});
     setGettingStartedDismissed(localStorage.getItem("gettingStartedDismissed") === "true");
+    // The sidebar Help menu re-opens the checklist from any page.
+    const reopen = () => setGettingStartedDismissed(false);
+    window.addEventListener("reopen-getting-started", reopen);
+    return () => window.removeEventListener("reopen-getting-started", reopen);
   }, []);
 
   function dismissGettingStarted() {
@@ -81,10 +91,16 @@ export default function DashboardPage() {
     );
   }
 
+  // Full first-cycle journey — not just setup. Steps 4-5 are where new users
+  // previously got lost (nothing pointed from "schedule created" to "generate
+  // and publish it").
+  const hasPublished = (onboarding?.publishedCount ?? 0) > 0;
   const gettingStartedSteps = [
     { label: "Import your staff roster", done: data.staffCount > 0, href: "/setup" },
-    { label: "Configure units & rules", done: data.unitsCount > 0, href: "/settings/units" },
-    { label: "Create a schedule period", done: data.scheduleInfo !== null, href: "/schedule" },
+    { label: "Review units & rules", done: data.unitsCount > 0, href: "/settings/units" },
+    { label: "Create a schedule period", done: (onboarding?.scheduleCount ?? 0) > 0 || data.scheduleInfo !== null, href: "/schedule" },
+    { label: "Generate the schedule", done: data.fillRate > 0 || hasPublished, href: data.scheduleInfo ? `/schedule/${data.scheduleInfo.id}` : "/schedule" },
+    { label: "Review and publish it", done: hasPublished, href: data.scheduleInfo ? `/schedule/${data.scheduleInfo.id}` : "/schedule" },
   ];
   const allStepsDone = gettingStartedSteps.every((s) => s.done);
   const showGettingStarted = !gettingStartedDismissed && !allStepsDone;
@@ -136,7 +152,8 @@ export default function DashboardPage() {
               <div className="flex-1">
                 <p className="font-semibold text-amber-900 dark:text-amber-200">Getting Started</p>
                 <p className="mt-0.5 text-sm text-amber-800/70 dark:text-amber-300/70">
-                  Complete these steps to create your first schedule.
+                  Complete these steps to publish your first schedule. You can reopen this
+                  anytime from the ? button in the sidebar.
                 </p>
                 <ol className="mt-4 space-y-2">
                   {gettingStartedSteps.map((step, i) => (

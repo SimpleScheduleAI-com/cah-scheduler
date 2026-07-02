@@ -35,8 +35,15 @@ export function CommandPalette({ commands }: CommandPaletteProps) {
       }
     }
 
+    // Sidebar Help menu opens the palette without the keyboard shortcut.
+    const openViaEvent = () => setOpen(true)
+
     document.addEventListener("keydown", down)
-    return () => document.removeEventListener("keydown", down)
+    window.addEventListener("open-command-palette", openViaEvent)
+    return () => {
+      document.removeEventListener("keydown", down)
+      window.removeEventListener("open-command-palette", openViaEvent)
+    }
   }, [])
 
   const filteredCommands = useMemo(() => {

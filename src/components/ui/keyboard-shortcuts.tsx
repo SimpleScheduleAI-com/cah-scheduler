@@ -40,8 +40,15 @@ export function KeyboardShortcutsPanel() {
       }
     }
 
+    // Sidebar Help menu opens this panel without the keyboard shortcut.
+    const openViaEvent = () => setOpen(true)
+
     document.addEventListener("keydown", down)
-    return () => document.removeEventListener("keydown", down)
+    window.addEventListener("open-keyboard-shortcuts", openViaEvent)
+    return () => {
+      document.removeEventListener("keydown", down)
+      window.removeEventListener("open-keyboard-shortcuts", openViaEvent)
+    }
   }, [])
 
   if (!open) return null
