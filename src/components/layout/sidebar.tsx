@@ -11,6 +11,26 @@ interface NotificationCounts {
   openCallouts: number;
   pendingSwapsCount: number;
   prnMissingCount: number;
+  onboarding?: {
+    staffCount: number;
+    unitsCount: number;
+    scheduleCount: number;
+    publishedCount: number;
+  };
+}
+
+/**
+ * "Next step" guide beacon: until the manager completes one full cycle
+ * (first published schedule), a gently pulsing dot marks the nav item to
+ * visit next. Returns the href to mark, or null once the cycle is done.
+ */
+function nextStepHref(c: NotificationCounts | null): string | null {
+  const o = c?.onboarding;
+  if (!o) return null;
+  if (o.publishedCount > 0) return null; // first full cycle complete — retire the beacon
+  if (o.staffCount === 0 || o.unitsCount === 0) return "/setup";
+  if (o.scheduleCount === 0) return "/schedule";
+  return "/schedule"; // draft exists → generate + publish live on the schedule page
 }
 
 const BADGE_COUNTS: Record<string, (c: NotificationCounts) => number> = {
@@ -21,6 +41,9 @@ const BADGE_COUNTS: Record<string, (c: NotificationCounts) => number> = {
   "/availability": (c) => c.prnMissingCount,
 };
 
+// Group order mirrors the first-run journey: set up once (import, units,
+// staff, rules) → build the schedule cycle → run daily ops → reporting.
+// Import/Export was previously buried under "System" at the very bottom.
 const navGroups: { label?: string; items: { href: string; label: string; icon: string }[] }[] = [
   {
     items: [
@@ -28,11 +51,21 @@ const navGroups: { label?: string; items: { href: string; label: string; icon: s
     ],
   },
   {
+    label: "Setup",
+    items: [
+      { href: "/setup", label: "Import / Export", icon: "Upload" },
+      { href: "/settings/units", label: "Units", icon: "Building" },
+      { href: "/staff", label: "Staff", icon: "Users" },
+      { href: "/rules", label: "Rules", icon: "Shield" },
+      { href: "/settings/holidays", label: "Holidays", icon: "Star" },
+    ],
+  },
+  {
     label: "Scheduling",
     items: [
       { href: "/schedule", label: "Schedule", icon: "Calendar" },
-      { href: "/census", label: "Census", icon: "Activity" },
       { href: "/scenarios", label: "Schedule Variants", icon: "GitBranch" },
+      { href: "/census", label: "Census", icon: "Activity" },
     ],
   },
   {
@@ -46,18 +79,8 @@ const navGroups: { label?: string; items: { href: string; label: string; icon: s
     ],
   },
   {
-    label: "Configuration",
-    items: [
-      { href: "/staff", label: "Staff", icon: "Users" },
-      { href: "/rules", label: "Rules", icon: "Shield" },
-      { href: "/settings/units", label: "Units", icon: "Building" },
-      { href: "/settings/holidays", label: "Holidays", icon: "Star" },
-    ],
-  },
-  {
     label: "System",
     items: [
-      { href: "/setup", label: "Import / Export", icon: "Upload" },
       { href: "/analytics", label: "Analytics", icon: "BarChart2" },
       { href: "/audit", label: "Audit Trail", icon: "FileText" },
     ],
@@ -180,6 +203,16 @@ export function Sidebar() {
                   >
                     {Icon && <Icon />}
                     <span className="flex-1">{item.label}</span>
+                    {!isActive && item.href === nextStepHref(counts) && (
+                      <span
+                        className="relative flex h-2 w-2"
+                        title="Suggested next step"
+                        aria-label="Suggested next step"
+                      >
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60 motion-reduce:hidden" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                      </span>
+                    )}
                     {counts && BADGE_COUNTS[item.href] && BADGE_COUNTS[item.href](counts) > 0 && (
                       <span className={cn(
                         "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-bold",
