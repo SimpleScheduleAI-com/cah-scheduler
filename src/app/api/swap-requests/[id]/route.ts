@@ -511,7 +511,9 @@ export async function PUT(
           db.transaction(() => {
             db.update(assignment)
               .set({
-                staffId: existing.targetStaffId,
+                // Non-null: this is the directed-swap branch (guarded above by
+                // `if (!existing.targetStaffId || !existing.targetAssignmentId)`).
+                staffId: existing.targetStaffId!,
                 assignmentSource: "swap",
                 isOvertime: reqIsOvertime,
                 updatedAt: new Date().toISOString(),

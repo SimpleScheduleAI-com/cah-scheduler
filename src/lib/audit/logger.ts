@@ -2,7 +2,7 @@ import { db } from "@/db";
 import { exceptionLog } from "@/db/schema";
 
 type EntityType = "assignment" | "schedule" | "callout" | "rule" | "staff" | "scenario"
-  | "leave" | "swap_request" | "unit" | "shift" | "open_shift";
+  | "leave" | "swap_request" | "unit" | "shift" | "open_shift" | "prn_availability";
 type Action =
   | "created" | "updated" | "deleted"
   | "override_hard_rule" | "override_soft_rule"

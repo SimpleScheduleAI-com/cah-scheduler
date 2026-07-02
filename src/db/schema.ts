@@ -712,6 +712,7 @@ export const exceptionLog = sqliteTable(
         "unit",
         "shift",
         "open_shift",
+        "prn_availability",
       ],
     }).notNull(),
     entityId: text("entity_id").notNull(),
