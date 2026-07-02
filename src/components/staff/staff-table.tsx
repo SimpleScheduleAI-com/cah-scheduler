@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { InfoTip, TERM_HELP } from "@/components/ui/info-tip";
 import { staffLevelColor } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -76,7 +77,12 @@ export function StaffTable({
           <TableHead>Home Unit</TableHead>
           <TableHead>Employment</TableHead>
           <TableHead>FTE</TableHead>
-          <TableHead>ICU Level</TableHead>
+          <TableHead>
+            <span className="inline-flex items-center gap-1">
+              ICU Level
+              <InfoTip label="What do ICU competency levels mean?">{TERM_HELP.competency}</InfoTip>
+            </span>
+          </TableHead>
           <TableHead>Charge RN</TableHead>
           <TableHead>Status</TableHead>
           <TableHead></TableHead>

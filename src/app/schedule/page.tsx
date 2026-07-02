@@ -132,7 +132,7 @@ export default function SchedulePage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Schedule Builder</h1>
+          <h1 className="text-2xl font-bold">Schedule</h1>
           <p className="mt-1 text-muted-foreground">
             {schedules.length} schedule period{schedules.length !== 1 ? "s" : ""}
           </p>

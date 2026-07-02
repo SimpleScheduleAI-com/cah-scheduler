@@ -313,7 +313,7 @@ export default function ScheduleBuilderPage() {
                       size="sm"
                       onClick={handlePublish}
                       disabled={publishing || disabledByViolations}
-                      title={disabledByViolations ? `Fix ${evaluation.hardViolations.length} hard violation${evaluation.hardViolations.length !== 1 ? "s" : ""} before publishing` : undefined}
+                      title={disabledByViolations ? `Fix ${evaluation.hardViolations.length} compliance issue${evaluation.hardViolations.length !== 1 ? "s" : ""} before publishing` : undefined}
                       className="bg-white/90 text-primary hover:bg-white font-medium shadow-sm disabled:cursor-not-allowed disabled:bg-white/40 disabled:text-primary/40 disabled:shadow-none"
                     >
                       {publishing ? "Publishing…" : (
@@ -329,7 +329,7 @@ export default function ScheduleBuilderPage() {
                     </Button>
                     {disabledByViolations && (
                       <p className="text-[11px] text-white/70 text-center mt-0.5 leading-tight">
-                        {evaluation.hardViolations.length} hard violation{evaluation.hardViolations.length !== 1 ? "s" : ""} — fix first
+                        {evaluation.hardViolations.length} compliance issue{evaluation.hardViolations.length !== 1 ? "s" : ""} — fix first
                       </p>
                     )}
                   </>
@@ -363,7 +363,7 @@ export default function ScheduleBuilderPage() {
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground">Hard Violations</p>
+            <p className="text-sm text-muted-foreground">Compliance Rules Broken</p>
             <p
               className={`text-2xl font-bold ${
                 evaluation && evaluation.hardViolations.length > 0
@@ -378,7 +378,7 @@ export default function ScheduleBuilderPage() {
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground">Soft Violations</p>
+            <p className="text-sm text-muted-foreground">Fairness Flags</p>
             <p className="text-2xl font-bold text-yellow-600">
               {evaluation?.softViolations.length ?? "-"}
             </p>
@@ -434,7 +434,7 @@ export default function ScheduleBuilderPage() {
               <Card className="border-red-200">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-red-600">
-                    Hard Violations — {evaluation.hardViolations.length} total (must fix)
+                    Compliance Rules Broken — {evaluation.hardViolations.length} total (must fix)
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -457,7 +457,7 @@ export default function ScheduleBuilderPage() {
               <Card className="border-yellow-200">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-yellow-700">
-                    Soft Violations — {evaluation.softViolations.length} total (schedule quality)
+                    Fairness Flags — {evaluation.softViolations.length} total (schedule quality)
                   </CardTitle>
                 </CardHeader>
                 <CardContent>

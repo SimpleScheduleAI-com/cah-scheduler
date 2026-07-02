@@ -293,7 +293,7 @@ export default function RulesPage() {
         <TabsContent value="rules" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Hard Rules (must be satisfied)</CardTitle>
+              <CardTitle>Compliance Rules (must always be satisfied)</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
@@ -449,7 +449,7 @@ export default function RulesPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Soft Rules (scored with weights)</CardTitle>
+              <CardTitle>Fairness Rules (balanced with weights)</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>

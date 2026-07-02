@@ -73,7 +73,7 @@ export function ShiftViolationsModal({
               <div className="mb-2 flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 text-red-600" />
                 <span className="font-medium text-red-800">
-                  Hard Rule Violations ({hardViolations.length})
+                  Compliance Rules Broken ({hardViolations.length})
                 </span>
                 <Badge variant="destructive" className="ml-auto">Must Fix</Badge>
               </div>
@@ -97,7 +97,7 @@ export function ShiftViolationsModal({
               <div className="mb-2 flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-yellow-600" />
                 <span className="font-medium text-yellow-800">
-                  Soft Rule Violations ({softViolations.length})
+                  Fairness Flags ({softViolations.length})
                 </span>
                 <Badge variant="outline" className="ml-auto border-yellow-600 text-yellow-700">
                   Preferences

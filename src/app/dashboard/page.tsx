@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { InfoTip, TERM_HELP } from "@/components/ui/info-tip";
 import { SkeletonCard } from "@/components/ui/skeleton";
 import { Sparkline } from "@/components/ui/sparkline";
 import { DoughnutChart } from "@/components/ui/doughnut-chart";
@@ -200,7 +201,7 @@ export default function DashboardPage() {
                 </div>
                 <Link href={`/schedule/${data.scheduleInfo.id}`}>
                   <Button variant="secondary" className="!bg-white !text-primary hover:!bg-white/90 shadow-sm hover:shadow-md transition-shadow">
-                    Open Schedule Builder →
+                    Open Schedule →
                   </Button>
                 </Link>
               </>
@@ -346,7 +347,10 @@ export default function DashboardPage() {
               />
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              {data.totalFTE.toFixed(1)} total FTE
+              <span className="inline-flex items-center gap-1">
+                {data.totalFTE.toFixed(1)} total FTE
+                <InfoTip label="What does FTE mean?">{TERM_HELP.fte}</InfoTip>
+              </span>
             </p>
           </CardContent>
         </Card>

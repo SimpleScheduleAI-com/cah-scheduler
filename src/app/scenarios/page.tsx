@@ -189,7 +189,7 @@ function ScenariosPageContent() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Scenario Comparison</h1>
+        <h1 className="text-2xl font-bold">Schedule Variants</h1>
         <p className="mt-1 text-muted-foreground">
           Generate and compare schedule variants. The Balanced schedule is applied
           automatically; use Apply to switch to a different variant.

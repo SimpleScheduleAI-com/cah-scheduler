@@ -7,8 +7,8 @@ const nextConfig: NextConfig = {
   // src/components) is type-clean. `next dev` already runs without a full
   // typecheck, so runtime behavior is unchanged by this.
   // TODO: fix test/script types, then flip these back on (or gate via CI).
+  // (Next 16 no longer runs eslint during builds, so only the TS gate needs relaxing.)
   typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true },
 };
 
 export default nextConfig;

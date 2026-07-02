@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { InfoTip, TERM_HELP } from "@/components/ui/info-tip";
 import {
   Table,
   TableBody,
@@ -66,7 +67,12 @@ export default function AvailabilityPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">PRN Availability</h1>
+        <h1 className="text-2xl font-bold">
+          <span className="inline-flex items-center gap-2">
+            PRN Availability
+            <InfoTip label="What does PRN mean?">{TERM_HELP.prn}</InfoTip>
+          </span>
+        </h1>
         <p className="mt-1 text-muted-foreground">
           View availability submitted by per diem (PRN) staff for scheduling
         </p>

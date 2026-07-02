@@ -183,7 +183,7 @@ export default function AnalyticsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Hard Violations</CardTitle>
+            <CardTitle className="text-sm font-medium">Compliance Rules Broken</CardTitle>
             <AlertTriangle className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
@@ -437,7 +437,7 @@ export default function AnalyticsPage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between p-4 rounded-lg bg-red-50 dark:bg-red-950/20">
                 <div>
-                  <p className="text-sm font-medium">Hard Violations</p>
+                  <p className="text-sm font-medium">Compliance Rules Broken</p>
                   <p className="text-xs text-muted-foreground">Safety / legal rule breaks (must fix)</p>
                 </div>
                 <div
@@ -453,7 +453,7 @@ export default function AnalyticsPage() {
 
               <div className="flex items-center justify-between p-4 rounded-lg bg-amber-50 dark:bg-amber-950/20">
                 <div>
-                  <p className="text-sm font-medium">Soft Violations</p>
+                  <p className="text-sm font-medium">Fairness Flags</p>
                   <p className="text-xs text-muted-foreground">Fairness / preference rule breaks</p>
                 </div>
                 <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">
