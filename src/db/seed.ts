@@ -4,7 +4,9 @@ import * as schema from "./schema";
 import path from "path";
 import { addDays, format, subDays } from "date-fns";
 
-const dbPath = path.join(process.cwd(), "cah-scheduler.db");
+// Same DATABASE_PATH override as src/db/index.ts so seeding targets the
+// volume-mounted DB on hosted deploys.
+const dbPath = process.env.DATABASE_PATH ?? path.join(process.cwd(), "cah-scheduler.db");
 const sqlite = new Database(dbPath);
 sqlite.pragma("journal_mode = WAL");
 sqlite.pragma("foreign_keys = ON");
