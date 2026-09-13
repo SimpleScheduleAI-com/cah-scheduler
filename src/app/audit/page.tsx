@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { format, parseISO, formatDistanceToNow, isAfter, subHours } from "date-fns";
+import {
+  format,
+  parseISO,
+  formatDistanceToNow,
+  isAfter,
+  subHours,
+} from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -61,9 +67,12 @@ const actionLabels: Record<string, string> = {
   acuity_changed: "Census Tier Changed",
   census_changed: "Census Count Changed",
   assignment_cancelled_for_leave: "Assignment Cancelled (Leave)",
+  post_publish_amendment: "Post-Publish Amendment",
+  unpublished: "Unpublished",
 };
 
-type BadgeVariant = "default" | "secondary" | "destructive" | "outline" | "ghost" | "link";
+type BadgeVariant =
+  "default" | "secondary" | "destructive" | "outline" | "ghost" | "link";
 const actionColors: Record<string, BadgeVariant> = {
   created: "default",
   updated: "secondary",
@@ -80,6 +89,8 @@ const actionColors: Record<string, BadgeVariant> = {
   acuity_changed: "secondary",
   census_changed: "secondary",
   assignment_cancelled_for_leave: "destructive",
+  post_publish_amendment: "outline",
+  unpublished: "destructive",
 };
 
 function csvField(value: string): string {
@@ -87,16 +98,27 @@ function csvField(value: string): string {
 }
 
 function exportToCsv(logs: AuditEntry[]) {
-  const header = ["Time (UTC)", "Action", "Entity", "Description", "Justification", "By"];
-  const rows = logs.map((e) => [
-    new Date(e.createdAt).toISOString().slice(0, 19).replace("T", " "),
-    actionLabels[e.action] ?? e.action,
-    e.entityType,
-    e.description,
-    e.justification ?? "",
-    e.performedBy,
-  ].map(csvField));
-  const csv = "\uFEFF" + [header.map(csvField), ...rows].map((r) => r.join(",")).join("\r\n");
+  const header = [
+    "Time (UTC)",
+    "Action",
+    "Entity",
+    "Description",
+    "Justification",
+    "By",
+  ];
+  const rows = logs.map((e) =>
+    [
+      new Date(e.createdAt).toISOString().slice(0, 19).replace("T", " "),
+      actionLabels[e.action] ?? e.action,
+      e.entityType,
+      e.description,
+      e.justification ?? "",
+      e.performedBy,
+    ].map(csvField),
+  );
+  const csv =
+    "\uFEFF" +
+    [header.map(csvField), ...rows].map((r) => r.join(",")).join("\r\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -105,7 +127,6 @@ function exportToCsv(logs: AuditEntry[]) {
   a.click();
   URL.revokeObjectURL(url);
 }
-
 
 export default function AuditPage() {
   const [logs, setLogs] = useState<AuditEntry[]>([]);
@@ -145,7 +166,12 @@ export default function AuditPage() {
           <Button variant="outline" size="sm" onClick={() => fetchLogs()}>
             Refresh
           </Button>
-          <Button variant="outline" size="sm" onClick={() => exportToCsv(logs)} disabled={logs.length === 0}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportToCsv(logs)}
+            disabled={logs.length === 0}
+          >
             Export CSV
           </Button>
         </div>
@@ -180,13 +206,19 @@ export default function AuditPage() {
           <SelectContent>
             <SelectItem value="all">All Actions</SelectItem>
             <SelectItem value="manual_assignment">Manual Assignment</SelectItem>
+            <SelectItem value="post_publish_amendment">
+              Post-Publish Amendment
+            </SelectItem>
+            <SelectItem value="unpublished">Unpublished</SelectItem>
             <SelectItem value="callout_logged">Callout Logged</SelectItem>
             <SelectItem value="callout_filled">Callout Filled</SelectItem>
             <SelectItem value="leave_requested">Leave Requested</SelectItem>
             <SelectItem value="leave_approved">Leave Approved</SelectItem>
             <SelectItem value="leave_denied">Leave Denied</SelectItem>
             <SelectItem value="scenario_selected">Scenario Selected</SelectItem>
-            <SelectItem value="override_hard_rule">Hard Rule Override</SelectItem>
+            <SelectItem value="override_hard_rule">
+              Hard Rule Override
+            </SelectItem>
             <SelectItem value="acuity_changed">Census Tier Changed</SelectItem>
             <SelectItem value="census_changed">Census Count Changed</SelectItem>
             <SelectItem value="swap_approved">Swap Approved</SelectItem>
@@ -214,7 +246,10 @@ export default function AuditPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => { setFilterFrom(""); setFilterTo(""); }}
+              onClick={() => {
+                setFilterFrom("");
+                setFilterTo("");
+              }}
             >
               Clear
             </Button>
@@ -253,7 +288,9 @@ export default function AuditPage() {
                           <>
                             <div>{format(ts, "MMM d, yyyy")}</div>
                             <div className="text-xs opacity-70">
-                              {recent ? formatDistanceToNow(ts, { addSuffix: true }) : format(ts, "h:mm a")}
+                              {recent
+                                ? formatDistanceToNow(ts, { addSuffix: true })
+                                : format(ts, "h:mm a")}
                             </div>
                           </>
                         );

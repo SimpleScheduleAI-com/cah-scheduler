@@ -1,10 +1,17 @@
 /**
- * Tests for POST/DELETE /api/schedules/[id]/assignments — published guard.
+ * Tests for POST/DELETE /api/schedules/[id]/assignments — post-publish
+ * amendments.
  *
- * Business rule: a published schedule is the version of record that staff
- * have been notified about. Mutating its assignments without unpublishing
- * silently desynchronizes what staff saw from what the system stores, so
- * both adding and removing assignments must be rejected with HTTP 409.
+ * Business rule (2026-09-13, replaces the old "unpublish first" 409 guard):
+ * a published schedule is the version of record nurses have seen, and once
+ * seen, "unpublishing" has no real-world meaning — a one-person change is an
+ * amendment, not a new schedule. So:
+ *  - on a published schedule, add/remove WITHOUT a reason → HTTP 400
+ *  - WITH a reason → allowed, logged against the SCHEDULE as
+ *    `post_publish_amendment` (justification = reason), and ONLY the affected
+ *    nurse is notified (`assignment_amended`)
+ *  - on a draft schedule nothing changes: no reason needed, no amendment
+ *    log, no notification
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -24,6 +31,10 @@ const mockInsertReturningGet = vi.hoisted(() => vi.fn());
 const mockDeleteRun = vi.hoisted(() => vi.fn());
 const mockUpdateRun = vi.hoisted(() => vi.fn());
 const mockLogAudit = vi.hoisted(() => vi.fn());
+const mockInsertNotification = vi.hoisted(() => vi.fn());
+const mockComposeAmended = vi.hoisted(() =>
+  vi.fn((p: Record<string, unknown>) => ({ _draft: p })),
+);
 
 vi.mock("next/server", () => ({
   NextResponse: {
@@ -45,6 +56,7 @@ vi.mock("drizzle-orm", () => ({
 
 vi.mock("@/db/schema", () => ({
   schedule: { _table: "schedule", id: "sched$id", status: "sched$status" },
+  notification: { _table: "notification" },
   shift: {
     _table: "shift",
     id: "shift$id",
@@ -130,6 +142,10 @@ vi.mock("@/db", () => {
 });
 
 vi.mock("@/lib/audit/logger", () => ({ logAuditEvent: mockLogAudit }));
+vi.mock("@/lib/notifications/notify", () => ({
+  insertNotification: mockInsertNotification,
+  composeAssignmentAmended: mockComposeAmended,
+}));
 
 // ─── Import SUT after mocks ──────────────────────────────────────────────────
 
@@ -150,18 +166,34 @@ function makePost(body: Record<string, unknown>) {
   );
 }
 
-function makeDelete(assignmentId: string) {
+function makeDelete(assignmentId: string, reason?: string) {
+  const qs = new URLSearchParams({ assignmentId });
+  if (reason !== undefined) qs.set("reason", reason);
   return new Request(
-    `http://localhost/api/schedules/${SCHEDULE_ID}/assignments?assignmentId=${assignmentId}`,
+    `http://localhost/api/schedules/${SCHEDULE_ID}/assignments?${qs.toString()}`,
     { method: "DELETE" },
   );
+}
+
+const PUBLISHED = {
+  id: SCHEDULE_ID,
+  name: "September 2026",
+  unit: "ICU",
+  status: "published",
+};
+const DRAFT = { ...PUBLISHED, status: "draft" };
+
+function amendmentLogs() {
+  return mockLogAudit.mock.calls
+    .map((c) => c[0] as Record<string, unknown>)
+    .filter((p) => p.action === "post_publish_amendment");
 }
 
 function makeParams() {
   return Promise.resolve({ id: SCHEDULE_ID });
 }
 
-describe("assignments route — published-schedule guard", () => {
+describe("assignments route — post-publish amendments", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     tableGets.shift.mockReturnValue({
@@ -189,47 +221,126 @@ describe("assignments route — published-schedule guard", () => {
     mockInsertReturningGet.mockReturnValue({ id: "assign-new" });
   });
 
-  it("POST returns 409 when the schedule is published", async () => {
-    tableGets.schedule.mockReturnValue({
-      id: SCHEDULE_ID,
-      status: "published",
-    });
+  // ── Published: reason required ─────────────────────────────────────────
+
+  it("POST on a published schedule without a reason → 400, nothing written", async () => {
+    tableGets.schedule.mockReturnValue(PUBLISHED);
     const res = await POST(
       makePost({ shiftId: "shift-001", staffId: "staff-001" }),
-      {
-        params: makeParams(),
-      },
+      { params: makeParams() },
     );
-    expect((res as { status: number }).status).toBe(409);
+    expect((res as { status: number }).status).toBe(400);
+    expect(mockInsertReturningGet).not.toHaveBeenCalled();
+    expect(mockInsertNotification).not.toHaveBeenCalled();
+  });
+
+  it("POST on a published schedule with a whitespace-only reason → 400", async () => {
+    tableGets.schedule.mockReturnValue(PUBLISHED);
+    const res = await POST(
+      makePost({ shiftId: "shift-001", staffId: "staff-001", reason: "   " }),
+      { params: makeParams() },
+    );
+    expect((res as { status: number }).status).toBe(400);
     expect(mockInsertReturningGet).not.toHaveBeenCalled();
   });
 
-  it("POST still creates the assignment on a draft schedule", async () => {
-    tableGets.schedule.mockReturnValue({ id: SCHEDULE_ID, status: "draft" });
+  it("DELETE on a published schedule without a reason → 400, row kept", async () => {
+    tableGets.schedule.mockReturnValue(PUBLISHED);
+    const res = await DELETE(makeDelete("assign-001"));
+    expect((res as { status: number }).status).toBe(400);
+    expect(mockDeleteRun).not.toHaveBeenCalled();
+    expect(mockInsertNotification).not.toHaveBeenCalled();
+  });
+
+  // ── Published: amendment with reason ───────────────────────────────────
+
+  it("POST with a reason on a published schedule creates the assignment, logs the amendment against the schedule, and notifies the added nurse", async () => {
+    tableGets.schedule.mockReturnValue(PUBLISHED);
     const res = await POST(
-      makePost({ shiftId: "shift-001", staffId: "staff-001" }),
-      {
-        params: makeParams(),
-      },
+      makePost({
+        shiftId: "shift-001",
+        staffId: "staff-001",
+        reason: "Covering approved leave",
+      }),
+      { params: makeParams() },
     );
     expect((res as { status: number }).status).toBe(201);
+    expect(mockInsertReturningGet).toHaveBeenCalled();
+
+    // Regular manual_assignment entry still present (assignment history)…
+    const manual = mockLogAudit.mock.calls
+      .map((c) => c[0] as Record<string, unknown>)
+      .find((p) => p.action === "manual_assignment");
+    expect(manual).toBeDefined();
+
+    // …plus the amendment against the SCHEDULE with the reason as justification.
+    const logs = amendmentLogs();
+    expect(logs).toHaveLength(1);
+    expect(logs[0].entityType).toBe("schedule");
+    expect(logs[0].entityId).toBe(SCHEDULE_ID);
+    expect(logs[0].justification).toBe("Covering approved leave");
+    expect(String(logs[0].description)).toContain("Jane Doe");
+    expect(String(logs[0].description)).toContain("Covering approved leave");
+    expect((logs[0].newState as Record<string, unknown>).change).toBe("added");
+
+    // Exactly one notification — the added nurse, not the whole unit.
+    expect(mockInsertNotification).toHaveBeenCalledTimes(1);
+    expect(mockComposeAmended).toHaveBeenCalledWith(
+      expect.objectContaining({
+        staffId: "staff-001",
+        change: "added",
+        date: "2026-04-01",
+        unit: "ICU",
+        reason: "Covering approved leave",
+      }),
+    );
   });
 
-  it("DELETE returns 409 when the assignment's schedule is published", async () => {
-    tableGets.schedule.mockReturnValue({
-      id: SCHEDULE_ID,
-      status: "published",
-    });
-    const res = await DELETE(makeDelete("assign-001"));
-    expect((res as { status: number }).status).toBe(409);
-    expect(mockDeleteRun).not.toHaveBeenCalled();
+  it("DELETE with a reason on a published schedule removes the row, logs the amendment, and notifies the removed nurse", async () => {
+    tableGets.schedule.mockReturnValue(PUBLISHED);
+    const res = await DELETE(makeDelete("assign-001", "Low census release"));
+    expect((res as { status: number }).status).toBe(200);
+    expect(mockDeleteRun).toHaveBeenCalled();
+
+    const logs = amendmentLogs();
+    expect(logs).toHaveLength(1);
+    expect(logs[0].entityType).toBe("schedule");
+    expect(logs[0].entityId).toBe(SCHEDULE_ID);
+    expect(logs[0].justification).toBe("Low census release");
+    expect((logs[0].previousState as Record<string, unknown>).change).toBe(
+      "removed",
+    );
+
+    expect(mockInsertNotification).toHaveBeenCalledTimes(1);
+    expect(mockComposeAmended).toHaveBeenCalledWith(
+      expect.objectContaining({
+        staffId: "staff-001",
+        change: "removed",
+        reason: "Low census release",
+      }),
+    );
   });
 
-  it("DELETE still removes the assignment on a draft schedule", async () => {
-    tableGets.schedule.mockReturnValue({ id: SCHEDULE_ID, status: "draft" });
+  // ── Draft: unchanged behaviour ─────────────────────────────────────────
+
+  it("POST on a draft schedule needs no reason and logs no amendment", async () => {
+    tableGets.schedule.mockReturnValue(DRAFT);
+    const res = await POST(
+      makePost({ shiftId: "shift-001", staffId: "staff-001" }),
+      { params: makeParams() },
+    );
+    expect((res as { status: number }).status).toBe(201);
+    expect(amendmentLogs()).toHaveLength(0);
+    expect(mockInsertNotification).not.toHaveBeenCalled();
+  });
+
+  it("DELETE on a draft schedule needs no reason and logs no amendment", async () => {
+    tableGets.schedule.mockReturnValue(DRAFT);
     const res = await DELETE(makeDelete("assign-001"));
     expect((res as { status: number }).status).toBe(200);
     expect(mockDeleteRun).toHaveBeenCalled();
+    expect(amendmentLogs()).toHaveLength(0);
+    expect(mockInsertNotification).not.toHaveBeenCalled();
   });
 
   it("POST excludes called-out and cancelled assignments from the weekly OT hours", async () => {

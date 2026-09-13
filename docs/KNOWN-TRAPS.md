@@ -52,6 +52,17 @@ rule is in CLAUDE.md and is not optional.
   of overtime status — cost order is straight-time → OT → agency. A past sort
   change silently ranked agency #1; the regression test in
   `src/lib/coverage/` guards it.
+- **Leave approval has TWO coverage paths** (`src/app/api/staff-leave/[id]/route.ts`),
+  split by the unit's `calloutThresholdDays` (default 7): open shift beyond,
+  callout within. Anything nurse-facing (notifications, board rows, tests)
+  must be reasoned through for BOTH — the callout path had no notification at
+  all until v1.11.0, and a demo with a schedule starting in 3 days exercises
+  only the callout path. The demo unit's threshold is 7, so "post leave for
+  next week" is always a callout.
+- **Route date tests: build "today + n" from LOCAL fields, not `toISOString()`.**
+  Routes parse `YYYY-MM-DD` as local midnight; a UTC slice is a day behind on
+  any machine east of Greenwich (the founder's is UTC+5:30), so "+4 days"
+  silently becomes "+3" and the assertion text drifts.
 - **Auth is flag-gated.** `AUTH_ENABLED !== "true"` = total no-op (no login,
   no middleware). Demo accounts + local run command: `DEMO-LOGINS.md`.
   Excel import cascade-deletes nurse logins; `provisionAuthUsers()` re-creates

@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/toast";
 import { useOnboarding } from "@/lib/onboarding/use-onboarding";
 import { ScheduleGrid } from "@/components/schedule/schedule-grid";
 import { AssignmentDialog } from "@/components/schedule/assignment-dialog";
+import { ChangeReasonDialog } from "@/components/schedule/change-reason-dialog";
 import { ShiftViolationsModal } from "@/components/schedule/shift-violations-modal";
 import { format, parseISO } from "date-fns";
 import { fetchJson, FetchJsonError } from "@/lib/fetch-json";
@@ -46,8 +47,15 @@ interface ScheduleData {
   endDate: string;
   unit: string;
   status: string;
+  amendmentCount?: number;
   shifts: ShiftData[];
 }
+
+/** A change to a published schedule waiting on the manager's reason. */
+type PendingChange =
+  | { kind: "assign"; shiftId: string; staffId: string; isChargeNurse: boolean }
+  | { kind: "remove"; assignmentId: string }
+  | { kind: "unpublish" };
 
 interface RuleViolation {
   ruleId: string;
@@ -86,6 +94,9 @@ export default function ScheduleBuilderPage() {
     [],
   );
   const [publishing, setPublishing] = useState(false);
+  const [pendingChange, setPendingChange] = useState<PendingChange | null>(
+    null,
+  );
 
   const fetchSchedule = useCallback(async () => {
     setLoading(true);
@@ -138,29 +149,108 @@ export default function ScheduleBuilderPage() {
       document.removeEventListener("visibilitychange", handleVisibility);
   }, [fetchSchedule]);
 
-  async function handleAssign(
+  const isPublished = schedule?.status === "published";
+
+  async function submitAssign(
     shiftId: string,
     staffId: string,
     isChargeNurse: boolean,
+    reason?: string,
   ) {
-    await fetch(`/api/schedules/${scheduleId}/assignments`, {
+    const res = await fetch(`/api/schedules/${scheduleId}/assignments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shiftId, staffId, isChargeNurse }),
+      body: JSON.stringify({ shiftId, staffId, isChargeNurse, reason }),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      addToast({
+        title: "Could not assign",
+        description: data.error ?? "Unknown error",
+        variant: "error",
+      });
+      return;
+    }
+    if (reason) {
+      addToast({
+        title: "Published schedule amended",
+        description:
+          "The nurse has been notified and the change is in the audit trail.",
+        variant: "success",
+      });
+    }
     setDialogOpen(false);
     setSelectedShift(null);
     fetchSchedule();
   }
 
-  async function handleRemove(assignmentId: string) {
-    await fetch(
-      `/api/schedules/${scheduleId}/assignments?assignmentId=${assignmentId}`,
+  async function submitRemove(assignmentId: string, reason?: string) {
+    const qs = new URLSearchParams({ assignmentId });
+    if (reason) qs.set("reason", reason);
+    const res = await fetch(
+      `/api/schedules/${scheduleId}/assignments?${qs.toString()}`,
       { method: "DELETE" },
     );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      addToast({
+        title: "Could not remove",
+        description: data.error ?? "Unknown error",
+        variant: "error",
+      });
+      return;
+    }
+    if (reason) {
+      addToast({
+        title: "Published schedule amended",
+        description:
+          "The nurse has been notified and the change is in the audit trail.",
+        variant: "success",
+      });
+    }
     setDialogOpen(false);
     setSelectedShift(null);
     fetchSchedule();
+  }
+
+  // On a published schedule every hand change is an amendment: ask for the
+  // reason first, then submit with it. On a draft, submit straight away.
+  function handleAssign(
+    shiftId: string,
+    staffId: string,
+    isChargeNurse: boolean,
+  ) {
+    if (isPublished) {
+      setPendingChange({ kind: "assign", shiftId, staffId, isChargeNurse });
+      return;
+    }
+    void submitAssign(shiftId, staffId, isChargeNurse);
+  }
+
+  function handleRemove(assignmentId: string) {
+    if (isPublished) {
+      setPendingChange({ kind: "remove", assignmentId });
+      return;
+    }
+    void submitRemove(assignmentId);
+  }
+
+  async function handleReasonConfirm(reason: string) {
+    const change = pendingChange;
+    setPendingChange(null);
+    if (!change) return;
+    if (change.kind === "assign") {
+      await submitAssign(
+        change.shiftId,
+        change.staffId,
+        change.isChargeNurse,
+        reason,
+      );
+    } else if (change.kind === "remove") {
+      await submitRemove(change.assignmentId, reason);
+    } else {
+      await submitStatus("draft", reason);
+    }
   }
 
   function handleShiftClick(shift: ShiftData) {
@@ -168,13 +258,24 @@ export default function ScheduleBuilderPage() {
     setDialogOpen(true);
   }
 
-  async function handlePublish() {
+  function handlePublish() {
+    if (schedule?.status === "published") {
+      // Unpublish withdraws the schedule from every nurse — needs a reason.
+      setPendingChange({ kind: "unpublish" });
+      return;
+    }
+    void submitStatus("published");
+  }
+
+  async function submitStatus(
+    newStatus: "published" | "draft",
+    reason?: string,
+  ) {
     setPublishing(true);
-    const newStatus = schedule?.status === "published" ? "draft" : "published";
     const res = await fetch(`/api/schedules/${scheduleId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: newStatus }),
+      body: JSON.stringify({ status: newStatus, reason }),
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -365,6 +466,15 @@ export default function ScheduleBuilderPage() {
           >
             {schedule.status}
           </Badge>
+          {isPublished && (schedule.amendmentCount ?? 0) > 0 && (
+            <Badge
+              variant="secondary"
+              className="bg-amber-400/90 text-amber-950 border-amber-300"
+              title="Hand changes made after publishing — each one is in the audit trail and the affected nurse was notified"
+            >
+              Amended ×{schedule.amendmentCount}
+            </Badge>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -709,6 +819,14 @@ export default function ScheduleBuilderPage() {
           />
         </CardContent>
       </Card>
+
+      {/* Reason prompt for changes to a published schedule */}
+      <ChangeReasonDialog
+        open={pendingChange !== null}
+        mode={pendingChange?.kind ?? "assign"}
+        onCancel={() => setPendingChange(null)}
+        onConfirm={handleReasonConfirm}
+      />
 
       {/* Assignment dialog */}
       <AssignmentDialog

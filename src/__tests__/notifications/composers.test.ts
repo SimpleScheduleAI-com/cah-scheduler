@@ -11,6 +11,8 @@ import {
   composeSwapResponse,
   composeSwapDecided,
   composeLeaveDecided,
+  composeCalloutPosted,
+  composeAssignmentAmended,
   insertNotification,
 } from "@/lib/notifications/notify";
 
@@ -145,5 +147,68 @@ describe("insertNotification", () => {
       href: "/my/swaps",
     });
     expect(run).toHaveBeenCalledOnce();
+  });
+});
+
+describe("composeCalloutPosted", () => {
+  it("is an urgent notice pointing the nurse at the manager (no board row to raise a hand on)", () => {
+    const d = composeCalloutPosted({
+      staffId: "staff-9",
+      date: "2026-09-17",
+      shiftLabel: "Night",
+      unit: "ICU",
+      daysUntilShift: 4,
+    });
+    expect(d.staffId).toBe("staff-9");
+    expect(d.type).toBe("callout_posted");
+    expect(d.title).toBe("Urgent: shift needs coverage");
+    expect(d.body).toContain("Night on 2026-09-17 (ICU)");
+    expect(d.body).toContain("in 4 days");
+    expect(d.body).toContain("Tell your manager");
+    expect(d.href).toBe("/my");
+  });
+
+  it("says 'tomorrow' for a one-day-out shift", () => {
+    const d = composeCalloutPosted({
+      staffId: "s",
+      date: "2026-09-14",
+      shiftLabel: "Day",
+      unit: "ER",
+      daysUntilShift: 1,
+    });
+    expect(d.body).toContain("is tomorrow");
+    expect(d.body).not.toContain("in 1 days");
+  });
+});
+
+describe("composeAssignmentAmended", () => {
+  it("added: names the shift, unit and the manager's reason", () => {
+    const d = composeAssignmentAmended({
+      staffId: "staff-2",
+      change: "added",
+      date: "2026-09-20",
+      shiftLabel: "Day",
+      unit: "ICU",
+      reason: "Covering approved leave",
+    });
+    expect(d.type).toBe("assignment_amended");
+    expect(d.title).toBe("You were added to a published shift");
+    expect(d.body).toBe(
+      "Day on 2026-09-20 (ICU). Reason: Covering approved leave",
+    );
+    expect(d.href).toBe("/my");
+  });
+
+  it("removed: distinct title, same body shape", () => {
+    const d = composeAssignmentAmended({
+      staffId: "staff-2",
+      change: "removed",
+      date: "2026-09-20",
+      shiftLabel: "Night",
+      unit: "ICU",
+      reason: "Low census",
+    });
+    expect(d.title).toBe("You were removed from a published shift");
+    expect(d.body).toBe("Night on 2026-09-20 (ICU). Reason: Low census");
   });
 });

@@ -20,6 +20,7 @@ import {
   insertNotification,
   composeLeaveDecided,
   composeOpenShiftPosted,
+  composeCalloutPosted,
 } from "@/lib/notifications/notify";
 
 export async function GET(
@@ -216,13 +217,19 @@ async function handleLeaveApproval(
 
     const calloutThreshold = unitConfig?.calloutThresholdDays ?? 7;
     const isUrgent = daysUntilShift <= calloutThreshold;
+    // Urgent callouts still get posted to eligible nurses when there is at
+    // least one full day to go — a nurse should hear that a shift in 4-5 days
+    // is vacant even while the manager works the escalation chain. Same-day
+    // or past-dated shifts are not posted: with hours left, the manager is
+    // on the phone and a board notification is noise.
+    const postUrgentCallout = isUrgent && daysUntilShift >= 1;
 
     // Candidate search is async — run it BEFORE the transaction below
     // (better-sqlite3 transactions are synchronous).
     let candidateResult: Awaited<
       ReturnType<typeof findCandidatesForShift>
     > | null = null;
-    if (!isUrgent) {
+    if (!isUrgent || postUrgentCallout) {
       // Full list (Infinity): every rule-eligible nurse gets the posting
       // notification below; the manager's stored recommendations stay top-3
       // via the slice at the insert.
@@ -361,10 +368,11 @@ async function handleLeaveApproval(
       }
     });
 
-    // Notify every rule-eligible nurse about the new posting (non-urgent path
-    // only — the urgent path made a callout, which is manager-worked, not a
-    // board posting). Best-effort: a notify failure never breaks the approval.
-    if (!isUrgent && candidateResult) {
+    // Notify every rule-eligible nurse about the vacancy. Non-urgent: an
+    // open-shift posting they can raise a hand on. Urgent with >= 1 day to
+    // go: a callout notice asking them to contact the manager. Best-effort:
+    // a notify failure never breaks the approval.
+    if ((!isUrgent || postUrgentCallout) && candidateResult) {
       try {
         const defInfo = db
           .select({
@@ -383,16 +391,29 @@ async function handleLeaveApproval(
           insertNotification(
             db,
             notification,
-            composeOpenShiftPosted({
-              staffId: c.staffId,
-              date: a.shiftDate,
-              shiftLabel,
-              unit: defInfo?.unit ?? a.scheduleUnit,
-            }),
+            isUrgent
+              ? composeCalloutPosted({
+                  staffId: c.staffId,
+                  date: a.shiftDate,
+                  shiftLabel,
+                  unit: defInfo?.unit ?? a.scheduleUnit,
+                  daysUntilShift,
+                })
+              : composeOpenShiftPosted({
+                  staffId: c.staffId,
+                  date: a.shiftDate,
+                  shiftLabel,
+                  unit: defInfo?.unit ?? a.scheduleUnit,
+                }),
           );
         }
       } catch (err) {
-        console.error("[notify] open_shift_posted failed", err);
+        console.error(
+          isUrgent
+            ? "[notify] callout_posted failed"
+            : "[notify] open_shift_posted failed",
+          err,
+        );
       }
     }
   }

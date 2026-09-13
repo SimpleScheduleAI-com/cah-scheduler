@@ -39,29 +39,44 @@ vi.mock("next/server", () => ({
 }));
 
 vi.mock("drizzle-orm", () => ({
-  eq:  vi.fn((a: unknown, b: unknown) => ({ _eq:  [a, b] })),
+  eq: vi.fn((a: unknown, b: unknown) => ({ _eq: [a, b] })),
   and: vi.fn((...args: unknown[]) => ({ _and: args })),
-  or:  vi.fn((...args: unknown[]) => ({ _or: args })),
+  or: vi.fn((...args: unknown[]) => ({ _or: args })),
   gte: vi.fn((a: unknown, b: unknown) => ({ _gte: [a, b] })),
   lte: vi.fn((a: unknown, b: unknown) => ({ _lte: [a, b] })),
 }));
 
 vi.mock("@/db/schema", () => ({
-  staffLeave:   { id: "sl$id", staffId: "sl$staffId", status: "sl$status" },
+  staffLeave: { id: "sl$id", staffId: "sl$staffId", status: "sl$status" },
   exceptionLog: { id: "el$id" },
-  assignment:   {
+  assignment: {
     id: "assign$id",
     staffId: "assign$staffId",
     status: "assign$status",
     shiftId: "assign$shiftId",
     scheduleId: "assign$scheduleId",
   },
-  shift:   { id: "shift$id",  date: "shift$date",  scheduleId: "shift$scheduleId" },
-  schedule:{ id: "sched$id",  unit: "sched$unit" },
-  unit:    { id: "unit$id",   name: "unit$name",  calloutThresholdDays: "unit$threshold" },
+  shift: { id: "shift$id", date: "shift$date", scheduleId: "shift$scheduleId" },
+  schedule: { id: "sched$id", unit: "sched$unit" },
+  shiftDefinition: {
+    id: "def$id",
+    name: "def$name",
+    shiftType: "def$type",
+    unit: "def$unit",
+  },
+  notification: { id: "notif$id" },
+  unit: {
+    id: "unit$id",
+    name: "unit$name",
+    calloutThresholdDays: "unit$threshold",
+  },
   openShift: { id: "os$id" },
-  callout:   { id: "co$id" },
-  staff:     { id: "staff$id", firstName: "staff$firstName", lastName: "staff$lastName" },
+  callout: { id: "co$id" },
+  staff: {
+    id: "staff$id",
+    firstName: "staff$firstName",
+    lastName: "staff$lastName",
+  },
   shiftSwapRequest: {
     id: "ssr$id",
     status: "ssr$status",
@@ -110,11 +125,14 @@ vi.mock("@/db", () => {
   };
 });
 
-vi.mock("@/lib/coverage/find-candidates", () => ({
-  findCandidatesForShift: vi.fn(async () => ({
-    candidates: [],
-    escalationStepsChecked: [],
+const mockFindCandidates = vi.hoisted(() =>
+  vi.fn(async () => ({
+    candidates: [] as { staffId: string; source: string }[],
+    escalationStepsChecked: [] as string[],
   })),
+);
+vi.mock("@/lib/coverage/find-candidates", () => ({
+  findCandidatesForShift: mockFindCandidates,
 }));
 
 // ─── Import SUT after mocks ───────────────────────────────────────────────────
@@ -170,7 +188,11 @@ describe("PUT /api/staff-leave/[id] — leave approval audit trail", () => {
 
     // Default: leave record found on first .get(), approved leave on update
     mockSelectGet.mockReturnValue(pendingLeave);
-    mockUpdateRetGet.mockReturnValue({ ...pendingLeave, status: "approved", approvedAt: new Date().toISOString() });
+    mockUpdateRetGet.mockReturnValue({
+      ...pendingLeave,
+      status: "approved",
+      approvedAt: new Date().toISOString(),
+    });
 
     // Staff name lookup (called when logging leave_approved)
     // These are sequential .get() calls inside the PUT handler
@@ -185,9 +207,9 @@ describe("PUT /api/staff-leave/[id] — leave approval audit trail", () => {
       //  1. existing leave record
       //  2. staff name (for leave_approved log)
       mockSelectGet
-        .mockReturnValueOnce(pendingLeave)                                          // existing leave
-        .mockReturnValueOnce({ firstName: "Alice", lastName: "Johnson" })            // staff name
-        .mockReturnValueOnce({ calloutThresholdDays: 7 });                          // unit config
+        .mockReturnValueOnce(pendingLeave) // existing leave
+        .mockReturnValueOnce({ firstName: "Alice", lastName: "Johnson" }) // staff name
+        .mockReturnValueOnce({ calloutThresholdDays: 7 }); // unit config
 
       // affectedAssignments query (.all())
       mockSelectAll.mockReturnValue([
@@ -208,19 +230,41 @@ describe("PUT /api/staff-leave/[id] — leave approval audit trail", () => {
 
     it("audit event for the created callout uses the callout id (not the assignment id) as entityId", async () => {
       // Capture all insert().values() calls
-      const capturedInserts: { entityType?: string; entityId?: string; action?: string; description?: string }[] = [];
+      const capturedInserts: {
+        entityType?: string;
+        entityId?: string;
+        action?: string;
+        description?: string;
+      }[] = [];
       const { db } = await import("@/db");
       const origInsert = db.insert.bind(db);
-      vi.spyOn(db, "insert").mockImplementation((_table: unknown) => ({
-        values: (vals: Record<string, unknown>) => {
-          capturedInserts.push(vals as { entityType?: string; entityId?: string; action?: string; description?: string });
-          return { run: mockInsertRun, returning: () => ({ get: mockInsertRetGet }) };
-        },
-      }) as ReturnType<typeof origInsert>);
+      vi.spyOn(db, "insert").mockImplementation(
+        (_table: unknown) =>
+          ({
+            values: (vals: Record<string, unknown>) => {
+              capturedInserts.push(
+                vals as {
+                  entityType?: string;
+                  entityId?: string;
+                  action?: string;
+                  description?: string;
+                },
+              );
+              return {
+                run: mockInsertRun,
+                returning: () => ({ get: mockInsertRetGet }),
+              };
+            },
+          }) as ReturnType<typeof origInsert>,
+      );
 
-      await PUT(makeRequest({ status: "approved", approvedBy: "manager" }), { params: makeParams() });
+      await PUT(makeRequest({ status: "approved", approvedBy: "manager" }), {
+        params: makeParams(),
+      });
 
-      const calloutAudit = capturedInserts.find(v => v.action === "callout_logged");
+      const calloutAudit = capturedInserts.find(
+        (v) => v.action === "callout_logged",
+      );
       expect(calloutAudit).toBeDefined();
       // entityId MUST be the callout id, not the assignment id
       expect(calloutAudit?.entityId).toBe(CALLOUT_ID);
@@ -228,37 +272,215 @@ describe("PUT /api/staff-leave/[id] — leave approval audit trail", () => {
     });
 
     it("audit description contains the staff member's name (not UUID)", async () => {
-      const capturedInserts: { entityType?: string; entityId?: string; action?: string; description?: string }[] = [];
+      const capturedInserts: {
+        entityType?: string;
+        entityId?: string;
+        action?: string;
+        description?: string;
+      }[] = [];
       const { db } = await import("@/db");
-      vi.spyOn(db, "insert").mockImplementation((_table: unknown) => ({
-        values: (vals: Record<string, unknown>) => {
-          capturedInserts.push(vals as { entityType?: string; entityId?: string; action?: string; description?: string });
-          return { run: mockInsertRun, returning: () => ({ get: mockInsertRetGet }) };
-        },
-      }) as ReturnType<typeof db.insert>);
+      vi.spyOn(db, "insert").mockImplementation(
+        (_table: unknown) =>
+          ({
+            values: (vals: Record<string, unknown>) => {
+              capturedInserts.push(
+                vals as {
+                  entityType?: string;
+                  entityId?: string;
+                  action?: string;
+                  description?: string;
+                },
+              );
+              return {
+                run: mockInsertRun,
+                returning: () => ({ get: mockInsertRetGet }),
+              };
+            },
+          }) as ReturnType<typeof db.insert>,
+      );
 
-      await PUT(makeRequest({ status: "approved", approvedBy: "manager" }), { params: makeParams() });
+      await PUT(makeRequest({ status: "approved", approvedBy: "manager" }), {
+        params: makeParams(),
+      });
 
-      const calloutAudit = capturedInserts.find(v => v.action === "callout_logged");
+      const calloutAudit = capturedInserts.find(
+        (v) => v.action === "callout_logged",
+      );
       expect(calloutAudit?.description).toContain("Alice Johnson");
       // Must NOT contain the raw UUID
       expect(calloutAudit?.description).not.toContain(STAFF_ID);
     });
 
     it("audit event entityType is 'callout'", async () => {
-      const capturedInserts: { entityType?: string; entityId?: string; action?: string }[] = [];
+      const capturedInserts: {
+        entityType?: string;
+        entityId?: string;
+        action?: string;
+      }[] = [];
       const { db } = await import("@/db");
-      vi.spyOn(db, "insert").mockImplementation((_table: unknown) => ({
-        values: (vals: Record<string, unknown>) => {
-          capturedInserts.push(vals as { entityType?: string; entityId?: string; action?: string });
-          return { run: mockInsertRun, returning: () => ({ get: mockInsertRetGet }) };
-        },
-      }) as ReturnType<typeof db.insert>);
+      vi.spyOn(db, "insert").mockImplementation(
+        (_table: unknown) =>
+          ({
+            values: (vals: Record<string, unknown>) => {
+              capturedInserts.push(
+                vals as {
+                  entityType?: string;
+                  entityId?: string;
+                  action?: string;
+                },
+              );
+              return {
+                run: mockInsertRun,
+                returning: () => ({ get: mockInsertRetGet }),
+              };
+            },
+          }) as ReturnType<typeof db.insert>,
+      );
 
-      await PUT(makeRequest({ status: "approved", approvedBy: "manager" }), { params: makeParams() });
+      await PUT(makeRequest({ status: "approved", approvedBy: "manager" }), {
+        params: makeParams(),
+      });
 
-      const calloutAudit = capturedInserts.find(v => v.action === "callout_logged");
+      const calloutAudit = capturedInserts.find(
+        (v) => v.action === "callout_logged",
+      );
       expect(calloutAudit?.entityType).toBe("callout");
+    });
+  });
+
+  // ── Urgent callout ≥ 1 day out: eligible nurses are told ───────────────
+  //
+  // 2026-09-13 (Dr. Tara demo): a night charge nurse's leave 6 days out went
+  // down the callout path and NO nurse heard the shift was vacant, because
+  // notifications only fired on the open-shift (> threshold) path. Now an
+  // urgent callout with at least one full day to go also posts a
+  // `callout_posted` notice to every rule-eligible nurse. Same-day/past
+  // shifts stay silent — with hours left, the manager is on the phone.
+
+  // LOCAL calendar date, not toISOString(): the route parses "YYYY-MM-DD"
+  // as local midnight, and a UTC slice is a day behind east of Greenwich.
+  function isoDaysFromToday(n: number): string {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + n);
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${d.getFullYear()}-${mm}-${dd}`;
+  }
+
+  function captureInserts() {
+    const captured: Record<string, unknown>[] = [];
+    return {
+      captured,
+      install: async () => {
+        const { db } = await import("@/db");
+        vi.spyOn(db, "insert").mockImplementation(
+          (_table: unknown) =>
+            ({
+              values: (vals: Record<string, unknown>) => {
+                captured.push(vals);
+                return {
+                  run: mockInsertRun,
+                  returning: () => ({ get: mockInsertRetGet }),
+                };
+              },
+            }) as unknown as ReturnType<typeof db.insert>,
+        );
+      },
+    };
+  }
+
+  describe("urgent callout notifications", () => {
+    beforeEach(() => {
+      mockSelectGet
+        .mockReturnValueOnce(pendingLeave) // existing leave
+        .mockReturnValueOnce({ firstName: "Alice", lastName: "Johnson" }) // staff name
+        .mockReturnValueOnce({ calloutThresholdDays: 7 }); // unit config
+      mockInsertRetGet.mockReturnValue({ id: CALLOUT_ID });
+      mockFindCandidates.mockResolvedValue({
+        candidates: [
+          { staffId: "nurse-james", source: "float" },
+          { staffId: "agency-placeholder", source: "agency" },
+          { staffId: STAFF_ID, source: "regular" }, // the nurse going on leave
+        ],
+        escalationStepsChecked: [],
+      });
+    });
+
+    // The defInfo lookup (.get #4) only happens on the notify path — queue it
+    // per test so an unconsumed value cannot leak into the next test.
+    const DEF_INFO = { name: "Night", shiftType: "night", unit: "ICU" };
+
+    it("4 days out (inside the 7-day threshold): creates a callout AND posts callout_posted to eligible nurses only", async () => {
+      mockSelectGet.mockReturnValueOnce(DEF_INFO);
+      mockSelectAll.mockReturnValue([
+        {
+          assignmentId: ASSIGN_ID,
+          shiftId: SHIFT_ID,
+          shiftDate: isoDaysFromToday(4),
+          scheduleId: SCHED_ID,
+          scheduleUnit: "ICU",
+        },
+      ]);
+      const { captured, install } = captureInserts();
+      await install();
+
+      await PUT(makeRequest({ status: "approved", approvedBy: "manager" }), {
+        params: makeParams(),
+      });
+
+      expect(captured.some((v) => v.action === "callout_logged")).toBe(true);
+      expect(mockFindCandidates).toHaveBeenCalled();
+      const posted = captured.filter((v) => v.type === "callout_posted");
+      expect(posted.map((v) => v.staffId)).toEqual(["nurse-james"]); // no agency, not the leaver
+      expect(String(posted[0].title)).toMatch(/urgent/i);
+      expect(String(posted[0].body)).toContain("in 4 days");
+      expect(captured.some((v) => v.type === "open_shift_posted")).toBe(false);
+    });
+
+    it("same-day shift: callout only, nobody is notified", async () => {
+      mockSelectAll.mockReturnValue([
+        {
+          assignmentId: ASSIGN_ID,
+          shiftId: SHIFT_ID,
+          shiftDate: isoDaysFromToday(0),
+          scheduleId: SCHED_ID,
+          scheduleUnit: "ICU",
+        },
+      ]);
+      const { captured, install } = captureInserts();
+      await install();
+
+      await PUT(makeRequest({ status: "approved", approvedBy: "manager" }), {
+        params: makeParams(),
+      });
+
+      expect(captured.some((v) => v.action === "callout_logged")).toBe(true);
+      expect(mockFindCandidates).not.toHaveBeenCalled();
+      expect(captured.some((v) => v.type === "callout_posted")).toBe(false);
+    });
+
+    it("beyond the threshold: open-shift path is unchanged (open_shift_posted, not callout_posted)", async () => {
+      mockSelectGet.mockReturnValueOnce(DEF_INFO);
+      mockSelectAll.mockReturnValue([
+        {
+          assignmentId: ASSIGN_ID,
+          shiftId: SHIFT_ID,
+          shiftDate: isoDaysFromToday(20),
+          scheduleId: SCHED_ID,
+          scheduleUnit: "ICU",
+        },
+      ]);
+      mockInsertRetGet.mockReturnValue({ id: OPEN_SHIFT_ID });
+      const { captured, install } = captureInserts();
+      await install();
+
+      await PUT(makeRequest({ status: "approved", approvedBy: "manager" }), {
+        params: makeParams(),
+      });
+
+      expect(captured.some((v) => v.type === "open_shift_posted")).toBe(true);
+      expect(captured.some((v) => v.type === "callout_posted")).toBe(false);
     });
   });
 
@@ -271,7 +493,9 @@ describe("PUT /api/staff-leave/[id] — leave approval audit trail", () => {
     mockUpdateRetGet.mockReturnValue(alreadyApproved);
 
     // affectedAssignments should never be queried
-    await PUT(makeRequest({ status: "approved", approvedBy: "manager" }), { params: makeParams() });
+    await PUT(makeRequest({ status: "approved", approvedBy: "manager" }), {
+      params: makeParams(),
+    });
 
     // selectAll would only be called inside handleLeaveApproval
     expect(mockSelectAll).not.toHaveBeenCalled();

@@ -49,7 +49,9 @@ type Action =
   | "safe_harbor"
   | "acuity_changed"
   | "census_changed"
-  | "agency_called";
+  | "agency_called"
+  | "post_publish_amendment"
+  | "unpublished";
 
 export function logAuditEvent(params: {
   entityType: EntityType;

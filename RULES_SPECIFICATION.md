@@ -1,12 +1,13 @@
 # CAH Scheduler - Complete Rules Specification
 
-**Document Version:** 1.6.17
-**Last Updated:** June 12, 2026 (v1.6.17)
+**Document Version:** 1.6.18
+**Last Updated:** September 13, 2026 (v1.6.18)
 **Purpose:** This document describes all scheduling rules and logic implemented in the CAH Scheduler application. Please review and mark any rules that need modification.
 
 ---
 
 ## Table of Contents
+
 1. [Staff Attributes](#1-staff-attributes)
 2. [Shift Types](#2-shift-types)
 3. [Hard Rules (Must Not Be Violated)](#3-hard-rules-must-not-be-violated)
@@ -25,64 +26,71 @@
 ## 1. Staff Attributes
 
 ### 1.1 Roles
-| Role | Description |
-|------|-------------|
-| **RN** | Registered Nurse |
-| **LPN** | Licensed Practical Nurse |
+
+| Role    | Description                 |
+| ------- | --------------------------- |
+| **RN**  | Registered Nurse            |
+| **LPN** | Licensed Practical Nurse    |
 | **CNA** | Certified Nursing Assistant |
 
 ### 1.2 Employment Types
-| Type | Description |
-|------|-------------|
-| **Full Time** | Regular employee, typically 1.0 FTE (40 hours/week) |
-| **Part Time** | Regular employee, less than 1.0 FTE |
+
+| Type               | Description                                          |
+| ------------------ | ---------------------------------------------------- |
+| **Full Time**      | Regular employee, typically 1.0 FTE (40 hours/week)  |
+| **Part Time**      | Regular employee, less than 1.0 FTE                  |
 | **Per Diem (PRN)** | Works on-demand, must submit availability in advance |
-| **Float** | Works across multiple units, no fixed home unit |
-| **Agency** | External/contract staff |
+| **Float**          | Works across multiple units, no fixed home unit      |
+| **Agency**         | External/contract staff                              |
 
 ### 1.3 ICU Competency Levels
-| Level | Name | Description | Restrictions |
-|-------|------|-------------|--------------|
-| **1** | Novice/Orientee | New hire in orientation period | Cannot take patients alone. Must be paired with Level 5 preceptor. FTE contribution = 0 for staffing calculations. |
-| **2** | Advanced Beginner | Can handle stable patients | Can take Med-Surg/Swing Bed patients. Cannot work ICU/ER alone - must have Level 4+ supervisor on same shift. |
-| **3** | Competent | Fully functional nurse | Can take standard ICU/ER patient load. Should have ACLS/PALS certification. |
+
+| Level | Name                      | Description                                 | Restrictions                                                                                                                |
+| ----- | ------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **1** | Novice/Orientee           | New hire in orientation period              | Cannot take patients alone. Must be paired with Level 5 preceptor. FTE contribution = 0 for staffing calculations.          |
+| **2** | Advanced Beginner         | Can handle stable patients                  | Can take Med-Surg/Swing Bed patients. Cannot work ICU/ER alone - must have Level 4+ supervisor on same shift.               |
+| **3** | Competent                 | Fully functional nurse                      | Can take standard ICU/ER patient load. Should have ACLS/PALS certification.                                                 |
 | **4** | Proficient (Trauma Ready) | Experienced, can handle critical situations | TNCC certified. Can handle Codes/Trauma alone until backup arrives. **Stand-in Charge Nurse** when no Level 5 is available. |
-| **5** | Expert (Charge/Preceptor) | Most experienced | **Primary Charge Nurse** (preferred). Can precept Level 1 staff. Can take the sickest patients. Can manage the unit. |
+| **5** | Expert (Charge/Preceptor) | Most experienced                            | **Primary Charge Nurse** (preferred). Can precept Level 1 staff. Can take the sickest patients. Can manage the unit.        |
 
 ### 1.4 Other Staff Attributes
-| Attribute | Description |
-|-----------|-------------|
-| **Home Unit** | The staff member's primary assigned unit (e.g., ICU, ER, Med-Surg) |
-| **Cross-Trained Units** | Other units the staff is qualified to work in |
-| **Charge Nurse Qualified** | Whether staff can serve as the shift's charge nurse |
-| **Weekend Exempt** | If true, staff is exempt from weekend requirements (set by Admin only, for HR accommodations) |
-| **Reliability Rating** | 1-5 scale indicating historical reliability |
-| **FTE** | Full-Time Equivalent (1.0 = 40 hours/week, 0.5 = 20 hours/week) |
-| **Flex Hours YTD** | Tracks how many hours staff has been flexed home (for fair rotation) |
-| **Voluntary Flex Available** | If true, staff is willing to go home voluntarily during low census (VTO) |
+
+| Attribute                    | Description                                                                                   |
+| ---------------------------- | --------------------------------------------------------------------------------------------- |
+| **Home Unit**                | The staff member's primary assigned unit (e.g., ICU, ER, Med-Surg)                            |
+| **Cross-Trained Units**      | Other units the staff is qualified to work in                                                 |
+| **Charge Nurse Qualified**   | Whether staff can serve as the shift's charge nurse                                           |
+| **Weekend Exempt**           | If true, staff is exempt from weekend requirements (set by Admin only, for HR accommodations) |
+| **Reliability Rating**       | 1-5 scale indicating historical reliability                                                   |
+| **FTE**                      | Full-Time Equivalent (1.0 = 40 hours/week, 0.5 = 20 hours/week)                               |
+| **Flex Hours YTD**           | Tracks how many hours staff has been flexed home (for fair rotation)                          |
+| **Voluntary Flex Available** | If true, staff is willing to go home voluntarily during low census (VTO)                      |
 
 ---
 
 ## 2. Shift Types
 
 ### 2.1 Regular Shifts
-| Shift | Default Hours | Counts Toward Staffing |
-|-------|---------------|------------------------|
-| **Day** | 07:00 - 19:00 (12 hours) | Yes |
-| **Night** | 19:00 - 07:00 (12 hours) | Yes |
-| **Evening** | 13:00 - 01:00 (12 hours) | Yes |
+
+| Shift       | Default Hours            | Counts Toward Staffing |
+| ----------- | ------------------------ | ---------------------- |
+| **Day**     | 07:00 - 19:00 (12 hours) | Yes                    |
+| **Night**   | 19:00 - 07:00 (12 hours) | Yes                    |
+| **Evening** | 13:00 - 01:00 (12 hours) | Yes                    |
 
 ### 2.2 Special Shifts
-| Shift | Description | Counts Toward Staffing |
-|-------|-------------|------------------------|
+
+| Shift       | Description                                  | Counts Toward Staffing                                      |
+| ----------- | -------------------------------------------- | ----------------------------------------------------------- |
 | **On-Call** | Staff is available to be called in if needed | **No** - does not count toward census staffing requirements |
 
 ### 2.3 Acuity Levels (Set per shift by CNO/Manager)
-| Level | Meaning | Effect |
-|-------|---------|--------|
-| **Green** | Normal acuity | Standard staffing |
-| **Yellow** | Elevated acuity | +1 additional staff needed (configurable) |
-| **Red** | High acuity/crisis | +2 additional staff needed (configurable) |
+
+| Level      | Meaning            | Effect                                    |
+| ---------- | ------------------ | ----------------------------------------- |
+| **Green**  | Normal acuity      | Standard staffing                         |
+| **Yellow** | Elevated acuity    | +1 additional staff needed (configurable) |
+| **Red**    | High acuity/crisis | +2 additional staff needed (configurable) |
 
 ---
 
@@ -91,6 +99,7 @@
 Hard rules are constraints that **cannot be broken**. The scheduler will not create assignments that violate these rules.
 
 ### 3.1 Minimum Staff Per Shift
+
 - **Rule:** Each shift must meet the effective minimum staff count, which is the **maximum** of:
   1. The census-band-based requirement (blue/green/yellow/red tier, or legacy actualCensus lookup), OR the shift definition's base required count if no census band is set
   2. The unit's **absolute staffing floor** — `minStaffDay` for day shifts, `minStaffNight` for night and evening shifts
@@ -104,6 +113,7 @@ Hard rules are constraints that **cannot be broken**. The scheduler will not cre
 - **Applies to:** All shifts where `countsTowardStaffing = true`
 
 ### 3.2 Charge Nurse Required
+
 - **Rule:** If a shift requires a charge nurse, at least one assigned staff member must be marked as charge nurse for that shift, must have `isChargeNurseQualified = true`, and must have `icuCompetencyLevel ≥ 4`
 - **Competency requirement:**
   - **Level 5** is the preferred (primary) charge nurse
@@ -111,7 +121,8 @@ Hard rules are constraints that **cannot be broken**. The scheduler will not cre
   - **Levels 1–3** can never be assigned as charge, even if `isChargeNurseQualified` is set in the database (the flag alone is not sufficient)
 - **Applies to:** Shifts marked as `requiresChargeNurse = true`
 
-### 3.3 Patient-to-RN Ratio *(renamed from "Patient-to-Nurse Ratio")*
+### 3.3 Patient-to-RN Ratio _(renamed from "Patient-to-Nurse Ratio")_
+
 - **Rule:** The ratio of patients to RNs must not exceed the census band limit
 - **Standard:** 2:1 ICU standard per AACN and state law — 1 RN for every 2 patients
 - **Example:** If census band says 2:1 ratio and there are 8 patients, you need at least 4 RNs assigned
@@ -120,46 +131,55 @@ Hard rules are constraints that **cannot be broken**. The scheduler will not cre
 - **Note:** This rule only fires for shifts where `actualCensus` is set directly. Shifts using the census tier system (`censusBandId` set) satisfy the ratio by band construction — each tier's `requiredRNs` is sized to satisfy 2:1 at the peak patient count for that tier.
 
 ### 3.4 Minimum Rest Between Shifts
+
 - **Rule:** Staff must have at least **10 hours** of rest between the end of one shift and the start of the next
 - **Purpose:** Prevents fatigue and ensures safety
 - **Configurable:** Yes, default is 10 hours
 
 ### 3.5 Maximum Consecutive Days
+
 - **Rule:** Staff cannot work more than **5 consecutive days** without a day off
 - **Configurable:** Yes, default is 5 days
 
-### 3.6 ICU/ER Competency Requirement *(updated)*
+### 3.6 ICU/ER Competency Requirement _(updated)_
+
 - **Rule:** Staff assigned to **ICU or ER shifts** must have a minimum competency level of **2**
 - **Applies to:** Shifts on units whose name matches "ICU" or "ER" (case-insensitive). This rule does **not** fire for other units (e.g., Med-Surg, Float).
 - **Level 1 orientees:** Explicitly blocked from ICU/ER shifts regardless of preceptor availability. Level 1 staff may work non-ICU/ER shifts if a Level 5 preceptor is also scheduled on that shift (see §3.7).
 - **Bug fix (v1.7.2):** Prior to v1.7.2 this rule incorrectly fired for all assignments regardless of unit, which prevented Level 1 staff from being scheduled anywhere. Fixed to apply only to ICU/ER shifts.
 
-### 3.7 Level 1 Orientee: Level 5 Preceptor Required *(updated)*
+### 3.7 Level 1 Orientee: Level 5 Preceptor Required _(updated)_
+
 - **Rule:** Any Level 1 (Novice/Orientee) staff member scheduled for a **non-ICU/ER shift** must have a Level 5 (Expert/Preceptor) RN also assigned to the **same shift**
 - **Purpose:** Orientees must always have a preceptor present
 - **ICU/ER exception:** Level 1 orientees are **never** placed on ICU or ER shifts — this is enforced by the ICU/ER Competency rule (§3.6), not this rule
 
-### 3.8 Level 2 ICU/ER Supervision Required *(NEW)*
+### 3.8 Level 2 ICU/ER Supervision Required _(NEW)_
+
 - **Rule:** Level 2 (Advanced Beginner) staff working in **ICU or ER** must have at least one Level 4 or Level 5 staff member on the same shift
 - **Purpose:** Advanced beginners need supervision in critical care areas
 - **Applies to units:** ICU, ER, ED, Emergency (exact word match on unit name)
 - **Note:** Unit matching uses word-boundary comparison, not substring matching. A unit named "Med-Surg" does **not** trigger this rule — "MED-SURG" must contain one of the supervised unit names as a complete word (e.g., "ICU", "ER", "ED", "EMERGENCY"). This prevents false positives on units whose names happen to contain supervised unit abbreviations as substrings.
 
-### 3.9 No Overlapping Shifts *(NEW)*
+### 3.9 No Overlapping Shifts _(NEW)_
+
 - **Rule:** A staff member cannot be assigned to two shifts that overlap in time
 - **Example:** Cannot be assigned to Day shift (07:00-19:00) and Evening shift (13:00-01:00) on the same day
 
-### 3.10 PRN Availability *(NEW)*
+### 3.10 PRN Availability _(NEW)_
+
 - **Rule:** Per Diem (PRN) staff can **only** be scheduled on days they have marked as available
 - **Process:** PRN staff submit their availability for each schedule period (6 weeks out)
 - **Note:** If a PRN staff member has not submitted availability, they cannot be scheduled
 
-### 3.11 Staff On Leave *(NEW)*
+### 3.11 Staff On Leave _(NEW)_
+
 - **Rule:** Staff with **approved leave** cannot be scheduled during their leave period
 - **Leave Types:** Vacation, Sick, Maternity, Medical, Personal, Bereavement, Other
 - **Note:** Only approved leave blocks scheduling; pending leave requests do not
 
-### 3.12 On-Call Limits *(updated)*
+### 3.12 On-Call Limits _(updated)_
+
 - **Rule:** Staff cannot exceed on-call limits:
   - Maximum **1 on-call shift per week** (configurable)
   - Maximum **1 on-call weekend per month** (configurable)
@@ -167,7 +187,8 @@ Hard rules are constraints that **cannot be broken**. The scheduler will not cre
 - **Enforcement scope:** Enforced during auto-generation, swap approval, and **open-shift candidate recommendations**. Candidates who have already reached either limit are excluded from coverage recommendations entirely.
 - **Callout warning:** If a candidate already has a callout-replacement assignment that week (not an on-call limit, but a coverage-stacking concern), a soft warning is displayed in their recommendation so the manager can make an informed decision.
 
-### 3.13 Maximum 60 Hours in 7 Days *(NEW)*
+### 3.13 Maximum 60 Hours in 7 Days _(NEW)_
+
 - **Rule:** Staff cannot work more than **60 hours** in any rolling 7-day period
 - **Calculation:** The system checks **all 7 rolling windows that contain the candidate shift date** — not just the backward-looking window — to correctly account for shifts already assigned on future dates. This is important because the scheduler processes the most-constrained shifts first, which may place future-dated assignments before earlier-dated ones are processed.
 - **Purpose:** Safety limit to prevent extreme fatigue
@@ -178,13 +199,15 @@ Hard rules are constraints that **cannot be broken**. The scheduler will not cre
 
 Soft rules are **preferences** that the scheduler tries to optimize. Violations incur penalty scores, and the scheduler tries to minimize total penalties. These can be overridden by managers when necessary.
 
-### 4.1 Overtime *(UPDATED)*
+### 4.1 Overtime _(UPDATED)_
+
 **Previous Logic (Incorrect):** Any hours over (FTE × 40) counted as overtime; violation was attached staff-level (not to a specific shift)
 
 **Current Logic:**
-| Scenario | Rule Name | Penalty Level | Example |
-|----------|-----------|---------------|---------|
-| Hours > 40 in a week | **"Overtime"** | **HIGH** (cost) | A 1.0 FTE nurse working 44h = 4h OT at 1.5× pay |
+
+| Scenario                    | Rule Name                   | Penalty Level        | Example                                                               |
+| --------------------------- | --------------------------- | -------------------- | --------------------------------------------------------------------- |
+| Hours > 40 in a week        | **"Overtime"**              | **HIGH** (cost)      | A 1.0 FTE nurse working 44h = 4h OT at 1.5× pay                       |
 | Hours > (FTE × 40) but ≤ 40 | **"Extra Hours Above FTE"** | **LOW** (preference) | A 0.9 FTE nurse (36h/week) working 40h = 4 extra hours at regular pay |
 
 **Why two separate rule names?**
@@ -195,10 +218,12 @@ Only hours above 40 trigger FLSA 1.5× overtime pay — a direct payroll cost in
 **Violation Attribution:** Each violation is emitted on the **specific shift that crosses or extends past the threshold**. For actual overtime, only the one shift that first pushes past 40h is flagged (once per week). For extra hours, every shift in the above-FTE zone is flagged with its marginal contribution, so managers can see which assignments are compounding the over-scheduling.
 
 **Penalty Weights:**
+
 - Actual OT (>40h): Weight = 1.0 (normalized so 12h OT = 1.0 penalty)
 - Extra hours (above FTE, ≤40h): Weight = 0.3
 
-### 4.2 Weekend Shifts Required *(UPDATED)*
+### 4.2 Weekend Shifts Required _(UPDATED)_
+
 - **Rule:** Each staff member must work a minimum number of weekend rotations per schedule period
 - **Default:** 3 weekend rotations per 6-week schedule
 - **Configurable:** Yes, per unit
@@ -207,13 +232,15 @@ Only hours above 40 trigger FLSA 1.5× overtime pay — a direct payroll cost in
 
 **How violations are raised (current logic):**
 The rule flags assignments **beyond** the required count — i.e., excess weekend rotations — rather than flagging a shortfall. Assignments up to the required count are accepted without penalty. Each assignment beyond that limit generates one violation, attached to that specific shift. This means:
+
 - The violation appears on the exact shift that is "one too many", making it easy to identify which assignment to remove or swap
 - A staff member with exactly the required number of weekend rotations has zero violations — they are meeting the target
 - A staff member with fewer than the required count has no violation either; shortfall is handled through the scheduler's optimisation pressure (preferring to assign that person on weekends when possible), not through explicit penalties
 
 **Penalty per excess rotation:** 0.5 per weekend rotation beyond the required count
 
-### 4.3 Consecutive Weekends Penalty *(UPDATED v1.7.7)*
+### 4.3 Consecutive Weekends Penalty _(UPDATED v1.7.7)_
+
 - **Rule:** Penalize staff who work more than the maximum consecutive weekends
 - **Default Maximum:** 2 consecutive weekends
 - **Penalty formula:** `weight × (0.5 + excess × 0.5)` where `excess = streak − maxConsecutive`
@@ -221,16 +248,17 @@ The rule flags assignments **beyond** the required count — i.e., excess weeken
 - **Weekend definition:** Saturday and Sunday of the same calendar weekend count as **one weekend**, not two. Working both days of the same weekend does not increment the consecutive weekend counter twice.
 - **Penalty escalation (FAIR variant, weight = 15.0):**
 
-| Streak | Excess | Penalty |
-|--------|--------|---------|
-| 3 | 1 | 15 × 1.0 = **15 pts** |
-| 4 | 2 | 15 × 1.5 = **22.5 pts** |
-| 5 | 3 | 15 × 2.0 = **30 pts** |
-| 6 | 4 | 15 × 2.5 = **37.5 pts** |
+| Streak | Excess | Penalty                 |
+| ------ | ------ | ----------------------- |
+| 3      | 1      | 15 × 1.0 = **15 pts**   |
+| 4      | 2      | 15 × 1.5 = **22.5 pts** |
+| 5      | 3      | 15 × 2.0 = **30 pts**   |
+| 6      | 4      | 15 × 2.5 = **37.5 pts** |
 
 - **Streak scan horizon (v1.7.7):** The backward and forward look-ahead spans `schedulePeriodWeeks` (default 6) weeks, not `maxConsecutive` (2). Prior to v1.7.7 the scan was bounded at 2 iterations, making streaks of 4–5 consecutive weekends appear identical to streak=3 in the penalty calculation.
 
-### 4.4 Holiday Fairness *(UPDATED)*
+### 4.4 Holiday Fairness _(UPDATED)_
+
 - **Rule:** Holiday shifts should be distributed fairly among staff **annually** (not per schedule period)
 - **Tracking:** System maintains `staff_holiday_assignment` table to track yearly holiday assignments
 - **Holiday Grouping:** Certain holidays are grouped together as one:
@@ -241,6 +269,7 @@ The rule flags assignments **beyond** the required count — i.e., excess weeken
 - **Holidays Tracked:** New Year's Day, MLK Day, Presidents' Day, Memorial Day, Independence Day, Labor Day, Thanksgiving, Christmas (Eve + Day combined)
 
 ### 4.5 Staff Preference Match
+
 - **Rule:** Try to match staff to their preferred shifts and days
 - **Preferences Tracked:**
   - Preferred shift type (Day, Night, Evening, Any)
@@ -250,16 +279,18 @@ The rule flags assignments **beyond** the required count — i.e., excess weeken
   - Preferred pattern (e.g., "3on-4off", "4on-3off")
 - **Penalty:** Applied when assignments don't match preferences
 
-### 4.6 Float Penalty *(NEW)*
+### 4.6 Float Penalty _(NEW)_
+
 - **Rule:** Minimize floating staff to units other than their home unit
 - **Penalty Levels:**
-  | Scenario | Penalty |
-  |----------|---------|
-  | Float to unit where staff IS cross-trained | Low (0.3) |
+  | Scenario                                       | Penalty    |
+  | ---------------------------------------------- | ---------- |
+  | Float to unit where staff IS cross-trained     | Low (0.3)  |
   | Float to unit where staff is NOT cross-trained | High (1.0) |
 - **Purpose:** Staff prefer working in familiar environments; cross-training makes floating less disruptive
 
-### 4.7 Charge Nurse Distribution *(NEW)*
+### 4.7 Charge Nurse Distribution _(NEW)_
+
 - **Rule:** Prevent too many charge-qualified nurses from clustering on the same shift
 - **Logic:**
   1. Calculate average charge-qualified nurses per shift
@@ -268,6 +299,7 @@ The rule flags assignments **beyond** the required count — i.e., excess weeken
 - **Purpose:** Keep charge nurses distributed so there's backup coverage across shifts
 
 ### 4.8 Skill Mix Diversity
+
 - **Rule:** Each shift should have a mix of experience levels
 - **Purpose:** Avoid having all senior or all junior staff on one shift
 - **Penalty:** Applied when skill mix is unbalanced
@@ -278,21 +310,21 @@ The rule flags assignments **beyond** the required count — i.e., excess weeken
 
 Each unit (ICU, ER, Med-Surg, etc.) can have its own configuration:
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| **Weekend Rule Type** | "count_per_period" or "alternate_weekends" | count_per_period |
-| **Weekend Shifts Required** | Number of weekend shifts required per schedule period | 3 |
-| **Schedule Period Weeks** | Length of scheduling period in weeks | 6 |
-| **Holiday Shifts Required** | Minimum holiday shifts per period | 1 |
-| **Max Consecutive Weekends** | Maximum consecutive weekends before penalty | 2 |
-| **Escalation Sequence** | Order to try when filling callouts | Float → Per Diem → Overtime → Agency |
-| **Min Staff — Day Shift** | Absolute staffing floor for day shifts regardless of census | 3 |
-| **Min Staff — Night/Evening Shift** | Absolute staffing floor for night/evening shifts regardless of census | 2 |
-| **Low Census Order** | Order to send home during low census | Voluntary → Overtime → Per Diem → Full Time |
-| **Callout Threshold Days** | Days before shift to classify as callout vs open shift | 7 |
-| **OT Approval Threshold** | Hours of OT requiring CNO approval | 4 |
-| **Max On-Call Per Week** | Maximum on-call shifts per week | 1 |
-| **Max On-Call Weekends Per Month** | Maximum on-call weekends per month | 1 |
+| Setting                             | Description                                                           | Default                                     |
+| ----------------------------------- | --------------------------------------------------------------------- | ------------------------------------------- |
+| **Weekend Rule Type**               | "count_per_period" or "alternate_weekends"                            | count_per_period                            |
+| **Weekend Shifts Required**         | Number of weekend shifts required per schedule period                 | 3                                           |
+| **Schedule Period Weeks**           | Length of scheduling period in weeks                                  | 6                                           |
+| **Holiday Shifts Required**         | Minimum holiday shifts per period                                     | 1                                           |
+| **Max Consecutive Weekends**        | Maximum consecutive weekends before penalty                           | 2                                           |
+| **Escalation Sequence**             | Order to try when filling callouts                                    | Float → Per Diem → Overtime → Agency        |
+| **Min Staff — Day Shift**           | Absolute staffing floor for day shifts regardless of census           | 3                                           |
+| **Min Staff — Night/Evening Shift** | Absolute staffing floor for night/evening shifts regardless of census | 2                                           |
+| **Low Census Order**                | Order to send home during low census                                  | Voluntary → Overtime → Per Diem → Full Time |
+| **Callout Threshold Days**          | Days before shift to classify as callout vs open shift                | 7                                           |
+| **OT Approval Threshold**           | Hours of OT requiring CNO approval                                    | 4                                           |
+| **Max On-Call Per Week**            | Maximum on-call shifts per week                                       | 1                                           |
+| **Max On-Call Weekends Per Month**  | Maximum on-call weekends per month                                    | 1                                           |
 
 ---
 
@@ -304,12 +336,12 @@ Census bands define staffing requirements based on patient count:
 
 The census system uses four color tiers. Each tier's `requiredRNs` is sized to satisfy the 2:1 RN:patient ratio at the **peak** patient count for that tier. The manager selects a tier on the **Daily Census page** (`/census`); the system applies the band's staffing requirements directly.
 
-| Tier | Color | Patients | Required RNs | Required LPNs | Required CNAs | Charge Nurses (in RN count) | Ratio |
-|------|-------|----------|--------------|---------------|---------------|-----------------------------|-------|
-| Blue | 🔵 Low Census | 1-4 | 2 | 0 | 0 | 1 | 2:1 |
-| Green | 🟢 Normal | 5-8 | 4 | 0 | 1 | 1 | 2:1 |
-| Yellow | 🟡 Elevated | 9-10 | 5 | 0 | 1 | 1 | 2:1 |
-| Red | 🔴 Critical | 11-12 | 6 | 0 | 2 | 1 | 2:1 |
+| Tier   | Color         | Patients | Required RNs | Required LPNs | Required CNAs | Charge Nurses (in RN count) | Ratio |
+| ------ | ------------- | -------- | ------------ | ------------- | ------------- | --------------------------- | ----- |
+| Blue   | 🔵 Low Census | 1-4      | 2            | 0             | 0             | 1                           | 2:1   |
+| Green  | 🟢 Normal     | 5-8      | 4            | 0             | 1             | 1                           | 2:1   |
+| Yellow | 🟡 Elevated   | 9-10     | 5            | 0             | 1             | 1                           | 2:1   |
+| Red    | 🔴 Critical   | 11-12    | 6            | 0             | 2             | 1                           | 2:1   |
 
 **Note:** Patient-to-nurse ratio is RN-only for ICU per AACN standard. LPNs do NOT count toward this ratio (scope-of-practice restriction: no IV push, no admissions, no blood administration in ICU). Census bands are viewable and editable under **Rules → Census Bands** tab.
 
@@ -323,13 +355,17 @@ The system handles coverage needs differently based on timing:
 
 When a staff member calls out or leave is approved within the callout threshold (default: 7 days), the system creates a **Callout** record. The manager follows the escalation sequence manually.
 
+**Nurse notification (v1.6.18):** if the callout's shift is at least **1 full day** away, every nurse who passes the hard rules for that shift (the same eligibility filter as the open-shift board, excluding agency placeholders and the nurse whose leave caused it) receives an in-app **"Urgent: shift needs coverage"** notification asking them to tell their manager if they can cover. There is no open-shift row to raise a hand on — the manager confirms the fill through the callout. Same-day (0 days) and past-dated callouts send no notification. Callouts beyond the threshold follow the open-shift path (§7.2) and post an "Open shift you could pick up" notification instead.
+
 **Default Escalation Sequence:**
+
 1. **Float Pool** - Check if float staff are available
 2. **Per Diem (PRN)** - Contact available per diem staff
 3. **Overtime** - Offer overtime to regular staff
 4. **Agency** - Call agency as last resort
 
 **Callout Reasons Tracked:**
+
 - Sick
 - Family Emergency
 - Personal
@@ -337,15 +373,17 @@ When a staff member calls out or leave is approved within the callout threshold 
 - Other
 
 **Callout Statuses:**
+
 - **Open** - Not yet filled
 - **Filled** - Replacement found
 - **Unfilled Approved** - Approved to run short-staffed
 
-### 7.2 Coverage Requests (Advance Notice - Beyond 7 Days) *(NEW in v1.2.1)*
+### 7.2 Coverage Requests (Advance Notice - Beyond 7 Days) _(NEW in v1.2.1)_
 
 When leave is approved more than 7 days before the shift, the system **automatically finds replacement candidates** and presents them for manager approval.
 
 **Automatic Candidate Finding Process:**
+
 1. System searches for available staff following the escalation ladder
 2. For each potential candidate, the system checks:
    - Availability (not on leave, not already assigned)
@@ -356,14 +394,16 @@ When leave is approved more than 7 days before the shift, the system **automatic
 3. Top 3 candidates are ranked and presented with reasons
 
 **Candidate Ranking Criteria:**
-| Source | Priority Score | Notes |
-|--------|---------------|-------|
-| Float Pool | Highest (100+) | Designed for coverage |
-| PRN (Available) | High (80+) | Marked date as available |
-| Regular Staff (OT) | Medium (60+) | Overtime may apply |
-| Agency | Lowest (10) | External, highest cost |
+
+| Source             | Priority Score | Notes                    |
+| ------------------ | -------------- | ------------------------ |
+| Float Pool         | Highest (100+) | Designed for coverage    |
+| PRN (Available)    | High (80+)     | Marked date as available |
+| Regular Staff (OT) | Medium (60+)   | Overtime may apply       |
+| Agency             | Lowest (10)    | External, highest cost   |
 
 **Within each source, candidates are ranked by:**
+
 - Unit qualification (home unit > cross-trained)
 - Competency level (higher = better)
 - Reliability rating (1-5 scale)
@@ -371,6 +411,7 @@ When leave is approved more than 7 days before the shift, the system **automatic
 
 **Reasons Provided for Each Candidate:**
 Each candidate recommendation includes explanatory reasons such as:
+
 - "Float pool staff - designed for coverage"
 - "Cross-trained for ICU"
 - "PRN staff - marked available for this date"
@@ -379,6 +420,7 @@ Each candidate recommendation includes explanatory reasons such as:
 - "Low flex hours YTD (fair distribution)"
 
 **Coverage Request Statuses:**
+
 - **Pending Approval** - Waiting for manager to select a candidate
 - **Approved** - Manager approved, assignment created
 - **Filled** - Assignment confirmed and active
@@ -392,6 +434,7 @@ Each candidate recommendation includes explanatory reasons such as:
 When census drops and staff need to be sent home, follow this order:
 
 ### Default Low Census Order:
+
 1. **Voluntary (VTO)** - Staff who have indicated willingness to go home (Voluntary Time Off)
 2. **Overtime** - Send home staff on OT
 3. **Per Diem** - Send home PRN staff
@@ -400,12 +443,14 @@ When census drops and staff need to be sent home, follow this order:
 **Note:** Agency staff are not included in the low census order because agency contracts typically guarantee minimum hours. Sending agency home may still incur costs.
 
 ### Voluntary Time Off (VTO):
+
 - Staff can indicate they are "Available for VTO" via the Staff page
 - These staff are prioritized first when low census requires sending people home
 - VTO is voluntary and based on staff preference
 - VTO indicator can be toggled on/off by staff or managers
 
 ### Flex Tracking:
+
 - System tracks flex hours year-to-date per staff member
 - Used to ensure fair rotation of who gets sent home
 - Staff with fewer flex hours YTD are more likely to be flexed next
@@ -417,32 +462,35 @@ When census drops and staff need to be sent home, follow this order:
 
 Each assignment (staff → shift) tracks:
 
-| Attribute | Description |
-|-----------|-------------|
-| **Is Charge Nurse** | Whether this person is charge for this shift |
-| **Is Overtime** | Whether this assignment is overtime |
-| **Assignment Source** | How the assignment was created: Manual, Auto-Generated, Swap, Callout Replacement, Float, Agency Manual, Pull Back |
-| **Is Float** | Whether staff is working outside their home unit |
-| **Float From Unit** | Original unit if floating |
-| **Safe Harbor Invoked** | If nurse accepted assignment under protest (Texas law) |
-| **Agency Reason** | For agency: Callout, Acuity Spike, or Vacancy |
-| **Status** | Assigned, Confirmed, Called Out, Swapped, Cancelled, Flexed |
+| Attribute               | Description                                                                                                        |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Is Charge Nurse**     | Whether this person is charge for this shift                                                                       |
+| **Is Overtime**         | Whether this assignment is overtime                                                                                |
+| **Assignment Source**   | How the assignment was created: Manual, Auto-Generated, Swap, Callout Replacement, Float, Agency Manual, Pull Back |
+| **Is Float**            | Whether staff is working outside their home unit                                                                   |
+| **Float From Unit**     | Original unit if floating                                                                                          |
+| **Safe Harbor Invoked** | If nurse accepted assignment under protest (Texas law)                                                             |
+| **Agency Reason**       | For agency: Callout, Acuity Spike, or Vacancy                                                                      |
+| **Status**              | Assigned, Confirmed, Called Out, Swapped, Cancelled, Flexed                                                        |
 
 ---
 
 ## 10. Special Features
 
 ### 10.1 Shift Swap Requests
+
 - Staff can request to swap shifts with each other
 - Swaps require manager approval
 - System validates that swap doesn't violate hard rules
 
 ### 10.2 Safe Harbor (Texas Law)
+
 - Nurses can accept an assignment "under protest" if they feel it's unsafe
 - This is tracked for legal/compliance purposes
 - Links to a Safe Harbor form ID
 
 ### 10.3 Sitters
+
 - Each shift can specify number of 1:1 sitters needed
 - Sitters add to CNA requirements
 
@@ -454,37 +502,38 @@ The CAH Scheduler application provides the following pages for managing scheduli
 
 ### 11.1 Main Pages
 
-| Page | URL | Description |
-|------|-----|-------------|
-| **Setup** | `/setup` | Import data from Excel - upload staff, units, and holidays from a spreadsheet |
-| **Dashboard** | `/dashboard` | Overview of current schedule status, pending items, and key metrics |
-| **Staff** | `/staff` | Manage all staff members - add, edit, view competency levels, employment types, certifications |
-| **Schedule** | `/schedule` | View and edit the schedule grid, make assignments, see coverage |
-| **Scenarios** | `/scenarios` | Compare different scheduling scenarios and their scores |
-| **Callouts** | `/callouts` | Log and manage staff callouts, track replacements and escalation |
-| **Coverage** | `/open-shifts` | Review and approve replacement candidates for shifts needing coverage (auto-recommended by system) |
-| **Audit Trail** | `/audit` | View all changes made to the system with timestamps and details |
+| Page            | URL            | Description                                                                                        |
+| --------------- | -------------- | -------------------------------------------------------------------------------------------------- |
+| **Setup**       | `/setup`       | Import data from Excel - upload staff, units, and holidays from a spreadsheet                      |
+| **Dashboard**   | `/dashboard`   | Overview of current schedule status, pending items, and key metrics                                |
+| **Staff**       | `/staff`       | Manage all staff members - add, edit, view competency levels, employment types, certifications     |
+| **Schedule**    | `/schedule`    | View and edit the schedule grid, make assignments, see coverage                                    |
+| **Scenarios**   | `/scenarios`   | Compare different scheduling scenarios and their scores                                            |
+| **Callouts**    | `/callouts`    | Log and manage staff callouts, track replacements and escalation                                   |
+| **Coverage**    | `/open-shifts` | Review and approve replacement candidates for shifts needing coverage (auto-recommended by system) |
+| **Audit Trail** | `/audit`       | View all changes made to the system with timestamps and details                                    |
 
 ### 11.2 Request Management Pages
 
-| Page | URL | Description |
-|------|-----|-------------|
-| **Leave Management** | `/leave` | View, approve, or deny leave requests (vacation, sick, maternity, etc.). Create new leave requests for staff. Filter by status: All, Pending, Approved, Denied. **When leave is approved, affected shifts automatically have replacement candidates found.** |
-| **Coverage** | `/open-shifts` | Review auto-recommended replacement candidates for shifts needing coverage. Shows top 3 candidates with reasons. Manager approves one candidate to auto-create the assignment. Filter by: Pending, Filled, Cancelled, All. |
-| **Shift Swaps** | `/swaps` | View, approve, or deny shift swap requests between staff. Shows requesting staff, their shift, target staff, and target shift. |
-| **PRN Availability** | `/availability` | View per-diem (PRN) staff availability submissions. See which dates each PRN staff is available. Highlights staff who haven't submitted availability yet. |
+| Page                 | URL             | Description                                                                                                                                                                                                                                                  |
+| -------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Leave Management** | `/leave`        | View, approve, or deny leave requests (vacation, sick, maternity, etc.). Create new leave requests for staff. Filter by status: All, Pending, Approved, Denied. **When leave is approved, affected shifts automatically have replacement candidates found.** |
+| **Coverage**         | `/open-shifts`  | Review auto-recommended replacement candidates for shifts needing coverage. Shows top 3 candidates with reasons. Manager approves one candidate to auto-create the assignment. Filter by: Pending, Filled, Cancelled, All.                                   |
+| **Shift Swaps**      | `/swaps`        | View, approve, or deny shift swap requests between staff. Shows requesting staff, their shift, target staff, and target shift.                                                                                                                               |
+| **PRN Availability** | `/availability` | View per-diem (PRN) staff availability submissions. See which dates each PRN staff is available. Highlights staff who haven't submitted availability yet.                                                                                                    |
 
 ### 11.3 Configuration Pages
 
-| Page | URL | Description |
-|------|-----|-------------|
-| **Rules** | `/rules` | View and configure scheduling rules (hard rules and soft rules with penalties) |
-| **Unit Configuration** | `/settings/units` | Configure per-unit settings including: weekend shift requirements, holiday requirements, callout escalation order, low census order, acuity staffing levels, OT approval thresholds, on-call limits |
-| **Holidays** | `/settings/holidays` | Manage public holidays that affect scheduling. Add standard US holidays with one click. Holidays affect fairness calculations. |
+| Page                   | URL                  | Description                                                                                                                                                                                         |
+| ---------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Rules**              | `/rules`             | View and configure scheduling rules (hard rules and soft rules with penalties)                                                                                                                      |
+| **Unit Configuration** | `/settings/units`    | Configure per-unit settings including: weekend shift requirements, holiday requirements, callout escalation order, low census order, acuity staffing levels, OT approval thresholds, on-call limits |
+| **Holidays**           | `/settings/holidays` | Manage public holidays that affect scheduling. Add standard US holidays with one click. Holidays affect fairness calculations.                                                                      |
 
 ### 11.4 Navigation
 
 All pages are accessible from the left sidebar. The navigation order is:
+
 1. Dashboard
 2. Staff
 3. Schedule
@@ -502,23 +551,23 @@ All pages are accessible from the left sidebar. The navigation order is:
 
 ### 11.5 Common Actions
 
-| Action | Where | How |
-|--------|-------|-----|
-| **Import Data from Excel** | `/setup` | Download template, fill with your data, upload, review preview, click "Import Data" |
-| **Download Excel Template** | `/setup` | Click "Download Template" to get pre-formatted spreadsheet |
-| **Approve/Deny Leave** | `/leave` | Click "Approve" or "Deny" button on pending requests. Approval auto-finds replacement candidates for affected assignments. |
-| **Approve Coverage** | `/open-shifts` | Click "Review" to see top 3 candidates with reasons, then click "Approve" on your choice |
-| **View Staff Calendar** | `/staff` | Click on a staff member's name to see their day-by-day calendar view |
-| **Approve/Deny Swap** | `/swaps` | Click "Approve" or "Deny" button on pending swap requests |
-| **Create Leave Request** | `/leave` | Click "New Leave Request" button, fill form |
-| **View PRN Availability** | `/availability` | See calendar of available dates per PRN staff |
-| **Configure Unit Rules** | `/settings/units` | Click "Edit" on a unit to modify its scheduling rules |
-| **Add Holidays** | `/settings/holidays` | Click "Add Standard Holidays" for US holidays or "Add Holiday" for custom |
-| **Log Callout** | `/callouts` | Click "Log Callout" and follow escalation workflow |
-| **View Audit History** | `/audit` | Filter by action type, date range, or entity |
-| **Set Shift Census Tier** | `/census` | Go to the Daily Census page, pick the date, and select a color tier (Blue/Green/Yellow/Red) per shift — staffing requirements update immediately |
-| **View Staff Preferences** | `/staff` | Click on a staff member's name to open detail dialog - see shift preferences, max hours, preferred days off, etc. |
-| **Export Data to Excel** | `/setup` | Click "Export Data" to download current database data (Staff, Units, Holidays, Census Bands) as Excel file |
+| Action                      | Where                | How                                                                                                                                              |
+| --------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Import Data from Excel**  | `/setup`             | Download template, fill with your data, upload, review preview, click "Import Data"                                                              |
+| **Download Excel Template** | `/setup`             | Click "Download Template" to get pre-formatted spreadsheet                                                                                       |
+| **Approve/Deny Leave**      | `/leave`             | Click "Approve" or "Deny" button on pending requests. Approval auto-finds replacement candidates for affected assignments.                       |
+| **Approve Coverage**        | `/open-shifts`       | Click "Review" to see top 3 candidates with reasons, then click "Approve" on your choice                                                         |
+| **View Staff Calendar**     | `/staff`             | Click on a staff member's name to see their day-by-day calendar view                                                                             |
+| **Approve/Deny Swap**       | `/swaps`             | Click "Approve" or "Deny" button on pending swap requests                                                                                        |
+| **Create Leave Request**    | `/leave`             | Click "New Leave Request" button, fill form                                                                                                      |
+| **View PRN Availability**   | `/availability`      | See calendar of available dates per PRN staff                                                                                                    |
+| **Configure Unit Rules**    | `/settings/units`    | Click "Edit" on a unit to modify its scheduling rules                                                                                            |
+| **Add Holidays**            | `/settings/holidays` | Click "Add Standard Holidays" for US holidays or "Add Holiday" for custom                                                                        |
+| **Log Callout**             | `/callouts`          | Click "Log Callout" and follow escalation workflow                                                                                               |
+| **View Audit History**      | `/audit`             | Filter by action type, date range, or entity                                                                                                     |
+| **Set Shift Census Tier**   | `/census`            | Go to the Daily Census page, pick the date, and select a color tier (Blue/Green/Yellow/Red) per shift — staffing requirements update immediately |
+| **View Staff Preferences**  | `/staff`             | Click on a staff member's name to open detail dialog - see shift preferences, max hours, preferred days off, etc.                                |
+| **Export Data to Excel**    | `/setup`             | Click "Export Data" to download current database data (Staff, Units, Holidays, Census Bands) as Excel file                                       |
 
 ---
 
@@ -542,53 +591,54 @@ Please review each section and note any changes needed:
 
 ## Changelog
 
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.6.17 | Jun 12, 2026 | **New soft rule: Weekend-Exempt Staff Protection (§4).** `weekendExempt` remains a quota exemption (not a hard ban), but scheduling an exempt nurse on a Saturday/Sunday is now a soft violation: the generator deprioritises them for weekend slots (deterrent = preference weight × 1.5) and the `weekend-exempt` evaluator (default weight 4.0) flags any weekend assignment in the violations panel. Decision: soft for now; may be promoted to a hard rule if customer contracts require an outright ban. Existing databases must add the rule row via the Rules UI (evaluator id `weekend-exempt`). |
-| 1.6.16 | Jun 12, 2026 | **Cross-workflow integrity:** approving leave now automatically denies pending swap requests that reference the cancelled assignments (auditable as `swap_denied` by system); leave approval is protected against double-submission; PRN availability records cannot be deleted while the nurse has active assignments on submitted dates; stuck schedule-generation jobs are auto-reclaimed after 10 minutes. No rule thresholds or penalties changed. | **Hard rules enforced on manual paths (§3):** swap approval now checks the 60h rolling window (§3.13) and max consecutive days (§3.5), and refuses swaps whose underlying assignments were cancelled or called out; open-shift approval/fill and callout fill re-run the availability hard checks at the moment of fill. **Cross-boundary enforcement (§3.4, §3.5, §3.13):** the scheduler and the rest-hours/max-consecutive evaluators now see the 7 days of assignments before the schedule period starts, closing the gap where a nurse could work 6+ consecutive days or get <10h rest across a schedule boundary. **ICU/ER unit matching (§3.6, §3.8):** evaluators and scheduler share one matcher; "ED", "Emergency", and compound unit names are now consistently treated as supervised units. | **On-call limits (§3.12) evaluator aligned with scheduler:** weeks are now identified by their Monday date (Mon–Sun), closing a gap where two on-call shifts in the Dec 28 – Jan 3 week were never flagged; weekends are identified by Saturday date so Sat+Sun of one weekend counts as ONE weekend toward the monthly limit. **Timezone safety:** all date-only arithmetic (week starts, weekend IDs, rolling 60h windows, shift-day enumeration, holiday year) is now UTC-based; previously, deployment on a server west of UTC (e.g. America/Chicago) shifted week boundaries and duplicated the DST spring-forward day's shifts. No intended rule semantics changed. |
-| 1.6.13 | Jun 12, 2026 | **Superseded evaluators deregistered:** `overtime-cost` (§4.1) and `weekend-fairness` (§4.2) can no longer be activated via rule rows — they were replaced by `overtime-v2` and `weekend-count`/`consecutive-weekends` and would have double-penalized the same hours/weekends if re-enabled. **Published-schedule guards:** regenerating a schedule or adding/removing assignments now requires the schedule to be unpublished first (HTTP 409 otherwise). No active rule behavior changed. |
-| 1.0 | Feb 2026 | Initial document with all rules and configuration options |
-| 1.1 | Feb 13, 2026 | Added Section 11 (Application UI Guide) documenting all available pages: Leave Management, Shift Swaps, PRN Availability, Unit Configuration, and Holidays Management |
-| 1.2 | Feb 15, 2026 | **Major updates based on expert feedback:** (1) Holiday fairness now tracks annually, Christmas Eve/Day merged as one holiday; (2) Low census order updated - removed Agency, added Voluntary Time Off (VTO); (3) Added Coverage page for managing shifts needing coverage; (4) Leave approval now auto-creates coverage requests for affected assignments; (5) Staff page now shows clickable calendar view for each staff member; (6) Added callout threshold days configuration |
-| 1.2.1 | Feb 15, 2026 | **Coverage auto-fill workflow:** Leave approval (> 7 days) now automatically finds top 3 replacement candidates instead of creating manual open shifts. Each candidate includes reasons (e.g., "Cross-trained for ICU", "High reliability"). Manager reviews and approves, assignment is auto-created. Renamed "Open Shifts" to "Coverage" in navigation. |
-| 1.2.2 | Feb 16, 2026 | **Census & Preferences visibility:** (1) Census input added to shift assignment dialog - determines required staffing via census bands; (2) Staff count display fixed to show scheduled/required based on census; (3) Staff detail dialog now shows shift preferences; (4) Census Bands added to Excel import/export |
-| 1.2.3 | Feb 18, 2026 | **Staff preferences in Excel:** Staff preferences can now be imported/exported via Excel. New columns in Staff sheet: Preferred Shift, Preferred Days Off, Max Consecutive Days, Max Hours Per Week, Avoid Weekends |
-| 1.3.0 | Feb 20, 2026 | **Section 12 added:** Scheduling Algorithm — describes greedy construction, local search, three weight profiles, hard rule eligibility, soft penalty scoring, understaffing handling, and audit behavior for automated schedule generation |
-| 1.4.0 | Feb 20, 2026 | **Charge nurse competency (§1.3, §3.2):** Level 4+ is now a hard requirement for charge nurse assignment. Level 5 is the preferred primary charge; Level 4 is stand-in only. `isChargeNurseQualified` flag alone is insufficient for levels 1–3. **60h rolling window (§3.13):** System now checks all 7 windows containing the shift date, not just the backward-looking window, to catch violations caused by future shifts assigned earlier in the greedy pass. |
-| 1.4.2 | Feb 20, 2026 | **Overtime rule (§4.1):** Violations now attach to the specific shift that crosses the threshold, not staff-level. Agency/on-demand staff with FTE = 0 are exempt. **Weekend rule (§4.2):** Logic flipped from flagging shortfall to flagging excess assignments beyond the required count; each excess assignment is flagged with a shift-specific violation. Both changes make the violations panel actionable — each flagged shift shows exactly which assignment to review. |
-| 1.4.3 | Feb 22, 2026 | **Balanced OT weight (§12.5):** Raised from 1.0 to 1.5 so actual overtime is consistently more expensive than any single preference violation, matching the real 1.5× payroll cost. **Capacity-spreading bonus (§12.4):** Small incentive added to prefer less-loaded staff as a tiebreaker, reducing overtime accumulation on regular staff and preserving float pool capacity. |
-| 1.4.4 | Feb 22, 2026 | **Assignment dialog charge validation (§3.2):** `needsCharge` condition now requires Level 4+ (not just any `isChargeNurse` flag). "Assign as Charge" button is gated to Level 4+ nurses. Assigning a new charge nurse demotes any previous charge on the same shift so the hard violation resolves immediately. |
-| 1.4.10 | Feb 22, 2026 | **Local search collective constraint guards (§12.2):** Two gaps in `isSwapValid` allowed the local search to undo repair-phase fixes. (1) Non-charge-qualified staff could inherit `isChargeNurse = true` via object spread. (2) Swapping a Level 4+ nurse out of an ICU/ER shift could leave Level 2 nurses without supervision. Both are now blocked before individual `passesHardRules` checks run. |
-| 1.4.5 | Feb 22, 2026 | **Charge protection guard (§12.2):** Look-ahead added to greedy Pass 2 — Level 4+ nurses are protected from regular slots when they are the sole remaining charge candidate for an upcoming ICU/ER shift within 7 days. Eliminates Sunday hard violations in the FAIR schedule caused by the low overtime weight exhausting charge nurses. **PRN availability (§3.10):** Lookup broadened to aggregate across all schedule submissions; standing availability is honoured by any new schedule covering the same dates. **Cost-Optimized float weight (§12.5):** Corrected 3.0 → 2.0 to reflect that float differentials cost less than overtime. |
-| 1.4.6 | Feb 22, 2026 | **Agency penalty added (§12.4, §12.5):** New `agency` weight component applies a flat penalty whenever an agency nurse is considered for a slot. Ensures the scheduler exhausts regular, float, and PRN pools before drawing on agency (markup 2–3× base pay). Weights: Balanced 2.5, Fairness-Optimized 1.5, Cost-Optimized 5.0. **PRN Available Days column in Excel (§3.10):** Import template and export now include a "PRN Available Days" column for per_diem staff. Accepted formats: comma-separated day abbreviations (e.g. "Mon, Wed, Fri"), "Weekdays", "Weekends", or "All". Importing this column auto-creates `prn_availability` records spanning the next 12 months — PRN staff are immediately usable in auto-generated schedules without a manual availability submission step. |
-| 1.4.7 | Feb 22, 2026 | **Weekend ICU charge shifts prioritised first in greedy (§12.2):** Weekend charge slots (Sat/Sun) were previously sorted after all weekday charge slots (earliest date first within priority 1). In the FAIR profile — where the low overtime weight allows charge nurses to accumulate hours freely Mon–Fri — this meant weekend slots arrived last with the charge pool already near its 60h rolling limit. Splitting priority 1 into weekend-ICU-charge (new priority 1) and weekday-ICU-charge (priority 2) ensures Sat/Sun charge shifts get first pick of Level 4+ nurses before any weekday shift has consumed their capacity. Applies to all three schedule variants; Balanced and Cost-Optimized are unaffected in practice because their higher overtime penalties already prevent charge-pool depletion. |
-| 1.4.3 | Feb 22, 2026 | **Scheduler penalty re-calibration (§12.4, §12.5):** (1) Balanced variant `overtime` weight raised from 1.0 → 1.5, making actual OT (a real 1.5× payroll cost) consistently more expensive than any single preference violation. (2) Capacity-spreading bonus added to the scoring function: a small incentive (−`overtime_weight × 0.1 × remaining_hours/40`) prefers staff with more remaining hours before the 40h threshold. Acts as a tiebreaker that naturally spreads assignments across the week, reduces temporal depletion of float pool capacity, and decreases unnecessary overtime on regular unit staff. |
-| 1.4.13 | Feb 23, 2026 | **OT badge calendar order (§12.3):** `recomputeOvertimeFlags()` pass added after local search so the `isOvertime` flag reflects calendar order, not greedy construction order. Manual assignment API now computes `isOvertime` server-side (was always `false`). |
-| 1.4.14 | Feb 23, 2026 | **Overtime vs Extra Hours display split (§4.1):** Violations now emitted under two distinct rule names: `"Overtime"` (>40h/week, direct 1.5× payroll cost) and `"Extra Hours Above FTE"` (above FTE target but ≤40h, regular pay rate, scheduling preference concern). Previously both appeared as `"Overtime & Extra Hours"`, which overstated the urgency of extra-hours flags and caused the same count to appear in both cost and preference categories. |
-| 1.4.15 | Feb 23, 2026 | **Cross-schedule weekend fairness (§12.4):** Scheduler now seeds the weekend count from the prior schedule period. At context-build time, `buildContext()` queries all weekend assignments in the one-period lookback window before the new schedule starts and stores per-staff counts as `historicalWeekendCounts`. `softPenalty()` adds these to the in-schedule count before applying the bonus/penalty. Nurses who hit their quota last period start the new period "already at quota" and are deprioritised for weekend slots; nurses who were below quota get the full assignment bonus. Prevents the deterministic greedy algorithm from assigning the same nurses to weekends every period. |
-| 1.5.0 | Mar 3, 2026 | **Daily Census page (§3.1, §3.3):** Added dedicated Census Management page at `/census`. Nurse manager selects a color tier (🔵 Blue/🟢 Green/🟡 Yellow/🔴 Red) per shift instead of entering a numeric patient count. Selecting a tier sets both `acuityLevel` and `censusBandId` on the shift. The min-staff rule uses `censusBandId` for direct band lookup (priority over legacy `actualCensus` range search). `acuityExtraStaff` is zeroed when a tier is selected to prevent double-counting. Added `color` column to census_band table. Removed census input from assignment dialog; replaced with read-only tier badge. |
-| 1.5.1 | Mar 3, 2026 | **Patient ratio rule corrected to RN-only (§3.3):** The 2:1 ICU nurse:patient ratio is RN-to-patient per AACN standard. Previous implementation counted RN + LPN as "licensed staff" — corrected to count RNs only. LPNs remain assignable as support staff (count toward total headcount) but do not satisfy the RN:patient ratio. **Census band staffing numbers corrected:** ICU bands redesigned so `requiredRNs` alone satisfies strict 2:1 at the peak patient count for each tier: Blue 1–4 pts → 2 RNs; Green 5–8 pts → 4 RNs; Yellow 9–10 pts → 5 RNs; Red 11–12 pts → 6 RNs. `requiredLPNs` set to 0 for ICU (LPN scope-of-practice does not extend to ICU-level RN duties). **Census Bands now editable in UI** (Rules → Census Bands tab) — inline edit per row using existing PUT API. Charge Nurses column labelled "(in RN count)" to clarify it is not an extra headcount. |
-| 1.5.2 | Mar 4, 2026 | **Census page UX (§11):** Unset shifts now default to Green tier on page load so managers don't have to manually select Green for every shift. Band Thresholds tab shows tier color labels ("Blue — Low Census", "Green — Normal", etc.) with correct colored dots instead of raw DB band names. Rules page Census Bands tab shows the same tier labels. **Schedule API required count (§3.1):** `getEffectiveRequired()` now checks `censusBandId` first (direct band lookup, no `Math.max` — allows Blue tier to legitimately reduce below base staffing level), then falls back to `acuityLevel`+unit color match, then `actualCensus` range lookup (which keeps `Math.max` as floor). |
-| 1.5.3 | Mar 4, 2026 | **Seed and 3-priority fallback (§3.1):** All seeded shifts now carry `censusBandId` matching their `acuityLevel`. Schedule API `getEffectiveRequired()` extended to a 3-priority fallback: (1) `censusBandId` direct ID lookup, (2) `acuityLevel`+unit color match (handles stale IDs after re-seed), (3) `actualCensus` range lookup. Prevents display of wrong required count when DB is reseeded or `censusBandId` is stale. |
-| 1.5.4 | Mar 4, 2026 | **Excel import preserves census tiers (§6):** Census band import gains a `color` field; parser reads "Color"/"Tier" column and falls back to sort-order derivation when column is absent. Export includes "Color" column and a Census Bands sheet in the template. **New schedules default to Green (§3.1):** When a new schedule is created, every shift is seeded with `acuityLevel="green"` and the corresponding `censusBandId`, so census-band-aware staffing applies from day one without requiring a Census page visit. |
-| 1.5.5 | Mar 4, 2026 | **Scheduler targets census-band-required count (§12.2, §12.6):** Critical bug fixed — the greedy scheduler and repair phase both use `shift.requiredStaffCount + shift.acuityExtraStaff` from the build context. When a census tier was selected (`censusBandId` set), `acuityExtraStaff` was correctly 0 but `requiredStaffCount` still held the shift definition's base value (e.g. 4 for Day, 3 for Night) rather than the band total (e.g. 5 for Green = 4 RNs + 1 CNA). `buildContext()` now adds a post-load pass that overrides `requiredStaffCount` with `band.requiredRNs + band.requiredCNAs` for every shift with `censusBandId` set, and zeros `acuityExtraStaff`. Scheduler now correctly fills 5 staff per shift when Green tier is active. |
-| 1.5.6 | Mar 4, 2026 | **Output validation utility (§12.6):** `checkForUnexplainedUnderstaffing()` added — a pure function that scans the scheduler's understaffed output and flags any shift where (a) no hard-rule rejection reasons were documented AND (b) enough potentially available staff existed. A non-empty result is a signal of a scheduler logic bug. Called after each Balanced generation; result logged to audit trail. **Tests block build:** `npm run test` added to the build script so all 399 tests must pass before a deployment can proceed. **Seed FK order fixed:** `open_shift`, `generation_job`, and `staff_holiday_assignment` now deleted before their parent tables, fixing a FK constraint error on re-seed when Open Shifts had been used through the UI. |
-| 1.6.12 | Mar 16, 2026 | **OT sweep improvements — replacement pass + OT guard (§12.2):** Two fixes ensure Cost-Optimized achieves meaningfully lower OT than Balanced. (1) `weekendRedistributionSweep` now unconditionally rejects any swap that would push either participant above 40h in the target week, preventing it from reintroducing OT that the OT reduction sweep removed. (2) `overtimeReductionSweep` now includes a replacement pass that runs when the swap pass stalls — it scans unassigned eligible staff for each remaining OT slot and replaces the OT assignment in-place when a net penalty improvement exists. Both passes alternate inside a shared `while (madeProgress)` loop. |
-| 1.6.11 | Mar 15, 2026 | **Violation modal restructured (UI only, no rule change):** The shift violations modal no longer shows a separate "Staff Schedule Issues" orange section. Schedule-wide soft violations (consecutive weekends, overtime) now appear in the single "Soft Rule Violations" section with a "Schedule-wide" badge so managers can distinguish them from shift-specific violations. Rule behaviour and penalty scoring are unchanged. |
-| 1.6.10 | Mar 15, 2026 | **Consecutive weekends penalty — quota gate added (§12.4):** The v1.6.0 penalty previously fired for all staff, including those below their required weekend count. This cancelled the weekend equity bonus (−`weekendCount_weight × 0.5`) applied in the same function for under-quota staff, making fairness worse rather than better after the fix was introduced (28-day fairness score: 0.25 → 0.35). The penalty now only fires when `weekendCount ≥ required` — the same threshold that switches section 3 from bonus to excess penalty. Staff below quota are never penalised for consecutive weekends during generation. **Performance fix (§12.2):** The v1.6.0 implementation iterated all staff assignments on every `softPenalty()` call (O(n) per call × 75,000 calls = 2.25M Date allocations for a 28-day schedule), causing a 14.7× regression (93s → 1,374s). Replaced with an O(maxConsecutive) bounded backward/forward scan using a new `hasWorkedDate()` O(1) Set lookup on `SchedulerState`. Performance restored to linear scaling. |
-| 1.6.0 | Mar 15, 2026 | **Consecutive weekends penalty now active in scheduler (§12.4):** `softPenalty()` now includes a consecutive-weekend component using `weights.consecutiveWeekends`. Previously this weight was defined in all three profiles but never read, meaning the scheduler assigned consecutive weekends freely and the FAIR profile's `consecutiveWeekends: 3.0` did nothing. The scheduler now penalises assigning a weekend shift that would push a staff member's consecutive-weekend streak past the unit maximum (default 2). Penalty: `weight × (0.5 + excess × 0.5)`. **Weekend-specific violations scoped to weekend shifts (§4.3):** `consecutive-weekends` and `weekend-fairness` violations are now only displayed on Sat/Sun shifts. Previously these staff-level violations were propagated to every shift the staff member was assigned to (including weekday shifts), making them appear on Monday Day Shifts where a manager had no actionable way to address a consecutive-weekends issue. |
-| 1.5.9 | Mar 15, 2026 | **OT-aware charge nurse selection (§12.2):** The greedy now applies a non-OT filter before the Level 5 charge preference. Within the charge-qualified pool, non-OT candidates (weekly hours + this shift ≤ 40h) are evaluated first; Level 5 is preferred within that non-OT pool. A Level 4 nurse with non-OT capacity is selected over a Level 5 nurse who would go into overtime. Previously the algorithm exclusively selected Level 5 nurses for all charge slots regardless of their OT status, causing Level 5 nurses (particularly those specialising in a single shift type) to be assigned to every charge slot until the 60h hard limit blocked them — concentrating 5 shifts/week of charge duty on one or two nurses each week. Level 4 stand-ins were only used when no Level 5 was eligible at all. **Performance: delta swap evaluation (§12.2):** Local search and both post-processing sweeps now use delta penalty evaluation instead of recomputing total penalty across all assignments. Only the ~15–30 assignments whose penalty actually changes (coworkers on both affected shifts + both staff members' same-week assignments for OT delta) are rescored per swap attempt, replacing ~280 softPenalty calls with ~15–30. In-place state mutation with unconditional restoration replaces state.clone() in swap validity checking, eliminating all Map copies during local search. These changes reduce 28-day schedule generation from ~15 minutes to under 2 minutes. |
-| 1.5.8 | Mar 15, 2026 | **Variant generation refactored — derived from Balanced base (§12.1, §12.2):** Fairness-Optimized and Cost-Optimized variants are now built from the Balanced result by applying deterministic post-processing sweeps instead of independent greedy+local-search runs. This guarantees: (a) fairness(Fair) ≤ fairness(Balanced) and (b) OT(Cost) ≤ OT(Balanced), which previously could not be reliably guaranteed due to seed sensitivity and preference-fairness conflicts in independent runs. Phase 3 section added to §12.2 documenting the OT-reduction and weekend-redistribution sweeps. **Composite cost score (§12.6):** Scenario cost score now measures composite labor cost — `(agency×4 + OT×1 + float×0.2) / (total×4)` — weighted by real hospital cost premiums (agency 2–3× base pay, OT 1.5× base pay, float differential ~10%). Previously the cost score counted only overtime assignments, making agency and float optimizations invisible in the score. **`computeTotalPenalty` O(n²) → O(n) (§12.2):** Precomputes a `shiftId → coworkers` map once per call instead of re-filtering the full assignment list per assignment. For 84 assignments this reduces from ~7,000 comparisons per call to ~252. |
-| 1.5.7 | Mar 4, 2026 | **On-leave staff displayed with Leave badge in schedule grid (§11):** When leave is approved and an assignment is cancelled (`status = "cancelled"`), the schedule grid now renders that staff member with a strikethrough name, orange dot, and orange "Leave" badge — and excludes them from the shift's staffing count. Previously, cancelled assignments were counted in the X/Y total (showing 5/5 as "full" even though one person was on leave) and rendered identically to active assignments. This masked understaffing created by leave approvals. The hard-violation badge from the rule engine still fires; the count now correctly drops to (N-1)/N so the orange understaffing border appears immediately. |
-| 1.7.2 | Mar 18, 2026 | **Six bug fixes and improvements:** (1) Schedule grid refetches after census change without requiring manual refresh (visibilitychange listener). (2) `isOvertime` flag on open-shift fill computed dynamically from actual DB hours, not stale snapshot. (3) Swap approval now blocks RN↔CNA swaps with a role-compatibility check before `validateSwap`. (4) **ICU/ER competency rule bug fixed (§3.6):** rule was incorrectly firing for ALL units — now only fires for ICU/ER shifts; Level 1 orientees explicitly blocked from ICU/ER but can work Med-Surg etc. with a Level 5 preceptor. (5) Excel export fixed: Units sheet now writes actual `minStaffDay`/`minStaffNight` values instead of hardcoded 4/3; column headers clarified ("Min Weekends Per Nurse Per Schedule", "Min Holidays Per Nurse Per Year"). (6) **On-call limits now enforced in coverage recommendations (§3.12):** Candidates exceeding the weekly or monthly on-call limit are excluded; candidates already covering a callout this week receive a soft warning in their recommendation. Rule descriptions and naming updated throughout. |
-| 1.7.4 | Mar 18, 2026 | **Fairness-Optimized variant improvements (§12.1, §12.4, §12.5):** (1) **Holiday fairness now active in generation:** `softPenalty()` Section 9 penalises assigning a public holiday shift to a nurse whose holiday count exceeds the current staff average. The `holidayFairness` weight (3.0 in FAIR, 1.0 in BALANCED) was previously defined but never referenced — it is now active. (2) **Per-nurse load fairness added:** `softPenalty()` Section 10 penalises assigning to nurses who already have significantly more total assignments than their peers. Active in FAIR (`weekendCount > 1.0`); near-zero in BALANCED/COST. (3) **FAIR consecutive-weekends weight raised from 3.0 → 15.0:** At 3.0, the consecutive-weekend penalty was routinely outweighed by charge-qualification and skill-mix bonuses, permitting 4–5 consecutive weekends. At 15.0, a third consecutive weekend (15 × 1.0 = 15 pts penalty) overrides all other scoring factors. (4) **FAIR variant now runs 150-iteration local-search with FAIR weights before the weekend sweep:** Previously, FAIR's greedy and local-search phases used BALANCED weights; only the final weekend-redistribution sweep used FAIR weights. This meant FAIR's higher fairness penalties had no effect on the core optimization. The new 150-iteration pass propagates FAIR weights into actual swap decisions. |
-| 1.7.11 | Mar 21, 2026 | **Charge nurse clustering eliminated in greedy construction (§12.2):** The greedy Pass 2 relied on a 0.8-pt soft penalty to discourage placing additional charge-qualified nurses in regular slots. This penalty was outweighed by other scoring factors (preference match, weekend quota, skill mix), consistently producing one shift per 4-week schedule with 3+ charge-qualified nurses. A hard preference tier (mirroring the non-OT preference) now filters regular-slot candidates: once a charge-qualified nurse is on a shift, non-charge-qualified nurses are tried first and the full pool is used only as a fallback to preserve coverage. |
-| 1.7.10 | Mar 21, 2026 | **FAIR variant quality regression fixed; hot-path memoization (§12.1):** (1) **FAIR local-search pass removed:** v1.7.9's `staffConsecWeekendDelta` made the FAIR local-search accept far more swaps. Combined with FAIR's `preference: 2.0` weight, this moved `avoidWeekends` nurses below their weekend minimum and FAIR's lower `overtime: 0.5` accepted OT-causing swaps — producing more violations than BALANCED. The FAIR local-search pass is removed. Since v1.7.9, `computeSwapDeltaPenalty` includes `staffConsecWeekendDelta`, so consecutive-weekend streak repair under FAIR's `consecutiveWeekends: 15.0` weight is handled by the `weekendRedistributionSweep` directly. FAIR now runs the sweep immediately on BALANCED's output, guaranteeing FAIR total violations ≤ BALANCED. (2) **Date-object allocation eliminated in hot path:** `weekendIdForDate` and `areConsecutiveWeekendIds` (added in v1.7.9) created `new Date` objects on every invocation. Module-level Maps now cache results; the same ~42 date strings in a 6-week schedule are converted to Date objects at most once per process lifetime. |
-| 1.7.9 | Mar 21, 2026 | **Consecutive-weekend penalty now visible in all swap delta calculations (§12.4):** `computeSwapDeltaPenalty` and `computeReplacementDeltaPenalty` previously returned 0 for the consecutive-weekend component on every call — the `alreadyThisWeekend` guard in `softPenalty()` fired for both old and new assignments because they were added to state before scoring. Three new helpers (`weekendIdForDate`, `totalStreakPenalty`, `staffConsecWeekendDelta`) compute the consecutive-weekend penalty directly from each nurse's full sorted weekend set in the original unmutated state, bypassing `softPenalty()`. The result is added to the existing delta, making streak improvements and degradations correctly visible to local search and all three deterministic sweeps. The regression test `streak ≤ maxConsecutiveWeekends (2)` now passes, confirming the sweep fully repairs streaks rather than partially reducing them. |
-| 1.7.8 | Mar 21, 2026 | **Regression tests for consecutive-weekend streak escalation and redistribution sweep:** (1) Seven new tests in `scoring.test.ts` verify streak escalation beyond `maxConsecutive`: streak=3→15 pts, streak=4→22.5 pts, streak=5→30 pts, streak=6→37.5 pts. An isolation approach (consecutive vs. non-consecutive priors of equal count) eliminates weekend-equity contamination. (2) Three new tests in `local-search.test.ts` exercise `weekendRedistributionSweep()` for the first time: assignment-count preservation, equity redistribution, and streak reduction. The streak assertion uses `toBeLessThan(initial)` rather than `≤ maxConsecutive` because the `alreadyThisWeekend` guard in `softPenalty()` makes the consecutive component invisible to `computeSwapDeltaPenalty` — delta calculations always see 0 for consecutive penalty. No rule logic changes. |
-| 1.7.7 | Mar 21, 2026 | **Consecutive-weekend streak penalty underestimation fixed; redistribution sweep widened for streak violations (§4.3, §12.4):** (1) **Streak scan horizon extended from `maxConsecutive` to `schedulePeriodWeeks`:** The backward/forward loops in `softPenalty()` Section 3b were bounded at `maxConsecutive=2` iterations (a v1.6.10 performance fix). This caused streaks of 4–5 to appear as streak=3 in the penalty — penalty was 15 pts for both streak=4 and streak=5 instead of the correct 22.5 and 30 pts respectively. The scan now extends to `schedulePeriodWeeks` (default 6). `maxConsecutive` is unchanged as the threshold for when the penalty fires. (2) **Weekend redistribution sweep now uses two-phase partner selection:** Phase 1 (deficit-only, unchanged) tries nurses with below-average weekend counts. When Phase 1 exhausts all options and a consecutive streak violation remains, Phase 2 (streak-repair fallback) widens the pool to any nurse with fewer weekend shifts than the violating nurse, sorted ascending by weekend count so deficit nurses are still tried first. |
-| 1.7.6 | Mar 21, 2026 | **Weekend unit semantics + performance fix (§4.2, §12.4, §12.5):** (1) **Weekend counting corrected to industry-standard unit semantics:** `getWeekendCount()` now counts distinct weekend rotations (Sat+Sun of the same week = ONE weekend, not two). Previously it counted individual weekend-day assignments, causing the equity quota to fire after only 1.5 real weekends instead of 3, and giving a spurious incentive to assign the second day of an already-covered weekend. `historicalWeekendCounts` carryforward similarly corrected. `weekendShiftsRequired=3` now means "3 complete weekend rotations per 6-week period." (2) **26-minute generation time eliminated:** Section 9's O(staff × assignments) holiday average computation was running inside `softPenalty()` on every local-search call. A new `computeHolidayAvg()` helper is now called once per pass; `scoreSubset()`, `computeSwapDeltaPenalty()`, and `computeReplacementDeltaPenalty()` thread the precomputed value through. All three sweeps and `localSearch()` precompute it at loop entry. (3) **`totalAssignmentCount()` now O(1):** A private `_totalCount` counter in `SchedulerState` replaces the O(staff) iteration. |
-| 1.7.5 | Mar 21, 2026 | **Consecutive-weekend quota gate removed (§12.4); carryforward accuracy fix:** (1) **Quota gate removed from consecutive-weekend penalty:** The guard `if (weekendCount >= required)` blocked the 15.0-weight penalty while nurses were below quota — preventing it from firing during the entire greedy construction phase, where streaks of 4–5 consecutive weekends could form freely. With FAIR weight now 15.0, the streak-3 penalty (15 pts) decisively outweighs the quota-fill bonus (−1.5 pts), so the gate is no longer needed. Removing it allows the greedy phase to detect and avoid consecutive streaks from the first assignment. BALANCED is barely affected (net +0.5 at streak=3). (2) **Historical weekend carryforward excludes cancelled/called-out assignments:** The lookback query that seeds `historicalWeekendCounts` for cross-schedule fairness now filters out `called_out` and `cancelled` statuses — nurses who called out sick no longer receive phantom weekend credits that deprioritise them in subsequent schedules. (3) **FAIR local-search iterations raised from 150 → 300:** Provides more swap attempts for the 6-week (~420-assignment) schedule. |
+| Version | Date         | Changes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1.6.18  | Sep 13, 2026 | **Callout notifications (§7.1):** an urgent callout whose shift is ≥ 1 day away now notifies every rule-eligible nurse ("Urgent: shift needs coverage"); same-day callouts stay silent. Previously only the open-shift path (> threshold) notified anyone. **Published-schedule amendments (§12.8):** adding/removing an assignment on a published schedule no longer returns HTTP 409 — it is allowed with a mandatory reason, logged against the schedule as `post_publish_amendment`, and notifies only the affected nurse. Unpublish now requires a reason and is logged as `unpublished`. Regeneration still requires unpublish. No rule evaluator behavior changed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 1.6.17  | Jun 12, 2026 | **New soft rule: Weekend-Exempt Staff Protection (§4).** `weekendExempt` remains a quota exemption (not a hard ban), but scheduling an exempt nurse on a Saturday/Sunday is now a soft violation: the generator deprioritises them for weekend slots (deterrent = preference weight × 1.5) and the `weekend-exempt` evaluator (default weight 4.0) flags any weekend assignment in the violations panel. Decision: soft for now; may be promoted to a hard rule if customer contracts require an outright ban. Existing databases must add the rule row via the Rules UI (evaluator id `weekend-exempt`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 1.6.16  | Jun 12, 2026 | **Cross-workflow integrity:** approving leave now automatically denies pending swap requests that reference the cancelled assignments (auditable as `swap_denied` by system); leave approval is protected against double-submission; PRN availability records cannot be deleted while the nurse has active assignments on submitted dates; stuck schedule-generation jobs are auto-reclaimed after 10 minutes. No rule thresholds or penalties changed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | **Hard rules enforced on manual paths (§3):** swap approval now checks the 60h rolling window (§3.13) and max consecutive days (§3.5), and refuses swaps whose underlying assignments were cancelled or called out; open-shift approval/fill and callout fill re-run the availability hard checks at the moment of fill. **Cross-boundary enforcement (§3.4, §3.5, §3.13):** the scheduler and the rest-hours/max-consecutive evaluators now see the 7 days of assignments before the schedule period starts, closing the gap where a nurse could work 6+ consecutive days or get <10h rest across a schedule boundary. **ICU/ER unit matching (§3.6, §3.8):** evaluators and scheduler share one matcher; "ED", "Emergency", and compound unit names are now consistently treated as supervised units. | **On-call limits (§3.12) evaluator aligned with scheduler:** weeks are now identified by their Monday date (Mon–Sun), closing a gap where two on-call shifts in the Dec 28 – Jan 3 week were never flagged; weekends are identified by Saturday date so Sat+Sun of one weekend counts as ONE weekend toward the monthly limit. **Timezone safety:** all date-only arithmetic (week starts, weekend IDs, rolling 60h windows, shift-day enumeration, holiday year) is now UTC-based; previously, deployment on a server west of UTC (e.g. America/Chicago) shifted week boundaries and duplicated the DST spring-forward day's shifts. No intended rule semantics changed. |
+| 1.6.13  | Jun 12, 2026 | **Superseded evaluators deregistered:** `overtime-cost` (§4.1) and `weekend-fairness` (§4.2) can no longer be activated via rule rows — they were replaced by `overtime-v2` and `weekend-count`/`consecutive-weekends` and would have double-penalized the same hours/weekends if re-enabled. **Published-schedule guards:** regenerating a schedule or adding/removing assignments now requires the schedule to be unpublished first (HTTP 409 otherwise). No active rule behavior changed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 1.0     | Feb 2026     | Initial document with all rules and configuration options                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 1.1     | Feb 13, 2026 | Added Section 11 (Application UI Guide) documenting all available pages: Leave Management, Shift Swaps, PRN Availability, Unit Configuration, and Holidays Management                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 1.2     | Feb 15, 2026 | **Major updates based on expert feedback:** (1) Holiday fairness now tracks annually, Christmas Eve/Day merged as one holiday; (2) Low census order updated - removed Agency, added Voluntary Time Off (VTO); (3) Added Coverage page for managing shifts needing coverage; (4) Leave approval now auto-creates coverage requests for affected assignments; (5) Staff page now shows clickable calendar view for each staff member; (6) Added callout threshold days configuration                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 1.2.1   | Feb 15, 2026 | **Coverage auto-fill workflow:** Leave approval (> 7 days) now automatically finds top 3 replacement candidates instead of creating manual open shifts. Each candidate includes reasons (e.g., "Cross-trained for ICU", "High reliability"). Manager reviews and approves, assignment is auto-created. Renamed "Open Shifts" to "Coverage" in navigation.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 1.2.2   | Feb 16, 2026 | **Census & Preferences visibility:** (1) Census input added to shift assignment dialog - determines required staffing via census bands; (2) Staff count display fixed to show scheduled/required based on census; (3) Staff detail dialog now shows shift preferences; (4) Census Bands added to Excel import/export                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 1.2.3   | Feb 18, 2026 | **Staff preferences in Excel:** Staff preferences can now be imported/exported via Excel. New columns in Staff sheet: Preferred Shift, Preferred Days Off, Max Consecutive Days, Max Hours Per Week, Avoid Weekends                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 1.3.0   | Feb 20, 2026 | **Section 12 added:** Scheduling Algorithm — describes greedy construction, local search, three weight profiles, hard rule eligibility, soft penalty scoring, understaffing handling, and audit behavior for automated schedule generation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 1.4.0   | Feb 20, 2026 | **Charge nurse competency (§1.3, §3.2):** Level 4+ is now a hard requirement for charge nurse assignment. Level 5 is the preferred primary charge; Level 4 is stand-in only. `isChargeNurseQualified` flag alone is insufficient for levels 1–3. **60h rolling window (§3.13):** System now checks all 7 windows containing the shift date, not just the backward-looking window, to catch violations caused by future shifts assigned earlier in the greedy pass.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 1.4.2   | Feb 20, 2026 | **Overtime rule (§4.1):** Violations now attach to the specific shift that crosses the threshold, not staff-level. Agency/on-demand staff with FTE = 0 are exempt. **Weekend rule (§4.2):** Logic flipped from flagging shortfall to flagging excess assignments beyond the required count; each excess assignment is flagged with a shift-specific violation. Both changes make the violations panel actionable — each flagged shift shows exactly which assignment to review.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 1.4.3   | Feb 22, 2026 | **Balanced OT weight (§12.5):** Raised from 1.0 to 1.5 so actual overtime is consistently more expensive than any single preference violation, matching the real 1.5× payroll cost. **Capacity-spreading bonus (§12.4):** Small incentive added to prefer less-loaded staff as a tiebreaker, reducing overtime accumulation on regular staff and preserving float pool capacity.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 1.4.4   | Feb 22, 2026 | **Assignment dialog charge validation (§3.2):** `needsCharge` condition now requires Level 4+ (not just any `isChargeNurse` flag). "Assign as Charge" button is gated to Level 4+ nurses. Assigning a new charge nurse demotes any previous charge on the same shift so the hard violation resolves immediately.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 1.4.10  | Feb 22, 2026 | **Local search collective constraint guards (§12.2):** Two gaps in `isSwapValid` allowed the local search to undo repair-phase fixes. (1) Non-charge-qualified staff could inherit `isChargeNurse = true` via object spread. (2) Swapping a Level 4+ nurse out of an ICU/ER shift could leave Level 2 nurses without supervision. Both are now blocked before individual `passesHardRules` checks run.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 1.4.5   | Feb 22, 2026 | **Charge protection guard (§12.2):** Look-ahead added to greedy Pass 2 — Level 4+ nurses are protected from regular slots when they are the sole remaining charge candidate for an upcoming ICU/ER shift within 7 days. Eliminates Sunday hard violations in the FAIR schedule caused by the low overtime weight exhausting charge nurses. **PRN availability (§3.10):** Lookup broadened to aggregate across all schedule submissions; standing availability is honoured by any new schedule covering the same dates. **Cost-Optimized float weight (§12.5):** Corrected 3.0 → 2.0 to reflect that float differentials cost less than overtime.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 1.4.6   | Feb 22, 2026 | **Agency penalty added (§12.4, §12.5):** New `agency` weight component applies a flat penalty whenever an agency nurse is considered for a slot. Ensures the scheduler exhausts regular, float, and PRN pools before drawing on agency (markup 2–3× base pay). Weights: Balanced 2.5, Fairness-Optimized 1.5, Cost-Optimized 5.0. **PRN Available Days column in Excel (§3.10):** Import template and export now include a "PRN Available Days" column for per_diem staff. Accepted formats: comma-separated day abbreviations (e.g. "Mon, Wed, Fri"), "Weekdays", "Weekends", or "All". Importing this column auto-creates `prn_availability` records spanning the next 12 months — PRN staff are immediately usable in auto-generated schedules without a manual availability submission step.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 1.4.7   | Feb 22, 2026 | **Weekend ICU charge shifts prioritised first in greedy (§12.2):** Weekend charge slots (Sat/Sun) were previously sorted after all weekday charge slots (earliest date first within priority 1). In the FAIR profile — where the low overtime weight allows charge nurses to accumulate hours freely Mon–Fri — this meant weekend slots arrived last with the charge pool already near its 60h rolling limit. Splitting priority 1 into weekend-ICU-charge (new priority 1) and weekday-ICU-charge (priority 2) ensures Sat/Sun charge shifts get first pick of Level 4+ nurses before any weekday shift has consumed their capacity. Applies to all three schedule variants; Balanced and Cost-Optimized are unaffected in practice because their higher overtime penalties already prevent charge-pool depletion.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 1.4.3   | Feb 22, 2026 | **Scheduler penalty re-calibration (§12.4, §12.5):** (1) Balanced variant `overtime` weight raised from 1.0 → 1.5, making actual OT (a real 1.5× payroll cost) consistently more expensive than any single preference violation. (2) Capacity-spreading bonus added to the scoring function: a small incentive (−`overtime_weight × 0.1 × remaining_hours/40`) prefers staff with more remaining hours before the 40h threshold. Acts as a tiebreaker that naturally spreads assignments across the week, reduces temporal depletion of float pool capacity, and decreases unnecessary overtime on regular unit staff.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 1.4.13  | Feb 23, 2026 | **OT badge calendar order (§12.3):** `recomputeOvertimeFlags()` pass added after local search so the `isOvertime` flag reflects calendar order, not greedy construction order. Manual assignment API now computes `isOvertime` server-side (was always `false`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 1.4.14  | Feb 23, 2026 | **Overtime vs Extra Hours display split (§4.1):** Violations now emitted under two distinct rule names: `"Overtime"` (>40h/week, direct 1.5× payroll cost) and `"Extra Hours Above FTE"` (above FTE target but ≤40h, regular pay rate, scheduling preference concern). Previously both appeared as `"Overtime & Extra Hours"`, which overstated the urgency of extra-hours flags and caused the same count to appear in both cost and preference categories.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 1.4.15  | Feb 23, 2026 | **Cross-schedule weekend fairness (§12.4):** Scheduler now seeds the weekend count from the prior schedule period. At context-build time, `buildContext()` queries all weekend assignments in the one-period lookback window before the new schedule starts and stores per-staff counts as `historicalWeekendCounts`. `softPenalty()` adds these to the in-schedule count before applying the bonus/penalty. Nurses who hit their quota last period start the new period "already at quota" and are deprioritised for weekend slots; nurses who were below quota get the full assignment bonus. Prevents the deterministic greedy algorithm from assigning the same nurses to weekends every period.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 1.5.0   | Mar 3, 2026  | **Daily Census page (§3.1, §3.3):** Added dedicated Census Management page at `/census`. Nurse manager selects a color tier (🔵 Blue/🟢 Green/🟡 Yellow/🔴 Red) per shift instead of entering a numeric patient count. Selecting a tier sets both `acuityLevel` and `censusBandId` on the shift. The min-staff rule uses `censusBandId` for direct band lookup (priority over legacy `actualCensus` range search). `acuityExtraStaff` is zeroed when a tier is selected to prevent double-counting. Added `color` column to census_band table. Removed census input from assignment dialog; replaced with read-only tier badge.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 1.5.1   | Mar 3, 2026  | **Patient ratio rule corrected to RN-only (§3.3):** The 2:1 ICU nurse:patient ratio is RN-to-patient per AACN standard. Previous implementation counted RN + LPN as "licensed staff" — corrected to count RNs only. LPNs remain assignable as support staff (count toward total headcount) but do not satisfy the RN:patient ratio. **Census band staffing numbers corrected:** ICU bands redesigned so `requiredRNs` alone satisfies strict 2:1 at the peak patient count for each tier: Blue 1–4 pts → 2 RNs; Green 5–8 pts → 4 RNs; Yellow 9–10 pts → 5 RNs; Red 11–12 pts → 6 RNs. `requiredLPNs` set to 0 for ICU (LPN scope-of-practice does not extend to ICU-level RN duties). **Census Bands now editable in UI** (Rules → Census Bands tab) — inline edit per row using existing PUT API. Charge Nurses column labelled "(in RN count)" to clarify it is not an extra headcount.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 1.5.2   | Mar 4, 2026  | **Census page UX (§11):** Unset shifts now default to Green tier on page load so managers don't have to manually select Green for every shift. Band Thresholds tab shows tier color labels ("Blue — Low Census", "Green — Normal", etc.) with correct colored dots instead of raw DB band names. Rules page Census Bands tab shows the same tier labels. **Schedule API required count (§3.1):** `getEffectiveRequired()` now checks `censusBandId` first (direct band lookup, no `Math.max` — allows Blue tier to legitimately reduce below base staffing level), then falls back to `acuityLevel`+unit color match, then `actualCensus` range lookup (which keeps `Math.max` as floor).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 1.5.3   | Mar 4, 2026  | **Seed and 3-priority fallback (§3.1):** All seeded shifts now carry `censusBandId` matching their `acuityLevel`. Schedule API `getEffectiveRequired()` extended to a 3-priority fallback: (1) `censusBandId` direct ID lookup, (2) `acuityLevel`+unit color match (handles stale IDs after re-seed), (3) `actualCensus` range lookup. Prevents display of wrong required count when DB is reseeded or `censusBandId` is stale.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 1.5.4   | Mar 4, 2026  | **Excel import preserves census tiers (§6):** Census band import gains a `color` field; parser reads "Color"/"Tier" column and falls back to sort-order derivation when column is absent. Export includes "Color" column and a Census Bands sheet in the template. **New schedules default to Green (§3.1):** When a new schedule is created, every shift is seeded with `acuityLevel="green"` and the corresponding `censusBandId`, so census-band-aware staffing applies from day one without requiring a Census page visit.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 1.5.5   | Mar 4, 2026  | **Scheduler targets census-band-required count (§12.2, §12.6):** Critical bug fixed — the greedy scheduler and repair phase both use `shift.requiredStaffCount + shift.acuityExtraStaff` from the build context. When a census tier was selected (`censusBandId` set), `acuityExtraStaff` was correctly 0 but `requiredStaffCount` still held the shift definition's base value (e.g. 4 for Day, 3 for Night) rather than the band total (e.g. 5 for Green = 4 RNs + 1 CNA). `buildContext()` now adds a post-load pass that overrides `requiredStaffCount` with `band.requiredRNs + band.requiredCNAs` for every shift with `censusBandId` set, and zeros `acuityExtraStaff`. Scheduler now correctly fills 5 staff per shift when Green tier is active.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 1.5.6   | Mar 4, 2026  | **Output validation utility (§12.6):** `checkForUnexplainedUnderstaffing()` added — a pure function that scans the scheduler's understaffed output and flags any shift where (a) no hard-rule rejection reasons were documented AND (b) enough potentially available staff existed. A non-empty result is a signal of a scheduler logic bug. Called after each Balanced generation; result logged to audit trail. **Tests block build:** `npm run test` added to the build script so all 399 tests must pass before a deployment can proceed. **Seed FK order fixed:** `open_shift`, `generation_job`, and `staff_holiday_assignment` now deleted before their parent tables, fixing a FK constraint error on re-seed when Open Shifts had been used through the UI.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 1.6.12  | Mar 16, 2026 | **OT sweep improvements — replacement pass + OT guard (§12.2):** Two fixes ensure Cost-Optimized achieves meaningfully lower OT than Balanced. (1) `weekendRedistributionSweep` now unconditionally rejects any swap that would push either participant above 40h in the target week, preventing it from reintroducing OT that the OT reduction sweep removed. (2) `overtimeReductionSweep` now includes a replacement pass that runs when the swap pass stalls — it scans unassigned eligible staff for each remaining OT slot and replaces the OT assignment in-place when a net penalty improvement exists. Both passes alternate inside a shared `while (madeProgress)` loop.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 1.6.11  | Mar 15, 2026 | **Violation modal restructured (UI only, no rule change):** The shift violations modal no longer shows a separate "Staff Schedule Issues" orange section. Schedule-wide soft violations (consecutive weekends, overtime) now appear in the single "Soft Rule Violations" section with a "Schedule-wide" badge so managers can distinguish them from shift-specific violations. Rule behaviour and penalty scoring are unchanged.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 1.6.10  | Mar 15, 2026 | **Consecutive weekends penalty — quota gate added (§12.4):** The v1.6.0 penalty previously fired for all staff, including those below their required weekend count. This cancelled the weekend equity bonus (−`weekendCount_weight × 0.5`) applied in the same function for under-quota staff, making fairness worse rather than better after the fix was introduced (28-day fairness score: 0.25 → 0.35). The penalty now only fires when `weekendCount ≥ required` — the same threshold that switches section 3 from bonus to excess penalty. Staff below quota are never penalised for consecutive weekends during generation. **Performance fix (§12.2):** The v1.6.0 implementation iterated all staff assignments on every `softPenalty()` call (O(n) per call × 75,000 calls = 2.25M Date allocations for a 28-day schedule), causing a 14.7× regression (93s → 1,374s). Replaced with an O(maxConsecutive) bounded backward/forward scan using a new `hasWorkedDate()` O(1) Set lookup on `SchedulerState`. Performance restored to linear scaling.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 1.6.0   | Mar 15, 2026 | **Consecutive weekends penalty now active in scheduler (§12.4):** `softPenalty()` now includes a consecutive-weekend component using `weights.consecutiveWeekends`. Previously this weight was defined in all three profiles but never read, meaning the scheduler assigned consecutive weekends freely and the FAIR profile's `consecutiveWeekends: 3.0` did nothing. The scheduler now penalises assigning a weekend shift that would push a staff member's consecutive-weekend streak past the unit maximum (default 2). Penalty: `weight × (0.5 + excess × 0.5)`. **Weekend-specific violations scoped to weekend shifts (§4.3):** `consecutive-weekends` and `weekend-fairness` violations are now only displayed on Sat/Sun shifts. Previously these staff-level violations were propagated to every shift the staff member was assigned to (including weekday shifts), making them appear on Monday Day Shifts where a manager had no actionable way to address a consecutive-weekends issue.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 1.5.9   | Mar 15, 2026 | **OT-aware charge nurse selection (§12.2):** The greedy now applies a non-OT filter before the Level 5 charge preference. Within the charge-qualified pool, non-OT candidates (weekly hours + this shift ≤ 40h) are evaluated first; Level 5 is preferred within that non-OT pool. A Level 4 nurse with non-OT capacity is selected over a Level 5 nurse who would go into overtime. Previously the algorithm exclusively selected Level 5 nurses for all charge slots regardless of their OT status, causing Level 5 nurses (particularly those specialising in a single shift type) to be assigned to every charge slot until the 60h hard limit blocked them — concentrating 5 shifts/week of charge duty on one or two nurses each week. Level 4 stand-ins were only used when no Level 5 was eligible at all. **Performance: delta swap evaluation (§12.2):** Local search and both post-processing sweeps now use delta penalty evaluation instead of recomputing total penalty across all assignments. Only the ~15–30 assignments whose penalty actually changes (coworkers on both affected shifts + both staff members' same-week assignments for OT delta) are rescored per swap attempt, replacing ~280 softPenalty calls with ~15–30. In-place state mutation with unconditional restoration replaces state.clone() in swap validity checking, eliminating all Map copies during local search. These changes reduce 28-day schedule generation from ~15 minutes to under 2 minutes. |
+| 1.5.8   | Mar 15, 2026 | **Variant generation refactored — derived from Balanced base (§12.1, §12.2):** Fairness-Optimized and Cost-Optimized variants are now built from the Balanced result by applying deterministic post-processing sweeps instead of independent greedy+local-search runs. This guarantees: (a) fairness(Fair) ≤ fairness(Balanced) and (b) OT(Cost) ≤ OT(Balanced), which previously could not be reliably guaranteed due to seed sensitivity and preference-fairness conflicts in independent runs. Phase 3 section added to §12.2 documenting the OT-reduction and weekend-redistribution sweeps. **Composite cost score (§12.6):** Scenario cost score now measures composite labor cost — `(agency×4 + OT×1 + float×0.2) / (total×4)` — weighted by real hospital cost premiums (agency 2–3× base pay, OT 1.5× base pay, float differential ~10%). Previously the cost score counted only overtime assignments, making agency and float optimizations invisible in the score. **`computeTotalPenalty` O(n²) → O(n) (§12.2):** Precomputes a `shiftId → coworkers` map once per call instead of re-filtering the full assignment list per assignment. For 84 assignments this reduces from ~7,000 comparisons per call to ~252.                                                                                                                                                                                                                                                                  |
+| 1.5.7   | Mar 4, 2026  | **On-leave staff displayed with Leave badge in schedule grid (§11):** When leave is approved and an assignment is cancelled (`status = "cancelled"`), the schedule grid now renders that staff member with a strikethrough name, orange dot, and orange "Leave" badge — and excludes them from the shift's staffing count. Previously, cancelled assignments were counted in the X/Y total (showing 5/5 as "full" even though one person was on leave) and rendered identically to active assignments. This masked understaffing created by leave approvals. The hard-violation badge from the rule engine still fires; the count now correctly drops to (N-1)/N so the orange understaffing border appears immediately.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 1.7.2   | Mar 18, 2026 | **Six bug fixes and improvements:** (1) Schedule grid refetches after census change without requiring manual refresh (visibilitychange listener). (2) `isOvertime` flag on open-shift fill computed dynamically from actual DB hours, not stale snapshot. (3) Swap approval now blocks RN↔CNA swaps with a role-compatibility check before `validateSwap`. (4) **ICU/ER competency rule bug fixed (§3.6):** rule was incorrectly firing for ALL units — now only fires for ICU/ER shifts; Level 1 orientees explicitly blocked from ICU/ER but can work Med-Surg etc. with a Level 5 preceptor. (5) Excel export fixed: Units sheet now writes actual `minStaffDay`/`minStaffNight` values instead of hardcoded 4/3; column headers clarified ("Min Weekends Per Nurse Per Schedule", "Min Holidays Per Nurse Per Year"). (6) **On-call limits now enforced in coverage recommendations (§3.12):** Candidates exceeding the weekly or monthly on-call limit are excluded; candidates already covering a callout this week receive a soft warning in their recommendation. Rule descriptions and naming updated throughout.                                                                                                                                                                                                                                                                                                                                                                       |
+| 1.7.4   | Mar 18, 2026 | **Fairness-Optimized variant improvements (§12.1, §12.4, §12.5):** (1) **Holiday fairness now active in generation:** `softPenalty()` Section 9 penalises assigning a public holiday shift to a nurse whose holiday count exceeds the current staff average. The `holidayFairness` weight (3.0 in FAIR, 1.0 in BALANCED) was previously defined but never referenced — it is now active. (2) **Per-nurse load fairness added:** `softPenalty()` Section 10 penalises assigning to nurses who already have significantly more total assignments than their peers. Active in FAIR (`weekendCount > 1.0`); near-zero in BALANCED/COST. (3) **FAIR consecutive-weekends weight raised from 3.0 → 15.0:** At 3.0, the consecutive-weekend penalty was routinely outweighed by charge-qualification and skill-mix bonuses, permitting 4–5 consecutive weekends. At 15.0, a third consecutive weekend (15 × 1.0 = 15 pts penalty) overrides all other scoring factors. (4) **FAIR variant now runs 150-iteration local-search with FAIR weights before the weekend sweep:** Previously, FAIR's greedy and local-search phases used BALANCED weights; only the final weekend-redistribution sweep used FAIR weights. This meant FAIR's higher fairness penalties had no effect on the core optimization. The new 150-iteration pass propagates FAIR weights into actual swap decisions.                                                                                                                  |
+| 1.7.11  | Mar 21, 2026 | **Charge nurse clustering eliminated in greedy construction (§12.2):** The greedy Pass 2 relied on a 0.8-pt soft penalty to discourage placing additional charge-qualified nurses in regular slots. This penalty was outweighed by other scoring factors (preference match, weekend quota, skill mix), consistently producing one shift per 4-week schedule with 3+ charge-qualified nurses. A hard preference tier (mirroring the non-OT preference) now filters regular-slot candidates: once a charge-qualified nurse is on a shift, non-charge-qualified nurses are tried first and the full pool is used only as a fallback to preserve coverage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 1.7.10  | Mar 21, 2026 | **FAIR variant quality regression fixed; hot-path memoization (§12.1):** (1) **FAIR local-search pass removed:** v1.7.9's `staffConsecWeekendDelta` made the FAIR local-search accept far more swaps. Combined with FAIR's `preference: 2.0` weight, this moved `avoidWeekends` nurses below their weekend minimum and FAIR's lower `overtime: 0.5` accepted OT-causing swaps — producing more violations than BALANCED. The FAIR local-search pass is removed. Since v1.7.9, `computeSwapDeltaPenalty` includes `staffConsecWeekendDelta`, so consecutive-weekend streak repair under FAIR's `consecutiveWeekends: 15.0` weight is handled by the `weekendRedistributionSweep` directly. FAIR now runs the sweep immediately on BALANCED's output, guaranteeing FAIR total violations ≤ BALANCED. (2) **Date-object allocation eliminated in hot path:** `weekendIdForDate` and `areConsecutiveWeekendIds` (added in v1.7.9) created `new Date` objects on every invocation. Module-level Maps now cache results; the same ~42 date strings in a 6-week schedule are converted to Date objects at most once per process lifetime.                                                                                                                                                                                                                                                                                                                                                               |
+| 1.7.9   | Mar 21, 2026 | **Consecutive-weekend penalty now visible in all swap delta calculations (§12.4):** `computeSwapDeltaPenalty` and `computeReplacementDeltaPenalty` previously returned 0 for the consecutive-weekend component on every call — the `alreadyThisWeekend` guard in `softPenalty()` fired for both old and new assignments because they were added to state before scoring. Three new helpers (`weekendIdForDate`, `totalStreakPenalty`, `staffConsecWeekendDelta`) compute the consecutive-weekend penalty directly from each nurse's full sorted weekend set in the original unmutated state, bypassing `softPenalty()`. The result is added to the existing delta, making streak improvements and degradations correctly visible to local search and all three deterministic sweeps. The regression test `streak ≤ maxConsecutiveWeekends (2)` now passes, confirming the sweep fully repairs streaks rather than partially reducing them.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 1.7.8   | Mar 21, 2026 | **Regression tests for consecutive-weekend streak escalation and redistribution sweep:** (1) Seven new tests in `scoring.test.ts` verify streak escalation beyond `maxConsecutive`: streak=3→15 pts, streak=4→22.5 pts, streak=5→30 pts, streak=6→37.5 pts. An isolation approach (consecutive vs. non-consecutive priors of equal count) eliminates weekend-equity contamination. (2) Three new tests in `local-search.test.ts` exercise `weekendRedistributionSweep()` for the first time: assignment-count preservation, equity redistribution, and streak reduction. The streak assertion uses `toBeLessThan(initial)` rather than `≤ maxConsecutive` because the `alreadyThisWeekend` guard in `softPenalty()` makes the consecutive component invisible to `computeSwapDeltaPenalty` — delta calculations always see 0 for consecutive penalty. No rule logic changes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 1.7.7   | Mar 21, 2026 | **Consecutive-weekend streak penalty underestimation fixed; redistribution sweep widened for streak violations (§4.3, §12.4):** (1) **Streak scan horizon extended from `maxConsecutive` to `schedulePeriodWeeks`:** The backward/forward loops in `softPenalty()` Section 3b were bounded at `maxConsecutive=2` iterations (a v1.6.10 performance fix). This caused streaks of 4–5 to appear as streak=3 in the penalty — penalty was 15 pts for both streak=4 and streak=5 instead of the correct 22.5 and 30 pts respectively. The scan now extends to `schedulePeriodWeeks` (default 6). `maxConsecutive` is unchanged as the threshold for when the penalty fires. (2) **Weekend redistribution sweep now uses two-phase partner selection:** Phase 1 (deficit-only, unchanged) tries nurses with below-average weekend counts. When Phase 1 exhausts all options and a consecutive streak violation remains, Phase 2 (streak-repair fallback) widens the pool to any nurse with fewer weekend shifts than the violating nurse, sorted ascending by weekend count so deficit nurses are still tried first.                                                                                                                                                                                                                                                                                                                                                                                  |
+| 1.7.6   | Mar 21, 2026 | **Weekend unit semantics + performance fix (§4.2, §12.4, §12.5):** (1) **Weekend counting corrected to industry-standard unit semantics:** `getWeekendCount()` now counts distinct weekend rotations (Sat+Sun of the same week = ONE weekend, not two). Previously it counted individual weekend-day assignments, causing the equity quota to fire after only 1.5 real weekends instead of 3, and giving a spurious incentive to assign the second day of an already-covered weekend. `historicalWeekendCounts` carryforward similarly corrected. `weekendShiftsRequired=3` now means "3 complete weekend rotations per 6-week period." (2) **26-minute generation time eliminated:** Section 9's O(staff × assignments) holiday average computation was running inside `softPenalty()` on every local-search call. A new `computeHolidayAvg()` helper is now called once per pass; `scoreSubset()`, `computeSwapDeltaPenalty()`, and `computeReplacementDeltaPenalty()` thread the precomputed value through. All three sweeps and `localSearch()` precompute it at loop entry. (3) **`totalAssignmentCount()` now O(1):** A private `_totalCount` counter in `SchedulerState` replaces the O(staff) iteration.                                                                                                                                                                                                                                                                                 |
+| 1.7.5   | Mar 21, 2026 | **Consecutive-weekend quota gate removed (§12.4); carryforward accuracy fix:** (1) **Quota gate removed from consecutive-weekend penalty:** The guard `if (weekendCount >= required)` blocked the 15.0-weight penalty while nurses were below quota — preventing it from firing during the entire greedy construction phase, where streaks of 4–5 consecutive weekends could form freely. With FAIR weight now 15.0, the streak-3 penalty (15 pts) decisively outweighs the quota-fill bonus (−1.5 pts), so the gate is no longer needed. Removing it allows the greedy phase to detect and avoid consecutive streaks from the first assignment. BALANCED is barely affected (net +0.5 at streak=3). (2) **Historical weekend carryforward excludes cancelled/called-out assignments:** The lookback query that seeds `historicalWeekendCounts` for cross-schedule fairness now filters out `called_out` and `cancelled` statuses — nurses who called out sick no longer receive phantom weekend credits that deprioritise them in subsequent schedules. (3) **FAIR local-search iterations raised from 150 → 300:** Provides more swap attempts for the 6-week (~420-assignment) schedule.                                                                                                                                                                                                                                                                                                      |
 
 ---
 
@@ -600,11 +650,11 @@ The CAH Scheduler includes an **automated scheduling engine** that generates a f
 
 ### 12.1 Overview
 
-| Variant | Description | Disposition |
-|---------|-------------|-------------|
-| **Balanced** | Equal weight across all objectives | Written directly to the schedule's assignment table as the active draft |
-| **Fairness-Optimized** | A deterministic weekend-redistribution sweep run directly on the Balanced output, using FAIR weights (weekendCount=3.0, consecutiveWeekends=15.0, holidayFairness=3.0). No separate local-search pass (removed v1.7.10 — see §12.4). Guarantees equal or better weekend equity than Balanced. | Saved as an alternative scenario |
-| **Cost-Optimized** | Minimises overtime and float/agency use via deterministic OT-reduction and weekend-redistribution sweeps | Saved as an alternative scenario |
+| Variant                | Description                                                                                                                                                                                                                                                                                   | Disposition                                                             |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| **Balanced**           | Equal weight across all objectives                                                                                                                                                                                                                                                            | Written directly to the schedule's assignment table as the active draft |
+| **Fairness-Optimized** | A deterministic weekend-redistribution sweep run directly on the Balanced output, using FAIR weights (weekendCount=3.0, consecutiveWeekends=15.0, holidayFairness=3.0). No separate local-search pass (removed v1.7.10 — see §12.4). Guarantees equal or better weekend equity than Balanced. | Saved as an alternative scenario                                        |
+| **Cost-Optimized**     | Minimises overtime and float/agency use via deterministic OT-reduction and weekend-redistribution sweeps                                                                                                                                                                                      | Saved as an alternative scenario                                        |
 
 The **Balanced** variant is generated first (greedy construction + local search). The **Fairness-Optimized** and **Cost-Optimized** variants are then derived from the Balanced result by applying deterministic post-processing sweeps — they never produce a result worse than Balanced on their primary metric. Managers compare variants on the Scenarios page and click **Apply** to switch the active schedule.
 
@@ -628,6 +678,7 @@ Shifts are sorted by **constraint difficulty** (most constrained first, to maxim
 Within each group, earlier dates come first, then earlier start times.
 
 For each shift:
+
 1. If a **charge nurse slot** is required and not yet filled, a charge-qualified candidate is selected first. Within the charge candidate pool, **non-OT candidates** (weekly hours + this shift ≤ 40h) are used first; OT candidates are only considered when every charge-qualified eligible nurse would go into overtime. Within whichever pool is used, **Level 5** nurses are preferred over Level 4 stand-ins. This means a Level 4 nurse with remaining non-OT hours will be selected as charge before a Level 5 nurse who would go into overtime.
 2. Remaining **staff slots** are filled one at a time.
 3. For each slot: filter all active staff through the **hard rule eligibility checks** (see §12.3) and the **charge protection guard** (see below). The eligible pool is then split into **non-OT candidates** (weekly hours + this shift ≤ 40h) and **OT candidates** (would cross 40h). Non-OT candidates are used exclusively when any exist; OT candidates are only considered when every eligible nurse would cause overtime. Within whichever pool is used, candidates are ranked by the **soft penalty function** (see §12.4) and the lowest-penalty candidate is assigned.
@@ -647,9 +698,10 @@ Shifts are repaired in criticality order (ICU charge first, then non-ICU charge,
 
 1. **Direct assignment** — find any eligible staff member not yet on the violated shift and assign them. This succeeds when the greedy's charge-protection guard held back a nurse who is actually available.
 
-2. **Swap repair** — move a Level 4+ nurse from a *lower-criticality* shift to the critical slot. The mechanism: removing the nurse from their current assignment changes which rolling 7-day windows contain their hours, potentially dropping their total below the 60-hour cap for the critical shift. The vacated slot is then back-filled with any eligible generalist nurse so the donor shift does not stay short-staffed.
+2. **Swap repair** — move a Level 4+ nurse from a _lower-criticality_ shift to the critical slot. The mechanism: removing the nurse from their current assignment changes which rolling 7-day windows contain their hours, potentially dropping their total below the 60-hour cap for the critical shift. The vacated slot is then back-filled with any eligible generalist nurse so the donor shift does not stay short-staffed.
 
 A donor shift is only raided when:
+
 - Its criticality is strictly lower than the violated shift (e.g., a regular day shift can donate to an ICU charge shift)
 - It retains at least one staff member after the raid
 - Its own charge nurse is not removed (unless another charge nurse remains)
@@ -662,6 +714,7 @@ A violation is preserved in the output **only when no eligible candidate exists 
 #### Phase 2: Local Search (Swap Improvement)
 
 Up to 1,500 random swap attempts are made between pairs of assignments on different shifts. A swap is accepted only if:
+
 - The swap passes all collective and individual hard rule checks (see below)
 - The total soft penalty of the schedule decreases
 
@@ -669,24 +722,24 @@ This uses the **Late Acceptance** metaheuristic (Burke & Bykov, 2012): a swap is
 
 **Collective checks applied before individual eligibility** (added in v1.4.10):
 
-| Check | Rule |
-|-------|------|
-| **Charge-slot integrity** | If an assignment has `isChargeNurse = true`, the incoming staff must be charge-qualified (Level 4+ and `isChargeNurseQualified = true`). The `isChargeNurse` flag is a slot property spread via object spread — without this check, a Level 3 nurse can silently inherit the flag. |
-| **Level 2 supervision residual** | After removing the outgoing staff from an ICU/ER shift, if Level 2 nurses remain on that shift, the shift must still have at least one Level 4+ supervisor (either from remaining staff or from the incoming staff member). |
+| Check                            | Rule                                                                                                                                                                                                                                                                               |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Charge-slot integrity**        | If an assignment has `isChargeNurse = true`, the incoming staff must be charge-qualified (Level 4+ and `isChargeNurseQualified = true`). The `isChargeNurse` flag is a slot property spread via object spread — without this check, a Level 3 nurse can silently inherit the flag. |
+| **Level 2 supervision residual** | After removing the outgoing staff from an ICU/ER shift, if Level 2 nurses remain on that shift, the shift must still have at least one Level 4+ supervisor (either from remaining staff or from the incoming staff member).                                                        |
 
 #### Phase 3: Deterministic Post-Processing Sweeps
 
-After local search completes, two deterministic sweeps are applied to the **Fairness-Optimized** and **Cost-Optimized** variants. Because these variants start from the Balanced result, they are guaranteed to never score *worse* than Balanced on their primary metric.
+After local search completes, two deterministic sweeps are applied to the **Fairness-Optimized** and **Cost-Optimized** variants. Because these variants start from the Balanced result, they are guaranteed to never score _worse_ than Balanced on their primary metric.
 
-**Overtime Reduction Sweep** *(Cost-Optimized only)*
+**Overtime Reduction Sweep** _(Cost-Optimized only)_
 Exhaustively iterates all overtime assignments (those that push a nurse above 40h/week) and attempts two kinds of improvement:
 
-1. *Swap pass* — tries swapping each OT assignment with every other existing assignment. Accepts only if total weighted penalty decreases under COST_OPTIMIZED weights (OT weight 3.0).
-2. *Replacement pass* — runs only when the swap pass stalls. For each remaining OT assignment, scans all staff in `context.staffList` for an unassigned eligible candidate who (a) is not already on that shift, (b) would not enter overtime by taking the shift, (c) passes all hard rules with the original OT assignment temporarily removed, and (d) produces a net penalty decrease. If found, the OT assignment is replaced in-place with the non-OT candidate. The replacement pass re-runs in alternation with the swap pass until neither finds an improvement.
+1. _Swap pass_ — tries swapping each OT assignment with every other existing assignment. Accepts only if total weighted penalty decreases under COST_OPTIMIZED weights (OT weight 3.0).
+2. _Replacement pass_ — runs only when the swap pass stalls. For each remaining OT assignment, scans all staff in `context.staffList` for an unassigned eligible candidate who (a) is not already on that shift, (b) would not enter overtime by taking the shift, (c) passes all hard rules with the original OT assignment temporarily removed, and (d) produces a net penalty decrease. If found, the OT assignment is replaced in-place with the non-OT candidate. The replacement pass re-runs in alternation with the swap pass until neither finds an improvement.
 
 Both passes run within the same `while (madeProgress)` loop, so a replacement improvement can open up new swap opportunities and vice versa.
 
-**Weekend Redistribution Sweep** *(Fairness-Optimized and Cost-Optimized)*
+**Weekend Redistribution Sweep** _(Fairness-Optimized and Cost-Optimized)_
 Computes mean weekend-assignment count across all staff. Identifies staff above and below the mean. Exhaustively pairs "excess" weekend assignments with "deficit" staff and attempts a swap for each pair. Before scoring the swap, an **OT guard** unconditionally rejects it if either participant would exceed 40 hours in the target week after the swap — regardless of whether the penalty improvement would outweigh the overtime cost at the variant's weights. This prevents the weekend sweep from reintroducing overtime that the OT reduction sweep removed. After the OT guard, the swap is accepted only if it passes all hard rules and total weighted penalty decreases under the variant's weights (FAIR weekendCount weight 3.0; COST_OPTIMIZED weekendCount weight 1.0). Runs until no improving swap remains.
 
 **Consecutive-weekend delta in swap evaluation (v1.7.9):** All delta calculations (`computeSwapDeltaPenalty`, `computeReplacementDeltaPenalty`) now include a parallel consecutive-weekend component computed from each nurse's complete weekend set in the pre-swap state. Prior to v1.7.9, the `alreadyThisWeekend` guard in `softPenalty()` caused this component to always return 0 during swap scoring — both the "old" and "new" assignments were in state when scored, triggering the guard each time. The new `staffConsecWeekendDelta()` function bypasses `softPenalty()` and computes the penalty from sorted weekend ID sets directly, making consecutive-streak improvements and degradations visible to all three sweeps and to local search.
@@ -699,16 +752,16 @@ The result: Fairness-Optimized is guaranteed to have weekend-count std dev ≤ B
 
 These are evaluated in the order shown. Failing any check immediately disqualifies the candidate for that shift — they are **never relaxed**.
 
-| # | Check | Details |
-|---|-------|---------|
-| 1 | **Approved leave** | Staff on approved leave for the shift date cannot be assigned |
-| 2 | **PRN availability** | Per-diem (PRN) staff must have submitted availability for this date |
-| 3 | **ICU/ER competency** | Shifts in ICU, ER, or ED units require `icuCompetencyLevel ≥ 2` |
-| 4 | **No overlapping shifts** | Staff cannot be on two shifts whose time windows overlap |
-| 5 | **Minimum rest (10 hours)** | At least 10 hours must separate the end of the previous shift and the start of this one |
-| 6 | **Max consecutive days (5)** | Cannot create a run of more than 5 consecutive working days. Reduced to a staff member's personal preference if that preference is lower. |
-| 7 | **60-hour rolling window** | Adding this shift must not push total hours in any 7-day window above 60h |
-| 8 | **On-call limits** | On-call shifts respect `maxOnCallPerWeek` and `maxOnCallWeekendsPerMonth` unit settings |
+| #   | Check                        | Details                                                                                                                                   |
+| --- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Approved leave**           | Staff on approved leave for the shift date cannot be assigned                                                                             |
+| 2   | **PRN availability**         | Per-diem (PRN) staff must have submitted availability for this date                                                                       |
+| 3   | **ICU/ER competency**        | Shifts in ICU, ER, or ED units require `icuCompetencyLevel ≥ 2`                                                                           |
+| 4   | **No overlapping shifts**    | Staff cannot be on two shifts whose time windows overlap                                                                                  |
+| 5   | **Minimum rest (10 hours)**  | At least 10 hours must separate the end of the previous shift and the start of this one                                                   |
+| 6   | **Max consecutive days (5)** | Cannot create a run of more than 5 consecutive working days. Reduced to a staff member's personal preference if that preference is lower. |
+| 7   | **60-hour rolling window**   | Adding this shift must not push total hours in any 7-day window above 60h                                                                 |
+| 8   | **On-call limits**           | On-call shifts respect `maxOnCallPerWeek` and `maxOnCallWeekendsPerMonth` unit settings                                                   |
 
 If **all** remaining candidates fail hard rules for a given slot, that slot is left unfilled. The shift is flagged as understaffed with a summary of the most common rejection reasons, surfaced to the manager after generation.
 
@@ -720,27 +773,27 @@ Each eligible candidate receives a penalty score. Lower is better. Negative valu
 
 Each component is multiplied by the weight for that component in the active variant's weight profile.
 
-| Component | Incentive / Penalty | Condition |
-|-----------|---------------------|-----------|
-| **Overtime — heavy** | + `weight × (OT hours / 12)` | Total weekly hours would exceed 40 |
-| **Overtime — light** | + `weight × 0.3 × (extra hours / 12)` | Total would exceed FTE target but not 40h |
-| **Capacity bonus** | − `weight × 0.1 × (remaining hours before 40h / 40)` | Always applied; highest for staff at 0h, zero for staff already at 40h |
-| **Shift type mismatch** | + `weight × 0.5` | Candidate prefers a different shift type |
-| **Preferred day off** | + `weight × 0.7` | Shift falls on a day the staff prefers off |
-| **Weekend avoidance** | + `weight × 0.6` | Shift is on Sat/Sun and staff has `avoidWeekends = true` |
-| **Weekend incentive** | − `weight × 0.5` | Shift is a weekend shift and staff is below their required weekend count (historical + current) |
-| **Weekend excess penalty** | + `weight × (0.4 + excess × 0.3)` | Shift is a weekend and staff is at or above required weekend count |
-| **Consecutive weekends** | + `weight × (0.5 + excess × 0.5)` | Assigning this weekend shift would push the staff member's consecutive-weekend streak past the unit maximum (default 2). `excess` = streak length minus max. **Fires regardless of weekend quota status** (v1.7.5 — quota gate removed). At FAIR weight 15.0: streak=3→15 pts, streak=4→22.5 pts, streak=5→30 pts (v1.7.7 — scan horizon extended to `schedulePeriodWeeks`; prior to v1.7.7 the scan was capped at `maxConsecutive=2` iterations so streaks of 4–5 appeared as streak=3). Sat + Sun of the same weekend share one ID and are not double-counted. |
-| **Float — uncross-trained** | + `weight × 1.0` | Assigned outside home unit, not cross-trained there |
-| **Float — cross-trained** | + `weight × 0.3` | Assigned outside home unit, but cross-trained |
-| **Skill mix — all same** | + `weight × 0.6` | All staff on shift (including candidate) would share the same competency level |
-| **Skill mix — partial dup** | + `weight × 0.1` | Candidate's competency level already exists on shift, but mix is not uniform |
-| **Preceptor incentive** | − `weight × 0.8` | Candidate is Level 5 and a Level 1 is already on the shift |
-| **Level 2 supervision** | − `weight × 0.6` | Candidate is Level 4+ on an ICU/ER shift that has a Level 2 nurse |
-| **Charge clustering** | + `weight × 0.5` | Non-charge-candidate is charge-qualified, but shift already has a charge nurse |
-| **Agency** | + `weight × 1.0` | Candidate is an agency nurse (employment type = `agency`) |
-| **Holiday fairness** | + `weight × 0.5 × excess` | Shift is a public holiday and candidate already has more holidays than the current staff average. `excess` = candidate's holiday count − average, measured in whole holidays above 0.5. Steers holiday shifts toward nurses who have worked fewer holidays so far in the current schedule. |
-| **Per-nurse load fairness** | + `weekendCount_weight × 0.2 × loadExcess` | Candidate already has significantly more total assignments than the staff average (`loadExcess > 1`). Only active when `weekendCount weight > 1.0` (i.e., Fairness-Optimized variant). Spreads shift count across the team so high-competency nurses do not accumulate disproportionate violations. |
+| Component                   | Incentive / Penalty                                  | Condition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| --------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Overtime — heavy**        | + `weight × (OT hours / 12)`                         | Total weekly hours would exceed 40                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **Overtime — light**        | + `weight × 0.3 × (extra hours / 12)`                | Total would exceed FTE target but not 40h                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **Capacity bonus**          | − `weight × 0.1 × (remaining hours before 40h / 40)` | Always applied; highest for staff at 0h, zero for staff already at 40h                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **Shift type mismatch**     | + `weight × 0.5`                                     | Candidate prefers a different shift type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **Preferred day off**       | + `weight × 0.7`                                     | Shift falls on a day the staff prefers off                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **Weekend avoidance**       | + `weight × 0.6`                                     | Shift is on Sat/Sun and staff has `avoidWeekends = true`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **Weekend incentive**       | − `weight × 0.5`                                     | Shift is a weekend shift and staff is below their required weekend count (historical + current)                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **Weekend excess penalty**  | + `weight × (0.4 + excess × 0.3)`                    | Shift is a weekend and staff is at or above required weekend count                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **Consecutive weekends**    | + `weight × (0.5 + excess × 0.5)`                    | Assigning this weekend shift would push the staff member's consecutive-weekend streak past the unit maximum (default 2). `excess` = streak length minus max. **Fires regardless of weekend quota status** (v1.7.5 — quota gate removed). At FAIR weight 15.0: streak=3→15 pts, streak=4→22.5 pts, streak=5→30 pts (v1.7.7 — scan horizon extended to `schedulePeriodWeeks`; prior to v1.7.7 the scan was capped at `maxConsecutive=2` iterations so streaks of 4–5 appeared as streak=3). Sat + Sun of the same weekend share one ID and are not double-counted. |
+| **Float — uncross-trained** | + `weight × 1.0`                                     | Assigned outside home unit, not cross-trained there                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **Float — cross-trained**   | + `weight × 0.3`                                     | Assigned outside home unit, but cross-trained                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| **Skill mix — all same**    | + `weight × 0.6`                                     | All staff on shift (including candidate) would share the same competency level                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **Skill mix — partial dup** | + `weight × 0.1`                                     | Candidate's competency level already exists on shift, but mix is not uniform                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| **Preceptor incentive**     | − `weight × 0.8`                                     | Candidate is Level 5 and a Level 1 is already on the shift                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **Level 2 supervision**     | − `weight × 0.6`                                     | Candidate is Level 4+ on an ICU/ER shift that has a Level 2 nurse                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **Charge clustering**       | + `weight × 0.5`                                     | Non-charge-candidate is charge-qualified, but shift already has a charge nurse                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **Agency**                  | + `weight × 1.0`                                     | Candidate is an agency nurse (employment type = `agency`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **Holiday fairness**        | + `weight × 0.5 × excess`                            | Shift is a public holiday and candidate already has more holidays than the current staff average. `excess` = candidate's holiday count − average, measured in whole holidays above 0.5. Steers holiday shifts toward nurses who have worked fewer holidays so far in the current schedule.                                                                                                                                                                                                                                                                       |
+| **Per-nurse load fairness** | + `weekendCount_weight × 0.2 × loadExcess`           | Candidate already has significantly more total assignments than the staff average (`loadExcess > 1`). Only active when `weekendCount weight > 1.0` (i.e., Fairness-Optimized variant). Spreads shift count across the team so high-competency nurses do not accumulate disproportionate violations.                                                                                                                                                                                                                                                              |
 
 **Capacity bonus rationale:** Mirrors natural charge-nurse behaviour — when two candidates are otherwise equal, the one with more remaining hours this week is asked first. The coefficient (0.1) is intentionally small so it acts as a tiebreaker only and does not override meaningful clinical penalties (skill mix, charge requirement, preferences). Float pool staff — who have no home-unit bias and often have lower accumulated hours when critical ICU shifts are scheduled first — benefit most from this bonus, naturally reducing overtime on regular unit staff later in the schedule.
 
@@ -752,17 +805,17 @@ Each component is multiplied by the weight for that component in the active vari
 
 Three profiles are defined. Weights are multiplied by the per-component penalty constants above.
 
-| Weight | Balanced | Fairness-Optimized | Cost-Optimized |
-|--------|----------|--------------------|----------------|
-| `overtime` | **1.5** | 0.5 | **3.0** |
-| `preference` | **1.5** | **2.0** | 0.5 |
-| `weekendCount` | 1.0 | **3.0** | 1.0 |
-| `consecutiveWeekends` | 1.0 | **15.0** | 1.0 |
-| `holidayFairness` | 1.0 | **3.0** | 1.0 |
-| `skillMix` | 1.0 | 1.0 | 0.5 |
-| `float` | 1.0 | 0.5 | **2.0** |
-| `chargeClustering` | 1.0 | 1.0 | 0.5 |
-| `agency` | **2.5** | 1.5 | **5.0** |
+| Weight                | Balanced | Fairness-Optimized | Cost-Optimized |
+| --------------------- | -------- | ------------------ | -------------- |
+| `overtime`            | **1.5**  | 0.5                | **3.0**        |
+| `preference`          | **1.5**  | **2.0**            | 0.5            |
+| `weekendCount`        | 1.0      | **3.0**            | 1.0            |
+| `consecutiveWeekends` | 1.0      | **15.0**           | 1.0            |
+| `holidayFairness`     | 1.0      | **3.0**            | 1.0            |
+| `skillMix`            | 1.0      | 1.0                | 0.5            |
+| `float`               | 1.0      | 0.5                | **2.0**        |
+| `chargeClustering`    | 1.0      | 1.0                | 0.5            |
+| `agency`              | **2.5**  | 1.5                | **5.0**        |
 
 **Balanced overtime rationale:** Raised from 1.0 → 1.5 so that actual overtime (a real payroll cost at 1.5× pay) is consistently more expensive than any single preference violation. At 1.5, 8h OT costs 1.0 scheduler units vs. a shift-type mismatch at 0.75 — overtime takes priority. The Fairness-Optimized profile intentionally keeps overtime low (0.5) because it accepts some extra hours in exchange for a more equitable weekend/holiday distribution.
 
@@ -777,6 +830,7 @@ Three profiles are defined. Weights are multiplied by the per-component penalty 
 When the greedy phase cannot fill a slot, the repair phase (§12.2 Phase 1.5) immediately attempts to fix it by swapping specialised staff from lower-priority shifts. A shift only remains understaffed after generation when **both** the greedy phase and the repair phase have exhausted all possibilities.
 
 For shifts that still cannot be filled after repair:
+
 - The slot is left **empty** — hard rules are never relaxed
 - The shift is recorded with: date, shift type, unit, slots required, slots filled, and rejection reason
 - After generation, warnings are shown to the manager
@@ -788,17 +842,32 @@ Understaffed shifts reported after generation represent **genuine staffing short
 
 ### 12.7 Audit Trail
 
-| Event | # Entries | Action | Details |
-|-------|-----------|--------|---------|
-| Schedule auto-generated | 3 (one per variant) | `schedule_auto_generated` | Variant type, assignment count, understaffed count, full score breakdown |
-| Scenario applied | 1 | `scenario_applied` | Scenario name, old assignment count, new assignment count |
-| Subsequent manual changes | Per-event | Existing behavior | Callouts, swaps, manual assignments continue to produce individual audit entries |
+| Event                     | # Entries           | Action                    | Details                                                                          |
+| ------------------------- | ------------------- | ------------------------- | -------------------------------------------------------------------------------- |
+| Schedule auto-generated   | 3 (one per variant) | `schedule_auto_generated` | Variant type, assignment count, understaffed count, full score breakdown         |
+| Scenario applied          | 1                   | `scenario_applied`        | Scenario name, old assignment count, new assignment count                        |
+| Subsequent manual changes | Per-event           | Existing behavior         | Callouts, swaps, manual assignments continue to produce individual audit entries |
 
 The `assignmentSource` field on each assignment record distinguishes how the assignment was created:
+
 - `auto_generated` — created by the scheduling algorithm (Balanced variant)
 - `scenario_applied` — created when a manager applied an alternative scenario
 - `manual` — created by a manager through the assignment dialog
 
+### 12.8 Published-Schedule Amendments _(v1.6.18)_
+
+A published schedule is the version of record nurses have seen. Changes after publish are handled as **amendments**, not as a new schedule:
+
+| Change on a published schedule                               | Allowed?                        | Reason required                        | Audit entry                                                                                                     | Who is notified                                                 |
+| ------------------------------------------------------------ | ------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Add an assignment (assignment dialog)                        | Yes                             | Yes (HTTP 400 without)                 | `manual_assignment` on the assignment **and** `post_publish_amendment` on the schedule, reason as justification | The added nurse only (`assignment_amended`)                     |
+| Remove an assignment (assignment dialog)                     | Yes                             | Yes                                    | `deleted` on the assignment **and** `post_publish_amendment` on the schedule                                    | The removed nurse only (`assignment_amended`)                   |
+| Leave approval, callout fill, open-shift fill, swap approval | Yes (unchanged)                 | No — the workflow itself is the reason | Their existing actions                                                                                          | Per their existing rules                                        |
+| Unpublish (published → draft)                                | Yes                             | Yes                                    | `unpublished` on the schedule, reason as justification                                                          | Nobody; re-publishing later notifies every assigned nurse again |
+| Regenerate variants                                          | No — unpublish first (HTTP 409) | —                                      | —                                                                                                               | —                                                               |
+
+The schedule header shows **Amended ×N**, where N is the count of `post_publish_amendment` rows for that schedule. Unpublish is reserved for wholesale rework; the unpublish dialog tells the manager to edit the shift instead for a one-person change.
+
 ---
 
-*Document generated from CAH Scheduler codebase*
+_Document generated from CAH Scheduler codebase_

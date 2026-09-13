@@ -195,8 +195,22 @@ export async function GET(
     };
   });
 
+  // How many hand changes were made after publish — drives the "Amended" badge.
+  const amendmentCount = db
+    .select({ id: exceptionLog.id })
+    .from(exceptionLog)
+    .where(
+      and(
+        eq(exceptionLog.entityType, "schedule"),
+        eq(exceptionLog.entityId, id),
+        eq(exceptionLog.action, "post_publish_amendment"),
+      ),
+    )
+    .all().length;
+
   return NextResponse.json({
     ...sched,
+    amendmentCount,
     shifts: shiftsWithAssignments,
   });
 }
@@ -231,6 +245,23 @@ export async function PUT(
     }
   }
 
+  // Unpublishing withdraws the version of record from every nurse. It is the
+  // wholesale-rework path (a one-person change is an amendment instead), so
+  // it must be explained: the reason lands in the audit trail.
+  const isUnpublish =
+    existing?.status === "published" && body.status === "draft";
+  const unpublishReason =
+    typeof body.reason === "string" ? body.reason.trim() : "";
+  if (isUnpublish && unpublishReason.length === 0) {
+    return NextResponse.json(
+      {
+        error:
+          "Give a reason for unpublishing — nurses have already seen this schedule, and the reason is recorded in the audit trail.",
+      },
+      { status: 400 },
+    );
+  }
+
   const updated = db
     .update(schedule)
     .set({
@@ -246,8 +277,9 @@ export async function PUT(
     .get();
 
   if (updated) {
-    const scheduleAction =
-      body.status === "published"
+    const scheduleAction = isUnpublish
+      ? "unpublished"
+      : body.status === "published"
         ? "published"
         : body.status === "archived"
           ? "archived"
@@ -257,7 +289,10 @@ export async function PUT(
         entityType: "schedule",
         entityId: id,
         action: scheduleAction,
-        description: `Schedule ${scheduleAction}: ${updated.name}`,
+        description: isUnpublish
+          ? `Schedule unpublished: ${updated.name} — ${unpublishReason}`
+          : `Schedule ${scheduleAction}: ${updated.name}`,
+        justification: isUnpublish ? unpublishReason : undefined,
         previousState: existing ? { status: existing.status } : undefined,
         newState: { status: updated.status },
         performedBy: "nurse_manager",

@@ -13,6 +13,28 @@ import { NextResponse } from "next/server";
 import { logAuditEvent } from "@/lib/audit/logger";
 import { describeStaffing } from "@/lib/audit/staffing-context";
 import { weekBounds } from "@/lib/date/week";
+import { notification } from "@/db/schema";
+import {
+  insertNotification,
+  composeAssignmentAmended,
+} from "@/lib/notifications/notify";
+
+/**
+ * Post-publish amendments. A published schedule is the version of record
+ * nurses have seen, and once seen "unpublishing" has no real-world meaning —
+ * a one-person change is an amendment, not a new schedule. Amendments are
+ * allowed, but must carry a reason, are logged against the SCHEDULE as
+ * `post_publish_amendment` (so the schedule's history reads as "what changed
+ * after publish"), and notify only the affected nurse. Wholesale rework still
+ * goes through unpublish (see PUT /api/schedules/[id]).
+ */
+function amendmentReason(raw: unknown): string | null {
+  const r = typeof raw === "string" ? raw.trim() : "";
+  return r.length > 0 ? r : null;
+}
+
+const AMENDMENT_REASON_REQUIRED =
+  "This schedule is published. Give a reason for the change — it is recorded in the audit trail and shown to the affected nurse.";
 
 /**
  * Holiday groups - maps individual holiday names to logical holiday groups.
@@ -34,21 +56,19 @@ export async function POST(
   const { id: scheduleId } = await params;
   const body = await request.json();
 
-  // A published schedule is the version of record staff were notified about.
-  // Mutating it directly would desynchronize what staff saw from what the
-  // system stores — require an explicit unpublish first.
+  // Changes to a published schedule are amendments: allowed, but only with a
+  // reason (audit trail + the affected nurse's notification).
   const scheduleRecord = db
     .select()
     .from(schedule)
     .where(eq(schedule.id, scheduleId))
     .get();
-  if (scheduleRecord?.status === "published") {
+  const isPublished = scheduleRecord?.status === "published";
+  const reason = amendmentReason(body.reason);
+  if (isPublished && !reason) {
     return NextResponse.json(
-      {
-        error:
-          "Cannot modify assignments on a published schedule. Unpublish it first to make changes.",
-      },
-      { status: 409 },
+      { error: AMENDMENT_REASON_REQUIRED },
+      { status: 400 },
     );
   }
 
@@ -168,6 +188,39 @@ export async function POST(
     newState: newAssignment as unknown as Record<string, unknown>,
   });
 
+  if (isPublished && reason && scheduleRecord) {
+    logAuditEvent({
+      entityType: "schedule",
+      entityId: scheduleId,
+      action: "post_publish_amendment",
+      description: `Amended published schedule "${scheduleRecord.name}": added ${staffName} to ${shiftLabel}${body.isChargeNurse ? " (charge nurse)" : ""} — ${reason}`,
+      justification: reason,
+      newState: {
+        change: "added",
+        assignmentId: newAssignment.id,
+        staffId: body.staffId,
+        shiftId: body.shiftId,
+        shiftDate: shiftRecord?.date ?? null,
+      },
+    });
+    try {
+      insertNotification(
+        db,
+        notification,
+        composeAssignmentAmended({
+          staffId: body.staffId,
+          change: "added",
+          date: shiftRecord?.date ?? "",
+          shiftLabel: shiftDef?.name ?? shiftDef?.shiftType ?? "Shift",
+          unit: scheduleRecord.unit,
+          reason,
+        }),
+      );
+    } catch (err) {
+      console.error("[notify] assignment_amended (added) failed", err);
+    }
+  }
+
   // Track holiday assignment for annual fairness — shiftRecord already fetched above
   if (shiftRecord) {
     const holidayRecord = db
@@ -235,23 +288,22 @@ export async function DELETE(request: Request) {
     .where(eq(assignment.id, assignmentId))
     .get();
 
-  // Same published-schedule guard as POST: removals on the version of record
-  // must go through unpublish first.
-  if (existing) {
-    const owningSchedule = db
-      .select()
-      .from(schedule)
-      .where(eq(schedule.id, existing.scheduleId))
-      .get();
-    if (owningSchedule?.status === "published") {
-      return NextResponse.json(
-        {
-          error:
-            "Cannot modify assignments on a published schedule. Unpublish it first to make changes.",
-        },
-        { status: 409 },
-      );
-    }
+  // Same amendment rule as POST: removals from a published schedule need a
+  // reason (?reason=...), are logged, and notify the removed nurse.
+  const owningSchedule = existing
+    ? db
+        .select()
+        .from(schedule)
+        .where(eq(schedule.id, existing.scheduleId))
+        .get()
+    : undefined;
+  const isPublished = owningSchedule?.status === "published";
+  const reason = amendmentReason(searchParams.get("reason"));
+  if (isPublished && !reason) {
+    return NextResponse.json(
+      { error: AMENDMENT_REASON_REQUIRED },
+      { status: 400 },
+    );
   }
 
   // Clean up holiday tracking if this was a holiday assignment
@@ -334,6 +386,39 @@ export async function DELETE(request: Request) {
       description: `Removed ${delStaffName} from ${delShiftLabel}${postRemovalStaffing}`,
       previousState: existing as unknown as Record<string, unknown>,
     });
+
+    if (isPublished && reason && owningSchedule) {
+      logAuditEvent({
+        entityType: "schedule",
+        entityId: owningSchedule.id,
+        action: "post_publish_amendment",
+        description: `Amended published schedule "${owningSchedule.name}": removed ${delStaffName} from ${delShiftLabel} — ${reason}${postRemovalStaffing}`,
+        justification: reason,
+        previousState: {
+          change: "removed",
+          assignmentId,
+          staffId: existing.staffId,
+          shiftId: existing.shiftId,
+          shiftDate: delShiftRecord?.date ?? null,
+        },
+      });
+      try {
+        insertNotification(
+          db,
+          notification,
+          composeAssignmentAmended({
+            staffId: existing.staffId,
+            change: "removed",
+            date: delShiftRecord?.date ?? "",
+            shiftLabel: delShiftDef?.name ?? delShiftDef?.shiftType ?? "Shift",
+            unit: owningSchedule.unit,
+            reason,
+          }),
+        );
+      } catch (err) {
+        console.error("[notify] assignment_amended (removed) failed", err);
+      }
+    }
   }
 
   return NextResponse.json({ success: true });

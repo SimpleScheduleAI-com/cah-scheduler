@@ -69,3 +69,32 @@ now. Founder: "leave it for now — we are not sure if we will keep this
 feature." Do not build earned-reliability, and do not re-flag the staleness;
 the open decision is whether the field survives at all. If it is removed,
 strip it from both rankers' base scores at the same time.
+
+## 2026-09-13 — Published schedules are amended, not unpublished
+
+A published schedule is the version of record nurses have seen. Once seen,
+"unpublishing" has no real-world meaning — a charge nurse does not take the
+schedule off the wall to move one name. So a hand change to a published
+schedule is an **amendment**: allowed, reason mandatory, logged against the
+schedule (`post_publish_amendment`, reason as justification), and only the
+affected nurse is notified. The old 409 "unpublish first" guard (v1.6.13) is
+gone from the assignments route. Unpublish survives for wholesale rework
+(regeneration still requires it), now with a mandatory reason and its own
+`unpublished` audit action. Rejected alternative: keep the 409 and make
+unpublish → re-publish cheaper — re-publish must keep alerting everyone
+(that is its job), so it can never be the right tool for a one-person change.
+Founder direction after the 2026-09-11 Dr. Tara demo; she also asked that
+every change be tracked and that nurses see only that their own shift moved.
+
+## 2026-09-13 — Urgent callouts notify eligible nurses when ≥ 1 day out
+
+Leave approval has two coverage paths split by the unit's callout threshold
+(default 7 days): open shift (beyond) and callout (within). Only the open
+shift path told nurses anything, so a night charge nurse's leave 6 days out
+silently became a manager-only callout — the demo gap. Now the callout path
+also posts `callout_posted` to every rule-eligible nurse when the shift is at
+least one full day away. Cutoff at 1 day, not 0: with hours to go the manager
+is already on the phone and a board notice is noise. The two paths remain
+distinct on purpose — a callout has no open-shift row, so the nurse is told
+to contact the manager rather than "raise a hand". Founder: "4-5 days before,
+it makes sense; less than a day away it does not."

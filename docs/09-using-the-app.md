@@ -10,13 +10,13 @@ The CAH Scheduler is a web application. You access it through a browser (Chrome,
 
 **Main navigation:** A sidebar on the left shows all available pages, organized into groups:
 
-| Group | Pages |
-|-------|-------|
-| *(top)* | Dashboard |
-| **Scheduling** | Schedule, Census, Schedule Variants |
+| Group                | Pages                                                       |
+| -------------------- | ----------------------------------------------------------- |
+| _(top)_              | Dashboard                                                   |
+| **Scheduling**       | Schedule, Census, Schedule Variants                         |
 | **Daily Management** | Callouts, Open Shifts, Leave, Shift Swaps, PRN Availability |
-| **Configuration** | Staff, Rules, Units, Holidays |
-| **System** | Import / Export, Audit Trail |
+| **Configuration**    | Staff, Rules, Units, Holidays                               |
+| **System**           | Import / Export, Audit Trail                                |
 
 ---
 
@@ -66,6 +66,7 @@ Here's every page in the application and what you can do on each.
 ### Excel Template Sheets
 
 **Sheet 1: Staff**
+
 - First Name, Last Name (required)
 - Role: RN, LPN, or CNA (required)
 - Employment Type: full_time, part_time, per_diem, float, agency (required)
@@ -78,14 +79,17 @@ Here's every page in the application and what you can do on each.
   - Avoid Weekends: Yes or No
 
 **Sheet 2: Units**
+
 - Name (required) - e.g., ICU, ER, Med-Surg
 - Min Staff Day, Min Staff Night (required)
 
 **Sheet 3: Holidays**
+
 - Name (required) - e.g., Christmas Day
 - Date (required) - e.g., 2026-12-25
 
 **Sheet 4: Census Bands** (optional)
+
 - Unit (required) - must match a unit name in the Units sheet
 - Color (required): blue, green, yellow, or red
 - Min Patients, Max Patients (required) - patient count range for this tier
@@ -93,6 +97,7 @@ Here's every page in the application and what you can do on each.
 - Sort Order (optional): display order (1 = lowest census)
 
 **Sheet 5: Staff Leave** (optional)
+
 - First Name, Last Name (required — must match a staff member in the Staff sheet)
 - Leave Type (required): vacation, sick, maternity, medical, personal, bereavement, or other
 - Start Date, End Date (required): YYYY-MM-DD format
@@ -103,17 +108,18 @@ Here's every page in the application and what you can do on each.
 
 ### Common Tasks
 
-| Task | How To |
-|------|--------|
-| Export current data | Click "Download Data" button |
-| Upload data | Drag file to upload area or click "Browse" |
-| Fix errors | Read error messages, fix in Excel, re-upload |
-| Import | Click "Import Data" after preview looks good |
-| Start over | Click "Remove" on uploaded file |
+| Task                | How To                                       |
+| ------------------- | -------------------------------------------- |
+| Export current data | Click "Download Data" button                 |
+| Upload data         | Drag file to upload area or click "Browse"   |
+| Fix errors          | Read error messages, fix in Excel, re-upload |
+| Import              | Click "Import Data" after preview looks good |
+| Start over          | Click "Remove" on uploaded file              |
 
 ### After a Successful Import
 
 When import completes, the page shows a success screen with:
+
 - **"Create Your First Schedule →"** — the recommended next step
 - **"Review Staff"** — verify the imported roster
 - **"Import Another File"** — start over with a different file
@@ -145,13 +151,13 @@ When import completes, the page shows a success screen with:
 
 ### Common Tasks
 
-| Task | How To |
-|------|--------|
-| Open the current schedule | Click "Open Schedule Builder →" on the schedule card |
-| Create your first schedule | Click "Create Schedule →" on the schedule card |
-| Follow the setup guide | Check the Getting Started card (amber) |
-| Jump to an alert | Click any item in the Needs Attention row |
-| Dismiss the checklist | Click the × on the Getting Started card |
+| Task                       | How To                                               |
+| -------------------------- | ---------------------------------------------------- |
+| Open the current schedule  | Click "Open Schedule Builder →" on the schedule card |
+| Create your first schedule | Click "Create Schedule →" on the schedule card       |
+| Follow the setup guide     | Check the Getting Started card (amber)               |
+| Jump to an alert           | Click any item in the Needs Attention row            |
+| Dismiss the checklist      | Click the × on the Getting Started card              |
 
 ---
 
@@ -167,19 +173,20 @@ When import completes, the page shows a success screen with:
 
 ### Common Tasks
 
-| Task | How To |
-|------|--------|
-| View all staff | Just open the page |
-| Find a specific person | Use search/filter |
-| Add new staff | Click "Add Staff" button |
-| Edit staff info | Click on a staff member, then "Edit" |
-| Deactivate staff | Edit and set "Active" to No |
-| View certifications | Click into staff detail view |
+| Task                    | How To                                             |
+| ----------------------- | -------------------------------------------------- |
+| View all staff          | Just open the page                                 |
+| Find a specific person  | Use search/filter                                  |
+| Add new staff           | Click "Add Staff" button                           |
+| Edit staff info         | Click on a staff member, then "Edit"               |
+| Deactivate staff        | Edit and set "Active" to No                        |
+| View certifications     | Click into staff detail view                       |
 | **View staff calendar** | Click on staff member's name to see their schedule |
 
 ### Adding New Staff
 
 Required information:
+
 1. First name, Last name
 2. Role (RN, LPN, CNA)
 3. Employment type (Full-time, Part-time, PRN, etc.)
@@ -198,25 +205,27 @@ Required information:
 - **Calendar Grid** - Days across the top, shifts down the side
 - **Assignments** - Who's working each shift
 - **Coverage Indicators** - Green (good), Yellow (warning), Red (problem)
-- **Schedule Status** - Draft or Published
+- **Schedule Status** - Draft or Published. A published schedule that has been changed by hand since publishing also shows an amber **Amended ×N** badge — N is how many changes were made
 
 ### Common Tasks
 
-| Task | How To |
-|------|--------|
-| View a day's coverage | Click on the day |
-| See who's working a shift | Click on the shift |
-| Add an assignment | Click any shift to open the assignment dialog |
-| Remove an assignment | Open the shift dialog, click "Remove" next to the staff member |
-| **Generate schedule automatically** | Click **"Generate Schedule"** button in the top-right |
-| Publish schedule | Click **"Publish"** button |
-| **Export schedule to Excel** | Click **"Export"** button — downloads a ready-to-distribute `.xlsx` file |
+| Task                                  | How To                                                                                                                                          |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| View a day's coverage                 | Click on the day                                                                                                                                |
+| See who's working a shift             | Click on the shift                                                                                                                              |
+| Add an assignment                     | Click any shift to open the assignment dialog                                                                                                   |
+| Remove an assignment                  | Open the shift dialog, click "Remove" next to the staff member                                                                                  |
+| **Generate schedule automatically**   | Click **"Generate Schedule"** button in the top-right                                                                                           |
+| Publish schedule                      | Click **"Publish"** button                                                                                                                      |
+| Change a shift after publishing       | Open the shift dialog and add or remove as usual — the app asks for a short reason, records it in the audit trail, and tells the affected nurse |
+| Unpublish (rework the whole schedule) | Click **"Unpublish"** and give a reason — only for wholesale changes such as regenerating; for a one-person change, edit the shift instead      |
+| **Export schedule to Excel**          | Click **"Export"** button — downloads a ready-to-distribute `.xlsx` file                                                                        |
 
 ### The Assignment Dialog
 
 When you click any shift in the grid, a dialog opens showing:
 
-- **Flex-Home / VTO Suggestions** *(blue panel — only appears when overstaffed)* — if the census tier was reduced (e.g., to Blue) and there are more staff assigned than required, this panel lists which staff to offer flex-home or VTO first, in priority order, with a reason for each:
+- **Flex-Home / VTO Suggestions** _(blue panel — only appears when overstaffed)_ — if the census tier was reduced (e.g., to Blue) and there are more staff assigned than required, this panel lists which staff to offer flex-home or VTO first, in priority order, with a reason for each:
   - Staff on overtime are listed first (sending them home stops the OT clock and saves payroll)
   - Agency staff next (flex before permanent staff)
   - PRN staff before full-time
@@ -224,7 +233,7 @@ When you click any shift in the grid, a dialog opens showing:
   - The charge nurse is never recommended regardless of other factors
 - **Currently Assigned** — everyone on this shift, with:
   - Badges for Charge, competency level, and **OT** (red) if this nurse's total hours for the week exceed 40h — the badge appears on every overtime shift, not just the first one
-  - Hours worked this week *including* this shift — shown in amber if a part-time nurse is above their FTE target
+  - Hours worked this week _including_ this shift — shown in amber if a part-time nurse is above their FTE target
   - FTE target in parentheses for part-time staff (e.g., "28h this week (20h FTE target)")
   - Preference mismatches in amber — "Prefers nights", "Prefers Monday off", "Avoids weekends"
 - **Available Staff** — all staff who pass hard scheduling rules for this shift, each showing:
@@ -236,9 +245,12 @@ When you click any shift in the grid, a dialog opens showing:
 
 If a shift requires a charge nurse, eligible charge nurses (Level 4+) show an **Assign as Charge** button instead of the plain Assign button.
 
+**On a published schedule** the dialog works the same way, with one extra step: after you click Assign or Remove, a small box asks for the reason (for example "Covering approved leave" or "Low census release"). The reason is saved in the audit trail and appears in the notification the nurse receives — only that nurse is told, not the whole unit. You do not need to unpublish and re-publish.
+
 ### Creating a New Schedule
 
 When you click **New Schedule**, a dialog opens where you:
+
 1. Enter a name (e.g., "ICU — Feb/Mar 2026")
 2. Set the start and end dates
 3. Select a unit from the dropdown
@@ -269,11 +281,11 @@ The dialog defaults to the unit used in your most recent non-archived schedule, 
 
 Click **"Export"** in the schedule header to download a `.xlsx` file. The file contains three sheets:
 
-| Sheet | Contents |
-|-------|----------|
-| **Schedule Grid** | Dates as rows, shift names as columns. Each cell lists the nurses assigned (★ = charge nurse). Easy to print or share. |
-| **Leave & Callouts** | All approved leave overlapping this schedule period, plus any callouts logged for shifts in this schedule. Shows leave type, dates, and status. |
-| **Per-Staff List** | Every assignment sorted by staff name then date, with shift name, start/end time, and charge/overtime flags. Useful for distributing individual schedules or importing into payroll. |
+| Sheet                | Contents                                                                                                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Schedule Grid**    | Dates as rows, shift names as columns. Each cell lists the nurses assigned (★ = charge nurse). Easy to print or share.                                                               |
+| **Leave & Callouts** | All approved leave overlapping this schedule period, plus any callouts logged for shifts in this schedule. Shows leave type, dates, and status.                                      |
+| **Per-Staff List**   | Every assignment sorted by staff name then date, with shift name, start/end time, and charge/overtime flags. Useful for distributing individual schedules or importing into payroll. |
 
 The export works on both draft and published schedules. Column widths are pre-set so the file is readable without manual adjustment.
 
@@ -289,12 +301,12 @@ The nurse manager uses this page each day to set a **census tier** for every shi
 
 ### Census Tiers
 
-| Tier | Meaning | What It Means for Staffing |
-|------|---------|---------------------------|
-| 🔵 **Blue** | Low Census | Fewer patients than normal — some staff may be sent home (low census protocol) |
-| 🟢 **Green** | Normal Census | Baseline staffing applies — standard assignment for most days |
-| 🟡 **Yellow** | Elevated Census | More patients than normal — may need to call in extra staff |
-| 🔴 **Red** | Critical Census | Highest patient load — all available staff needed |
+| Tier          | Meaning         | What It Means for Staffing                                                     |
+| ------------- | --------------- | ------------------------------------------------------------------------------ |
+| 🔵 **Blue**   | Low Census      | Fewer patients than normal — some staff may be sent home (low census protocol) |
+| 🟢 **Green**  | Normal Census   | Baseline staffing applies — standard assignment for most days                  |
+| 🟡 **Yellow** | Elevated Census | More patients than normal — may need to call in extra staff                    |
+| 🔴 **Red**    | Critical Census | Highest patient load — all available staff needed                              |
 
 ### What You'll See
 
@@ -303,15 +315,16 @@ The nurse manager uses this page each day to set a **census tier** for every shi
 
 ### Common Tasks
 
-| Task | How To |
-|------|--------|
-| Set today's census tier | Open page → pick date → select tier per shift → Save Changes |
-| Check staffing requirements for a tier | Click "Band Thresholds" tab |
-| Override a tier mid-day | Return to the page, change the dropdown, Save Changes |
+| Task                                   | How To                                                       |
+| -------------------------------------- | ------------------------------------------------------------ |
+| Set today's census tier                | Open page → pick date → select tier per shift → Save Changes |
+| Check staffing requirements for a tier | Click "Band Thresholds" tab                                  |
+| Override a tier mid-day                | Return to the page, change the dropdown, Save Changes        |
 
 ### How It Connects to the Schedule
 
 Once you save a census tier for a shift:
+
 - The **Schedule grid** immediately shows the updated required count (e.g., "3/5 staff" instead of "3/4")
 - The **rule engine** evaluates staffing against the tier — if short, a hard violation badge appears
 - The **auto-scheduler** (when you generate a new schedule) fills to the tier's required count, not just the shift definition's baseline
@@ -344,11 +357,11 @@ Once you save a census tier for a shift:
 
 Every time you click **"Generate Schedule"**, the system automatically creates **three** complete schedule variants at once — each with a different priority:
 
-| Variant | Priority | Auto-applied? |
-|---------|----------|---------------|
-| **Balanced** | Equal weight across all goals | ✅ Yes — becomes the active draft immediately |
-| **Fairness-Optimized** | Maximises fair weekend/holiday distribution and preference matching | No — shown as an alternative |
-| **Cost-Optimized** | Minimises overtime and use of float/agency staff | No — shown as an alternative |
+| Variant                | Priority                                                            | Auto-applied?                                 |
+| ---------------------- | ------------------------------------------------------------------- | --------------------------------------------- |
+| **Balanced**           | Equal weight across all goals                                       | ✅ Yes — becomes the active draft immediately |
+| **Fairness-Optimized** | Maximises fair weekend/holiday distribution and preference matching | No — shown as an alternative                  |
+| **Cost-Optimized**     | Minimises overtime and use of float/agency staff                    | No — shown as an alternative                  |
 
 The Balanced variant is applied to the schedule automatically. You can review the other two and **Apply** one if you prefer it.
 
@@ -363,18 +376,19 @@ The Balanced variant is applied to the schedule automatically. You can review th
 
 ### Common Tasks
 
-| Task | How To |
-|------|--------|
-| Generate all three variants | Select a schedule, click "Generate Schedule" |
-| Watch generation progress | Progress bar and three-step tracker (Balanced → Fairness → Cost) appear automatically; each step highlights as its variant finishes |
-| Compare variants | View score bars side-by-side on the cards |
-| Switch to a different variant | Click **"Apply"** on the card you prefer (available on any non-active variant, including previously rejected ones) |
-| Dismiss a variant you don't want | Click **"Reject"** (only available while the variant is in Draft status) |
-| See understaffed shifts | Check the yellow warning panel after generation |
+| Task                             | How To                                                                                                                              |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Generate all three variants      | Select a schedule, click "Generate Schedule"                                                                                        |
+| Watch generation progress        | Progress bar and three-step tracker (Balanced → Fairness → Cost) appear automatically; each step highlights as its variant finishes |
+| Compare variants                 | View score bars side-by-side on the cards                                                                                           |
+| Switch to a different variant    | Click **"Apply"** on the card you prefer (available on any non-active variant, including previously rejected ones)                  |
+| Dismiss a variant you don't want | Click **"Reject"** (only available while the variant is in Draft status)                                                            |
+| See understaffed shifts          | Check the yellow warning panel after generation                                                                                     |
 
 ### Understaffing Warnings
 
 If any shift could not be fully staffed (because every available nurse failed a hard rule), a warning panel appears listing:
+
 - Which shift (date, type, unit)
 - How many slots were filled vs. required
 - Why candidates were rejected (e.g., "on approved leave", "insufficient rest time")
@@ -384,6 +398,7 @@ Review these with your team and assign the remaining slots manually from the Sch
 ### Score Bars Explained
 
 Each score bar shows 0–100% where **higher is better**:
+
 - **Coverage** — How many required slots were filled
 - **Fairness** — How evenly weekends and holidays are distributed
 - **Cost** — How little overtime and float/agency use is required
@@ -395,12 +410,14 @@ Each score bar shows 0–100% where **higher is better**:
 When you click a staff member's **name** (not the edit button), a calendar opens showing their schedule:
 
 **Color Coding:**
+
 - **Blue** - Day shift assigned
 - **Purple** - Night shift assigned
 - **Green** - On approved leave
 - **Gray** - Off / not scheduled
 
 **Features:**
+
 - Navigate between months using arrows
 - Default view: current schedule period
 - Shows staff summary (role, FTE, home unit)
@@ -420,12 +437,12 @@ When you click a staff member's **name** (not the edit button), a calendar opens
 
 ### Common Tasks
 
-| Task | How To |
-|------|--------|
-| See requests needing approval | Click "Pending" filter tab |
-| Review candidates | Click "Review" button to see top 3 candidates |
-| Approve a candidate | Click "Approve" next to your choice |
-| Cancel a request | Click "Cancel" button |
+| Task                          | How To                                        |
+| ----------------------------- | --------------------------------------------- |
+| See requests needing approval | Click "Pending" filter tab                    |
+| Review candidates             | Click "Review" button to see top 3 candidates |
+| Approve a candidate           | Click "Approve" next to your choice           |
+| Cancel a request              | Click "Cancel" button                         |
 
 ### Approval Workflow
 
@@ -438,6 +455,7 @@ When you click a staff member's **name** (not the edit button), a calendar opens
 ### Candidate Sources
 
 Candidates are found in this order (escalation ladder):
+
 1. **Float Pool** - Staff designated for floating (highest priority)
 2. **PRN** - Per diem staff who marked the date as available
 3. **Overtime** - Regular staff who could work extra
@@ -457,12 +475,12 @@ Candidates are found in this order (escalation ladder):
 
 ### Common Tasks
 
-| Task | How To |
-|------|--------|
-| Log a new callout | Click "Log Callout" |
-| Find replacement for an open callout | Click "Find Replacement" on that row |
-| Mark as filled | Assign replacement staff in the escalation dialog |
-| View a resolved callout's full record | Click "View" on any filled or closed row |
+| Task                                  | How To                                            |
+| ------------------------------------- | ------------------------------------------------- |
+| Log a new callout                     | Click "Log Callout"                               |
+| Find replacement for an open callout  | Click "Find Replacement" on that row              |
+| Mark as filled                        | Assign replacement staff in the escalation dialog |
+| View a resolved callout's full record | Click "View" on any filled or closed row          |
 
 ### Logging a Callout
 
@@ -496,17 +514,18 @@ Click **View** on any filled callout to see the complete record: shift date and 
 
 ### Common Tasks
 
-| Task | How To |
-|------|--------|
-| See pending requests | Click "Pending" filter |
-| Approve a request | Click "Approve" button |
-| Deny a request | Click "Deny" — a dialog opens requiring a written reason |
-| View full details of any request | Click "View" on the row |
-| Create request for staff | Click "New Leave Request" |
+| Task                             | How To                                                   |
+| -------------------------------- | -------------------------------------------------------- |
+| See pending requests             | Click "Pending" filter                                   |
+| Approve a request                | Click "Approve" button                                   |
+| Deny a request                   | Click "Deny" — a dialog opens requiring a written reason |
+| View full details of any request | Click "View" on the row                                  |
+| Create request for staff         | Click "New Leave Request"                                |
 
 ### What Happens When You Approve Leave
 
 When you approve a leave request, the system automatically:
+
 1. **Cancels the staff member's assignments** on every affected date
 2. **Updates the Schedule grid**: the staff member's name appears with a strikethrough and an orange **"Leave"** badge on each affected shift — and the shift's count drops (e.g., 4/5) so you can immediately see the gap
 3. **Creates coverage requests** for each date — either a Callout (if the shift is within 7 days) or an Open Shift with replacement candidates (if more than 7 days away)
@@ -514,11 +533,13 @@ When you approve a leave request, the system automatically:
 ### Approving/Denying
 
 **Before approving, consider:**
+
 - Is coverage available for those dates?
 - How many others are already off?
 - Is this a blackout period?
 
 **When denying:**
+
 - A written denial reason is **required** — the dialog will not let you confirm without one
 - The reason is saved permanently to the record and the audit trail
 - Be specific and consistent (e.g., "Short-staffed on 3/10 — already 2 people off")
@@ -541,12 +562,12 @@ Click **View** on any request to see: submission timestamp, leave type and date 
 
 ### Common Tasks
 
-| Task | How To |
-|------|--------|
-| Log a new swap request | Click **"Log Swap Request"** (top-right) |
-| See requests awaiting action | Click "Pending" filter |
-| Approve a directed swap | Click "Approve" — system validates hard rules automatically |
-| Deny a swap | Click "Deny" |
+| Task                         | How To                                                      |
+| ---------------------------- | ----------------------------------------------------------- |
+| Log a new swap request       | Click **"Log Swap Request"** (top-right)                    |
+| See requests awaiting action | Click "Pending" filter                                      |
+| Approve a directed swap      | Click "Approve" — system validates hard rules automatically |
+| Deny a swap                  | Click "Deny"                                                |
 
 ### Logging a Swap Request
 
@@ -570,6 +591,7 @@ If any rule is violated, a **"Swap Cannot Be Approved"** dialog appears listing 
 ### Approving an Open Swap Request
 
 If no target staff was selected, approving the request:
+
 1. Hides the requesting staff member's original assignment from the schedule grid
 2. Automatically creates a **Coverage Request** for that shift — it appears on the Coverage page (`/open-shifts`) where you can use the normal escalation workflow to find a replacement
 
@@ -588,11 +610,11 @@ If no target staff was selected, approving the request:
 
 ### Common Tasks
 
-| Task | How To |
-|------|--------|
-| See who hasn't submitted | Check "Missing Submissions" card |
-| View someone's availability | Click on their row |
-| See availability calendar | Scroll to calendar section |
+| Task                        | How To                           |
+| --------------------------- | -------------------------------- |
+| See who hasn't submitted    | Check "Missing Submissions" card |
+| View someone's availability | Click on their row               |
+| See availability calendar   | Scroll to calendar section       |
 
 ### Using This Information
 
@@ -616,26 +638,26 @@ If no target staff was selected, approving the request:
 
 Hard rules have numeric thresholds and level requirements that you can adjust. Click **Edit** on any hard rule to open an inline editor:
 
-| Rule | What You Can Configure |
-|------|----------------------|
-| Minimum Rest Between Shifts | Minimum hours of rest (e.g., 10h) |
-| Maximum Consecutive Days | Max days in a row before a day off is required |
-| Maximum Hours (7-Day Rolling) | Max hours in any 7-day window |
-| ICU Competency Minimum | Minimum competency level to work ICU shifts |
-| Level 1 Must Have Preceptor | Minimum level the preceptor must be (default: Level 5) |
-| Level 2 ICU/ER Supervision | Minimum supervisor level (default: Level 4) |
-| On-Call Limits | Max on-call shifts per week; max on-call weekends per month |
+| Rule                          | What You Can Configure                                      |
+| ----------------------------- | ----------------------------------------------------------- |
+| Minimum Rest Between Shifts   | Minimum hours of rest (e.g., 10h)                           |
+| Maximum Consecutive Days      | Max days in a row before a day off is required              |
+| Maximum Hours (7-Day Rolling) | Max hours in any 7-day window                               |
+| ICU Competency Minimum        | Minimum competency level to work ICU shifts                 |
+| Level 1 Must Have Preceptor   | Minimum level the preceptor must be (default: Level 5)      |
+| Level 2 ICU/ER Supervision    | Minimum supervisor level (default: Level 4)                 |
+| On-Call Limits                | Max on-call shifts per week; max on-call weekends per month |
 
 Values outside the recommended clinical range show an amber warning — you can still save, but the warning flags the deviation.
 
 ### Common Tasks
 
-| Task | How To |
-|------|--------|
-| View all rules | Open the page |
-| Adjust a hard rule threshold | Click **Edit** on the rule row, change the value, click **Save** |
-| Toggle a soft rule on/off | Use the Active toggle |
-| Adjust soft rule penalty weight | Use the weight slider |
+| Task                            | How To                                                           |
+| ------------------------------- | ---------------------------------------------------------------- |
+| View all rules                  | Open the page                                                    |
+| Adjust a hard rule threshold    | Click **Edit** on the rule row, change the value, click **Save** |
+| Toggle a soft rule on/off       | Use the Active toggle                                            |
+| Adjust soft rule penalty weight | Use the weight slider                                            |
 
 ---
 
@@ -650,11 +672,11 @@ Values outside the recommended clinical range show an amber warning — you can 
 
 ### Common Tasks
 
-| Task | How To |
-|------|--------|
-| Add a unit | Click "Add Unit" |
+| Task               | How To                        |
+| ------------------ | ----------------------------- |
+| Add a unit         | Click "Add Unit"              |
 | Edit unit settings | Click "Edit" on the unit card |
-| Delete a unit | Click "Delete" (careful!) |
+| Delete a unit      | Click "Delete" (careful!)     |
 
 ### What You Can Configure
 
@@ -680,13 +702,13 @@ Values outside the recommended clinical range show an amber warning — you can 
 
 ### Common Tasks
 
-| Task | How To |
-|------|--------|
-| Add US holidays | Click "Add Standard Holidays" |
-| Add custom holiday | Click "Add Holiday" |
-| Edit a holiday | Click "Edit" |
-| Delete a holiday | Click "Delete" |
-| Change year | Click year buttons |
+| Task               | How To                        |
+| ------------------ | ----------------------------- |
+| Add US holidays    | Click "Add Standard Holidays" |
+| Add custom holiday | Click "Add Holiday"           |
+| Edit a holiday     | Click "Edit"                  |
+| Delete a holiday   | Click "Delete"                |
+| Change year        | Click year buttons            |
 
 ---
 
@@ -704,27 +726,27 @@ Values outside the recommended clinical range show an amber warning — you can 
 
 ### Common Tasks
 
-| Task | How To |
-|------|--------|
-| Find events for a specific entity type | Use the **Entity** filter (Callouts, Leave, Swaps, etc.) |
-| Find a specific action | Use the **Action** filter |
-| Narrow to a date range | Set the **From** and **To** date pickers, then click Clear to reset |
-| See entries you just created without navigating away | Click **Refresh** in the top-right corner |
-| Download for a staffing committee | Click **Export CSV** in the top-right corner — downloads a UTF-8 Excel-compatible CSV with UTC timestamps |
+| Task                                                 | How To                                                                                                    |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Find events for a specific entity type               | Use the **Entity** filter (Callouts, Leave, Swaps, etc.)                                                  |
+| Find a specific action                               | Use the **Action** filter                                                                                 |
+| Narrow to a date range                               | Set the **From** and **To** date pickers, then click Clear to reset                                       |
+| See entries you just created without navigating away | Click **Refresh** in the top-right corner                                                                 |
+| Download for a staffing committee                    | Click **Export CSV** in the top-right corner — downloads a UTF-8 Excel-compatible CSV with UTC timestamps |
 
 ### What Gets Logged
 
 Every change is logged automatically — you do not need to do anything:
 
-| Action | What you see in the trail |
-|--------|--------------------------|
-| Manual assignment added | "Assigned Sarah Chen to Day Shift on 2026-03-06" |
-| Assignment removed | "Removed Sarah Chen from Day Shift on 2026-03-06" |
-| Census tier changed | "Census tier changed from green to blue for Day Shift (ICU) on 2026-03-06" |
-| Leave approved/denied | Staff name, dates, and decision |
-| Callout logged | Staff name, shift, reason |
-| Schedule generated | Variant names and job ID |
-| Rule override | Which rule was overridden and why |
+| Action                  | What you see in the trail                                                  |
+| ----------------------- | -------------------------------------------------------------------------- |
+| Manual assignment added | "Assigned Sarah Chen to Day Shift on 2026-03-06"                           |
+| Assignment removed      | "Removed Sarah Chen from Day Shift on 2026-03-06"                          |
+| Census tier changed     | "Census tier changed from green to blue for Day Shift (ICU) on 2026-03-06" |
+| Leave approved/denied   | Staff name, dates, and decision                                            |
+| Callout logged          | Staff name, shift, reason                                                  |
+| Schedule generated      | Variant names and job ID                                                   |
+| Rule override           | Which rule was overridden and why                                          |
 
 You can filter by **Entity** (Assignments, Shifts / Census, Leave, Callouts, etc.) or **Action** (Manual Assignment, Census Tier Changed, Leave Approved, etc.) to find specific events quickly.
 
@@ -752,6 +774,18 @@ You can filter by **Entity** (Assignments, Shifts / Census, Leave, Callouts, etc
 7. Click "Publish" — if there are unresolved hard violations, the Publish button shows a lock icon and lists the violation count beneath it so you know exactly what needs to be fixed first
 8. Click "Export" to download the schedule as an Excel file for distribution
 ```
+
+### Changing a Schedule After It Is Published
+
+```
+1. Open the published schedule and click the shift
+2. Add or remove the staff member as usual
+3. Type a short reason when asked, then confirm
+4. The change is recorded in the audit trail with your reason,
+   the affected nurse is notified, and the header shows "Amended ×1"
+```
+
+Use **Unpublish** only when the whole schedule needs redoing (for example, regenerating after new hires start). It asks for a reason, withdraws the schedule from every nurse, and re-publishing later alerts all of them again.
 
 ### Handling a Same-Day Callout
 
@@ -797,16 +831,19 @@ You can filter by **Entity** (Assignments, Shifts / Census, Leave, Callouts, etc
 ## Tips & Best Practices
 
 ### Daily
+
 - Check Dashboard for alerts
 - Review any pending callouts
 - Monitor today's coverage
 
 ### Weekly
+
 - Process pending leave requests
 - Process pending swap requests
 - Review schedule for next week
 
 ### Before Each Schedule Period
+
 - Collect PRN availability
 - Process vacation requests
 - Build/generate the schedule
@@ -814,6 +851,7 @@ You can filter by **Entity** (Assignments, Shifts / Census, Leave, Callouts, etc
 - Publish
 
 ### Monthly
+
 - Review callout patterns
 - Check fairness metrics (weekend/holiday distribution)
 - Adjust configuration if needed
@@ -825,27 +863,18 @@ You can filter by **Entity** (Assignments, Shifts / Census, Leave, Callouts, etc
 The application is organized around your workflow:
 
 **Scheduling**
+
 1. **Import / Export** - Import data from Excel (first-time setup)
 2. **Dashboard** - Your starting point; follow the Getting Started checklist on first use
 3. **Schedule** - The main event; use "Generate Schedule" to auto-build, click issue badges for details
 4. **Census** - Set daily patient census tier (Blue/Green/Yellow/Red) per shift — drives staffing requirements
 5. **Schedule Variants** - Generate 3 variants, compare scores, Apply your preferred one
 
-**Daily Management**
-6. **Callouts** - Handle same-day absences
-7. **Open Shifts** - Review and approve replacement candidates
-8. **Leave** - Time-off requests (cancels assignments and shows Leave badge in grid when approved)
-9. **Shift Swaps** - Shift trades
-10. **PRN Availability** - PRN scheduling
+**Daily Management** 6. **Callouts** - Handle same-day absences 7. **Open Shifts** - Review and approve replacement candidates 8. **Leave** - Time-off requests (cancels assignments and shows Leave badge in grid when approved) 9. **Shift Swaps** - Shift trades 10. **PRN Availability** - PRN scheduling
 
-**Configuration**
-11. **Staff** - Who you're scheduling (click names for calendar view)
-12. **Rules** - Scheduling constraints (Census Bands tab is editable inline)
-13. **Units** - Department configuration
-14. **Holidays** - Special days
+**Configuration** 11. **Staff** - Who you're scheduling (click names for calendar view) 12. **Rules** - Scheduling constraints (Census Bands tab is editable inline) 13. **Units** - Department configuration 14. **Holidays** - Special days
 
-**System**
-15. **Audit Trail** - Complete change history
+**System** 15. **Audit Trail** - Complete change history
 
 Navigate using the sidebar, and you'll find what you need!
 

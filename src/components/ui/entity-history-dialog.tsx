@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { History, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { useState } from "react";
+import { History, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -11,18 +11,19 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 
 interface AuditEntry {
-  id: string
-  action: string
-  description: string
-  justification: string | null
-  performedBy: string
-  createdAt: string
+  id: string;
+  action: string;
+  description: string;
+  justification: string | null;
+  performedBy: string;
+  createdAt: string;
 }
 
-type BadgeVariant = "default" | "secondary" | "destructive" | "outline" | "ghost" | "link"
+type BadgeVariant =
+  "default" | "secondary" | "destructive" | "outline" | "ghost" | "link";
 
 const ACTION_LABELS: Record<string, string> = {
   created: "Created",
@@ -45,10 +46,12 @@ const ACTION_LABELS: Record<string, string> = {
   open_shift_cancelled: "Coverage Cancelled",
   assignment_cancelled_for_leave: "Assignment Cancelled",
   callout_created_for_leave: "Callout (Leave)",
+  post_publish_amendment: "Post-Publish Amendment",
+  unpublished: "Unpublished",
   schedule_auto_generated: "Schedule Generated",
   acuity_changed: "Census Tier Changed",
   census_changed: "Census Count Changed",
-}
+};
 
 const ACTION_COLORS: Record<string, BadgeVariant> = {
   created: "default",
@@ -68,54 +71,60 @@ const ACTION_COLORS: Record<string, BadgeVariant> = {
   open_shift_created: "outline",
   open_shift_filled: "default",
   open_shift_cancelled: "destructive",
+  post_publish_amendment: "outline",
+  unpublished: "destructive",
   assignment_cancelled_for_leave: "destructive",
   callout_created_for_leave: "destructive",
   schedule_auto_generated: "secondary",
-}
+};
 
 function formatTimestamp(iso: string): string {
-  const d = new Date(iso)
+  const d = new Date(iso);
   return d.toLocaleString(undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
-  })
+  });
 }
 
 interface EntityHistoryDialogProps {
-  entityId: string
-  entityType: string
-  title: string
+  entityId: string;
+  entityType: string;
+  title: string;
 }
 
-export function EntityHistoryDialog({ entityId, entityType, title }: EntityHistoryDialogProps) {
-  const [open, setOpen] = useState(false)
-  const [entries, setEntries] = useState<AuditEntry[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+export function EntityHistoryDialog({
+  entityId,
+  entityType,
+  title,
+}: EntityHistoryDialogProps) {
+  const [open, setOpen] = useState(false);
+  const [entries, setEntries] = useState<AuditEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function loadHistory() {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
       const res = await fetch(
-        `/api/audit?entityType=${encodeURIComponent(entityType)}&entityId=${encodeURIComponent(entityId)}&limit=50`
-      )
-      if (!res.ok) throw new Error("Failed to load history")
-      const data: AuditEntry[] = await res.json()
-      setEntries(data)
+        `/api/audit?entityType=${encodeURIComponent(entityType)}&entityId=${encodeURIComponent(entityId)}&limit=50`,
+      );
+      if (!res.ok) throw new Error("Failed to load history");
+      const data: AuditEntry[] = await res.json();
+      setEntries(data);
     } catch {
-      setError("Could not load history. Please try again.")
+      setError("Could not load history. Please try again.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   function handleOpenChange(value: boolean) {
-    setOpen(value)
-    if (value) loadHistory()
+    setOpen(value);
+    if (value) loadHistory();
   }
 
   return (
@@ -145,7 +154,9 @@ export function EntityHistoryDialog({ entityId, entityType, title }: EntityHisto
           )}
 
           {error && !loading && (
-            <div className="text-sm text-destructive text-center py-6">{error}</div>
+            <div className="text-sm text-destructive text-center py-6">
+              {error}
+            </div>
           )}
 
           {!loading && !error && entries.length === 0 && (
@@ -160,8 +171,12 @@ export function EntityHistoryDialog({ entityId, entityType, title }: EntityHisto
                 <li key={entry.id} className="ml-4">
                   <div className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full border border-background bg-muted-foreground/40" />
                   <div className="flex flex-wrap items-center gap-2 mb-0.5">
-                    <Badge variant={ACTION_COLORS[entry.action] ?? "secondary"} className="text-[10px] px-1.5 py-0">
-                      {ACTION_LABELS[entry.action] ?? entry.action.replace(/_/g, " ")}
+                    <Badge
+                      variant={ACTION_COLORS[entry.action] ?? "secondary"}
+                      className="text-[10px] px-1.5 py-0"
+                    >
+                      {ACTION_LABELS[entry.action] ??
+                        entry.action.replace(/_/g, " ")}
                     </Badge>
                     <span className="text-[11px] text-muted-foreground">
                       {formatTimestamp(entry.createdAt)}
@@ -173,7 +188,9 @@ export function EntityHistoryDialog({ entityId, entityType, title }: EntityHisto
                       Reason: {entry.justification}
                     </p>
                   )}
-                  <p className="text-[11px] text-muted-foreground mt-0.5">by {entry.performedBy}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    by {entry.performedBy}
+                  </p>
                 </li>
               ))}
             </ol>
@@ -183,5 +200,5 @@ export function EntityHistoryDialog({ entityId, entityType, title }: EntityHisto
         <DialogFooter showCloseButton />
       </DialogContent>
     </Dialog>
-  )
+  );
 }

@@ -6,6 +6,73 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.11.0] - 2026-09-13
+
+Both changes come from the 2026-09-11 demo to Dr. Tara Shajan (CNO, OMH
+psychiatric hospital, NY), where the founder spotted two gaps live.
+
+### Added
+
+- **Urgent callouts now reach the nurses who could cover them.** When
+  approved leave lands inside the unit's callout threshold (default 7 days),
+  the system creates a callout for the manager to escalate — and until now
+  told NO nurse. Only the open-shift path (beyond the threshold) posted a
+  notification, which is why James Wilson never heard that a night charge
+  shift 6 days out was vacant. Now a callout with at least one full day to
+  go also sends a `callout_posted` notice ("Urgent: shift needs coverage …
+  Tell your manager if you can cover it") to every rule-eligible nurse, same
+  eligibility filter as the open-shift board, agency placeholders and the
+  nurse going on leave excluded. Same-day and past-dated callouts stay
+  silent: with hours left the manager is on the phone and a board
+  notification is noise. The callout record and escalation chain are
+  unchanged. (`src/app/api/staff-leave/[id]/route.ts`,
+  `src/lib/notifications/notify.ts`)
+- **Post-publish amendments replace "unpublish first".** A published
+  schedule is the version of record nurses have seen; once seen,
+  unpublishing has no real-world meaning, and a one-person change is an
+  amendment, not a new schedule. Adding or removing an assignment on a
+  published schedule is now allowed, but:
+  - the manager must give a reason (a dialog asks for it; the API returns
+    400 without one),
+  - the change is logged against the SCHEDULE as `post_publish_amendment`
+    with the reason as justification, alongside the usual assignment entry,
+  - only the affected nurse is notified (`assignment_amended`: "You were
+    added to / removed from a published shift … Reason: …") — the rest of
+    the unit does not get a second "new schedule" alert,
+  - the schedule header shows an amber **Amended ×N** badge backed by those
+    audit rows.
+    Unpublish still exists for wholesale rework (regeneration), but now needs
+    a reason too and is logged as its own `unpublished` action instead of a
+    generic "updated". The Unpublish dialog steers a one-person change back to
+    editing the shift. Previously both routes returned HTTP 409 and the only
+    path was unpublish → edit → re-publish, which re-alerted every nurse (29
+    in the demo) and reset the publish timestamp.
+    (`src/app/api/schedules/[id]/assignments/route.ts`,
+    `src/app/api/schedules/[id]/route.ts`, `src/app/schedule/[id]/page.tsx`,
+    new `src/components/schedule/change-reason-dialog.tsx`, audit label maps)
+
+### Changed
+
+- Audit action enum gains `post_publish_amendment` and `unpublished`;
+  notification type enum gains `callout_posted` and `assignment_amended`
+  (TypeScript-level enums on text columns — no migration needed).
+- Audit page filter and entity-history dialog label both new actions.
+
+### Tests
+
+- 14 new (761 total): callout notification at +4 days / same day / beyond
+  threshold; amendment reason required (POST/DELETE, whitespace), amendment
+  logged against the schedule and notifies exactly one nurse, draft path
+  unchanged; unpublish reason required and `unpublished` audit row; the two
+  new composers. `assignments-published-guard.test.ts` is renamed
+  `assignments-published-amendment.test.ts`.
+
+### Docs
+
+- `RULES_SPECIFICATION.md` 1.6.18 (§7.1 callout notification, §12.8 published
+  schedule amendments), `docs/09-using-the-app.md`, `docs/10-glossary.md`,
+  `docs/DECISIONS.md`, `docs/KNOWN-TRAPS.md`.
+
 ## [1.10.3] - 2026-08-31
 
 ### Fixed

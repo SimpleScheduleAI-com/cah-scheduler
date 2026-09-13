@@ -21,7 +21,9 @@ export type NotificationType =
   | "swap_decided"
   | "leave_decided"
   | "open_shift_posted"
-  | "open_shift_decided";
+  | "open_shift_decided"
+  | "callout_posted"
+  | "assignment_amended";
 
 /** The pure output of a composer — everything needed to insert one row. */
 export interface NotificationDraft {
@@ -209,6 +211,61 @@ export function composeOpenShiftPosted(params: {
     type: "open_shift_posted",
     title: "Open shift you could pick up",
     body: `${params.shiftLabel} on ${params.date} (${params.unit}) needs coverage. Interested? Raise your hand from your schedule page.`,
+    href: "/my",
+  };
+}
+
+/**
+ * A callout was created for a shift at least one full day away (approved
+ * leave inside the unit's callout threshold). The manager works the
+ * escalation chain, but the nurses who could cover it should know it is
+ * open — a night nurse should hear that a night shift is vacant (founder
+ * direction 2026-09-13, after the Dr. Tara demo). Same-day and past-dated
+ * callouts are NOT posted: with hours to go, a board notification is noise.
+ * There is no open-shift row to raise a hand on, so the nurse is told to
+ * contact the manager.
+ */
+export function composeCalloutPosted(params: {
+  staffId: string;
+  date: string;
+  shiftLabel: string;
+  unit: string;
+  daysUntilShift: number;
+}): NotificationDraft {
+  const when =
+    params.daysUntilShift === 1
+      ? "tomorrow"
+      : `in ${params.daysUntilShift} days`;
+  return {
+    staffId: params.staffId,
+    type: "callout_posted",
+    title: "Urgent: shift needs coverage",
+    body: `${params.shiftLabel} on ${params.date} (${params.unit}) is ${when} and needs coverage. Tell your manager if you can cover it.`,
+    href: "/my",
+  };
+}
+
+/**
+ * A manager changed a PUBLISHED schedule by hand — this nurse was added to or
+ * removed from a shift. Only the affected nurse is told; the rest of the unit
+ * does not get a second "new schedule" alert for a one-person change.
+ */
+export function composeAssignmentAmended(params: {
+  staffId: string;
+  change: "added" | "removed";
+  date: string;
+  shiftLabel: string;
+  unit: string;
+  reason: string;
+}): NotificationDraft {
+  const added = params.change === "added";
+  return {
+    staffId: params.staffId,
+    type: "assignment_amended",
+    title: added
+      ? "You were added to a published shift"
+      : "You were removed from a published shift",
+    body: `${params.shiftLabel} on ${params.date} (${params.unit}). Reason: ${params.reason}`,
     href: "/my",
   };
 }

@@ -19,6 +19,7 @@ const scheduleGet = vi.hoisted(() => vi.fn());
 const assignmentAll = vi.hoisted(() => vi.fn<() => unknown[]>(() => []));
 const updateReturningGet = vi.hoisted(() => vi.fn());
 const insertRun = vi.hoisted(() => vi.fn());
+const insertValues = vi.hoisted(() => vi.fn());
 
 vi.mock("next/server", () => ({
   NextResponse: {
@@ -83,10 +84,13 @@ vi.mock("@/db", () => {
         }),
       }),
       insert: () => ({
-        values: () => ({
-          run: insertRun,
-          returning: () => ({ get: vi.fn() }),
-        }),
+        values: (row: unknown) => {
+          insertValues(row);
+          return {
+            run: insertRun,
+            returning: () => ({ get: vi.fn() }),
+          };
+        },
       }),
       delete: () => ({ where: () => ({ run: vi.fn() }) }),
     },
@@ -163,5 +167,75 @@ describe("PUT /api/schedules/[id] empty-publish guard", () => {
     const res = await callPut({ status: "published", name: "Renamed" });
     expect(res.status).toBe(200);
     expect(updateReturningGet).toHaveBeenCalled();
+  });
+});
+
+/**
+ * Unpublish (2026-09-13): a published schedule is the version of record
+ * nurses have seen. Withdrawing it is the wholesale-rework path (one-person
+ * changes are amendments on the assignments route), so it needs a reason,
+ * and the audit row is a distinct `unpublished` action — not a generic
+ * "updated" — with the reason as justification.
+ */
+describe("PUT /api/schedules/[id] unpublish requires a reason", () => {
+  function insertedValues(): Record<string, unknown>[] {
+    return insertValues.mock.calls.map((c) => c[0] as Record<string, unknown>);
+  }
+
+  beforeEach(() => {
+    updateReturningGet.mockReturnValue({
+      id: "sched-1",
+      name: "September 2026",
+      status: "draft",
+      startDate: "2026-09-01",
+      endDate: "2026-09-28",
+    });
+  });
+
+  it("rejects published → draft without a reason (400) and does not update", async () => {
+    scheduleGet.mockReturnValue({ id: "sched-1", status: "published" });
+    const res = await callPut({ status: "draft" });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/reason/i);
+    expect(updateReturningGet).not.toHaveBeenCalled();
+  });
+
+  it("rejects a whitespace-only reason", async () => {
+    scheduleGet.mockReturnValue({ id: "sched-1", status: "published" });
+    const res = await callPut({ status: "draft", reason: "   " });
+    expect(res.status).toBe(400);
+    expect(updateReturningGet).not.toHaveBeenCalled();
+  });
+
+  it("with a reason: updates and logs a distinct 'unpublished' audit action carrying the reason", async () => {
+    scheduleGet.mockReturnValue({ id: "sched-1", status: "published" });
+    const res = await callPut({
+      status: "draft",
+      reason: "Regenerating after three new hires start",
+    });
+    expect(res.status).toBe(200);
+    expect(updateReturningGet).toHaveBeenCalled();
+    const row = insertedValues().find((v) => v.action === "unpublished");
+    expect(row).toBeDefined();
+    expect(row?.entityType).toBe("schedule");
+    expect(row?.entityId).toBe("sched-1");
+    expect(row?.justification).toBe("Regenerating after three new hires start");
+    expect(String(row?.description)).toContain("unpublished");
+    expect(String(row?.description)).toContain(
+      "Regenerating after three new hires start",
+    );
+    expect(row?.previousState).toEqual({ status: "published" });
+    expect(row?.newState).toEqual({ status: "draft" });
+  });
+
+  it("a draft staying draft (rename) needs no reason and is logged as 'updated'", async () => {
+    scheduleGet.mockReturnValue({ id: "sched-1", status: "draft" });
+    const res = await callPut({ status: "draft", name: "Renamed" });
+    expect(res.status).toBe(200);
+    expect(insertedValues().some((v) => v.action === "unpublished")).toBe(
+      false,
+    );
+    expect(insertedValues().some((v) => v.action === "updated")).toBe(true);
   });
 });
