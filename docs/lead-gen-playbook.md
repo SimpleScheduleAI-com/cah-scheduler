@@ -98,6 +98,49 @@ LinkedIn if it exists (many won't — that's normal here).
   as durable identity or cut. Quoting someone's own public words back to
   them is durable — congratulating them on old news is not.
 
+## Outreach message standard (founder-set, 2026-09-12)
+
+Every first-touch message has three beats, in this order, and nothing else:
+
+1. **Their situation, verified and specific.** One sentence about the
+   hospital's own scheduling pain, built from the row's brief (never the
+   `why` column), and ideally carrying a date or duration: how long a nursing
+   posting has been open, how many months the person has been in the seat, a
+   service they still run at their size. Re-check the source at send time
+   (careers page, job board, leadership page); a posting hook older than ~8
+   weeks is stale until re-checked.
+2. **One plain line on who we are.** "I run SimpleScheduleAI, a nurse
+   scheduling solution for small Texas hospitals." No fee, no service-model
+   framing, no install or compliance claims, no "AI" as the lead.
+3. **A value-first ask in their currency, naming their hospital.** Never
+   "could I get 20 minutes for your read" (a favor request), never "send me
+   your roster" (nobody hands over data before they know us). The close
+   promises something they can watch, at no cost to them:
+   - CNO / DON: "Would it be worth 20 minutes to see how <Hospital>'s next
+     month could be built in under 30 minutes, with rest and weekend rules
+     checked before it reaches your nurses? Nothing needed from your side,
+     I'll show it on a sample unit. - Pradeep"
+   - CEO / Administrator: "...built in under 30 minutes, with overtime and
+     agency shifts visible before they're worked instead of after? Nothing
+     needed from your side, I'll show it on a sample unit. - Pradeep"
+     "Under 30 minutes" must stay demonstrable live (three drafts in about two
+     minutes on the sample unit; the rest is review). No savings numbers: we
+     have no customer data, and a rural CFO will ask "how much" first.
+
+Rules that ride along: connection notes cap at 300 characters, so the note is
+beats 1-2 plus a short ask and the value close goes in the DM on acceptance
+("Thanks for connecting, <First>." opener). "Dr." only for an earned
+doctorate. Flattery only when earned and specific. A death or crisis at the
+hospital means hold the row and never reference it. The person must be
+verified in seat on the day of sending.
+
+**Revision procedure** (when asked to improve a message): reopen the row's
+brief and its `VERIFIED` line; re-check the hook's source live for currency;
+confirm the person is still in seat; rewrite to the three beats; record in
+`new_message_reason` what changed and why; write the row back to the sheet.
+The real worked example (before/after with the source that sharpened the
+hook) lives in the gitignored `leads/message-standard.md`.
+
 ## Cadence + hygiene
 
 - Volume stays tiny and personal (5-10 first-touches/week). This is 85
