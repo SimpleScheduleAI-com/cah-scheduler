@@ -240,3 +240,106 @@ exist (open-shift "raise a hand", the evaluator that scores any proposed
 assignment); missing are a claim window on a draft schedule and a fairness
 pass over claims. Do not build yet, but stop pitching "the manager generates
 the schedule" — pitch "rules plus whoever fills the grid".
+
+## Gaps register — everything we do not handle yet (consolidated 2026-09-20)
+
+One line each. Sources: senior-industry review (Sep 2026), Dr. Tara / OMH
+meeting (2026-09-11), multi-unit assessment (2026-09-13), code inspection.
+Items already expanded above are cross-referenced, not repeated.
+
+### A. Context the engine cannot express
+
+- **Rule provenance.** No way to say a rule exists because of state law, a
+  labor contract, an HR policy, or a manager preference. Add `source` on
+  `rule` (see item 3 above). Matters the moment a schedule is disputed.
+- **State-specific limits.** Thresholds are configurable, but there is no
+  per-state preset (Texas Safe Harbor is the only state-specific concept).
+  A New York deployment starts from Texas defaults.
+- **Labor contracts.** Seniority, bidding order, mandatory-overtime rules,
+  guaranteed hours for agency contracts — none modelled. `hireDate` exists
+  but nothing reads it as seniority.
+- **HR accommodations.** Only `weekendExempt`. See item 3.
+- **Culture / governance model.** Self-scheduling vs manager-scheduled is not a
+  setting; the product silently assumes manager-scheduled. See item 6.
+
+### B. Staffing model assumptions baked in
+
+- **Position control vs budget.** No budgeted FTE or approved-position count
+  anywhere. See item 2.
+- **Centralized vs decentralized staffing.** One manager per unit is assumed.
+  No house-supervisor role that staffs across units, and no house-wide view of
+  who is where today.
+- **ED treated like a ward.** "ED busy enough to be viewed separately" has no
+  expression: same census-band model, same rules, no arrival-driven demand.
+- **Hybrid / gig workforce.** Employment types exist (float, per diem, agency)
+  but there is no agency contract object: guaranteed hours, contract dates,
+  cost per hour, "cannot be sole coverage" flag. Agency is a placeholder row.
+- **Regular-staff floor.** No hard rule that at least one regular (non-agency)
+  RN is on every shift. Dr. Tara asked for it explicitly; reviewer implies it.
+- **Seasonality.** Static census bands. See item 4.
+- **Twinned units / "it comes in the door, it is yours".** Needs item 5 plus
+  on-call activation (item 1).
+- **On-call as standby that converts to worked hours.** See item 1.
+- **1:1 observation demand.** `shift.sitterCount` exists but is not driven by
+  a patient-level input and does not feed the staffing requirement in the
+  generator. Dr. Tara had 22 concurrent 1:1s.
+
+### C. Schedule shapes we cannot generate
+
+- **Fixed recurring patterns.** No "this nurse works Mon/Tue/Wed/Fri every
+  week" template that repeats to a date. The generator is the only way to fill
+  a grid; copy-forward does not exist.
+- **Biweekly pay-period targets.** Hours are checked weekly (40 h OT, 60 h
+  rolling). An 80 h / 2-week target with 6x12 h + 1x8 h is not expressible;
+  the 8 h make-up shift has no concept.
+- **Mixed shift lengths per nurse.** Preferred shift is a type (day/night),
+  not a length; grandfathered 8 h nurses cannot be pinned to 8 h.
+- **Weekend rules by role or seniority.** Weekend fairness is one rule for
+  everyone; "junior techs every weekend, nurses alternate" would be reported
+  as violations.
+- **Mandated overtime override.** No emergency mode that turns hard rules into
+  flagged warnings so a manager can hold the whole incoming shift.
+- **Per-unit competency.** `icuCompetencyLevel` is one number per nurse used
+  for every unit; a Level 5 ICU nurse is Level 5 in OB too.
+- **Charge-nurse pre-seeding is ICU/ER-only** (`greedy.ts` filters
+  `isICUUnit`); Med-Surg charge coverage depends on the general pass.
+- **"ICU" hardcoded fallbacks** in schedule creation, rule engine, staff form,
+  and importer; census bands loaded without a unit filter in the rule engine.
+
+### D. Workflow and roles
+
+- **Role hierarchy.** Only manager and nurse. No clerk/staffer who enters
+  requests on behalf of staff, no supervisor over 2-3 units who approves, no
+  assistant director / CNO tier. Every approval is "the manager".
+- **Seniority-aware leave approval.** When several nurses request the same
+  day, no ranking by seniority and no coverage preview of "approve this one
+  and only one nurse is left".
+- **Rejection reasons.** Leave and swap denials have `denialReason` fields but
+  the manager UI does not require or prompt for one.
+- **Sick-call cutoff.** Callouts record no "called at" time; a 1-hour cutoff
+  policy (OMH) or a 2-hour one (typical) cannot be enforced or reported.
+- **Notification channels.** In-app only. Email is the channel Dr. Tara will
+  accept; SMS is refused by staff who will not use work phones.
+- **Paper trail linkage.** No way to attach or reference the paper "pink slip"
+  a clerk keyed in, so the audit trail cannot point at its supporting document.
+
+### E. Reporting
+
+- **Daily staffing sheet.** No per-shift printable of who is on (RN/tech/LPN
+  breakdown, 1:1s, on-call). Night supervisors hand-write it today.
+- **Monthly schedule in the hospital's own layout.** Export is our format
+  only; each customer has a wall-poster format they will not give up.
+- **Per-nurse absence report.** No "all sick calls and leave for Nurse X in a
+  date range" view or download; the data is in `staff_leave` and `callout`.
+- **Budget variance.** See item 2.
+- **Cross-unit daily view.** See B, centralized staffing.
+
+### F. Engine internals still open (from the July findings above)
+
+- Local-search objective misaligned with soft-rule penalties (item 1 of the
+  original list).
+- Non-deterministic optimizer, no surfaced seed.
+- `weekendRedistributionSweep` 17-115 s on 28-day schedules.
+- Cross-schedule equity limited to weekends; `flexHoursYearToDate` unmaintained.
+- All of which still argue for PROJECT OPTIMUS
+  (`docs/superpowers/plans/2026-06-13-PROJECT-OPTIMUS-cpsat-engine.md`).
