@@ -7,8 +7,8 @@
 ## What
 
 Replace the greedy + local-search + sweeps generation core with Google OR-Tools **CP-SAT**
-(via the `or-tools-wasm` npm package, Apache 2.0), so each schedule variant is *solved
-independently against its own objective* instead of derived from BALANCED via swap sweeps.
+(via the `or-tools-wasm` npm package, Apache 2.0), so each schedule variant is _solved
+independently against its own objective_ instead of derived from BALANCED via swap sweeps.
 
 **Bundled scope — MOSAIC (role-aware scheduling):** while rebuilding the engine, also make
 slots role-typed (X RNs + Y LPNs + Z CNAs per shift) instead of N undifferentiated bodies.
@@ -71,22 +71,26 @@ variance and may be throwaway if OPTIMUS lands — decide before investing.
 ## Plan
 
 **Phase 0 — Benchmark prototype (1 session, go/no-go gate)**
+
 - `npm i or-tools-wasm`, encode HARD rules only for one real 6-week context.
 - Measure: feasible-solution time, 10s/30s-budget quality, WASM memory. Abort if ugly.
 
 **Phase 1 — Model builder (1–2 sessions)**
+
 - `src/lib/engine/cpsat/model-builder.ts`: SchedulerContext → CP-SAT model.
 - Hard rules as constraints (incl. priorAssignments boundary seeding — same semantics as
   v1.7.24). Soft rules as weighted objective terms reusing WeightProfile weights.
 - Determinism: fixed seed, `num_workers: 1`, time budget param (default 30s/variant).
 
 **Phase 2 — Shadow variant (1 session)**
+
 - Add 4th variant "Optimal" to runner; scored by the SAME `scoreFromDrafts`; validated by
   the SAME `evaluateSchedule` + `validate-output.ts` (defense in depth — solver output never
   trusted blind). Understaffed explanations: reuse existing `getRejectionReasons` machinery.
 - Extend `scripts/verify-schedule-periods.ts` to run the Optimal variant through all 79 checks.
 
 **Phase 3 — Promotion (after several real cycles)**
+
 - Compare Optimal vs Balanced on real data (ops team eyeball + score deltas).
 - If consistently better: FAIR/COST become independent CP-SAT solves with their own
   objectives; greedy engine stays as fallback + explanation generator.
@@ -119,6 +123,7 @@ RN-only pilots may not need this for months — but when triggered, build it ins
 proves the "role-typed slot filled first with eligibility constraints" pattern.
 
 **The core design decision — substitution model (real nursing scope):**
+
 - Role hierarchy with downward substitution: `RN(3) > LPN(2) > CNA(1)`.
 - Higher license CAN fill a lower slot — allowed but **soft-penalized** (paying RN wages for
   LPN work is wasteful, not unsafe). Same shape as the existing "cap competency at the
@@ -127,6 +132,7 @@ proves the "role-typed slot filled first with eligibility constraints" pattern.
   practice / legal).
 
 **Build (inside the OPTIMUS phases):**
+
 - Phase 0/1 (model): per-shift role requirements derived from the census band; role-rank
   constraints in the CP-SAT model (each slot requires `roleRank ≥ slot rank`); over-qualified
   substitution as a weighted objective term.
@@ -144,3 +150,106 @@ proves the "role-typed slot filled first with eligibility constraints" pattern.
 urgent yet): it can be done as a standalone greedy-engine pass (~4–6 sessions) using the same
 substitution model and the Phase-2/3 rule changes above — but prefer bundling into OPTIMUS if
 the timing allows, to avoid two engine rewrites.
+
+## Competitor details (added 2026-09-22, from `docs/competitor-pricing-tiers.md`)
+
+What the eight closest vendors actually ship, and what it means for the
+engine we build. Full tier-by-tier detail and sources in
+`docs/competitor-pricing-tiers.md`; positioning in `docs/competitor-lessons.md`.
+
+### The bar OPTIMUS has to clear is low on rules, high on forecasting
+
+- **Nobody publishes how their scheduler decides.** Deputy's auto-fill has
+  three weights (cost, equal hours, learn-from-me) and JSON "recipes";
+  M7's "Auto-Balance" names no method; QGenda's "intelligent automation"
+  is rules that reviewers say break on complex rule sets; ShiftWizard is
+  "rules-based shift building", not a solver; ScheduleAnywhere, SmartLinx
+  and OnShift have no generator at all. A CP-SAT engine that optimises 22
+  NAMED rules with a printable objective is unique in the set, and "here is
+  exactly why nurse X got shift Y" stays our cheapest durable
+  differentiator. Keep the explanation output a first-class deliverable of
+  OPTIMUS, not a nice-to-have.
+- **Hard rules are soft everywhere else.** Deputy: only shift overlap is a
+  hard block; training, leave, fatigue and availability are warnings with a
+  "Schedule anyway" button; its rest rule fires only when shift one ends
+  after 7 pm and shift two starts before 9 am; no consecutive-night limit,
+  no rolling 7-day cap, no on-call or weekend limits. ScheduleAnywhere has
+  coverage counters, not constraints. No competitor evidences ratio, rest,
+  preceptor or charge-nurse enforcement inside the generator. Our 13 hard
+  rules as true constraints is a real gap in the market; do not weaken any
+  of them to make the solver's job easier.
+- **Real "AI" in this market is census forecasting, not scheduling.**
+  In-House Health (length-of-stay model, department matcher, hourly census
+  per department) and ShiftWizard (Predictive Census, 7-120 days, claimed
+  87-90%) are the only genuine models. Both need admission volumes a 25-bed
+  hospital does not produce. Do NOT scope forecasting into OPTIMUS; census
+  bands plus seasonal band sets (gaps register item 4) are the right-sized
+  demand input for a CAH, and the solver should consume required-staff per
+  shift as given.
+- **Fairness is claimed, never defined.** M7 markets "staff fairness scores
+  over 94%" with no methodology; QGenda has "equity tracking"; Deputy has an
+  "equal hours" toggle. OPTIMUS should publish its fairness terms (weekend
+  count, holiday, preference hit rate, OT distribution) as named objective
+  components with weights the DON can see. That is the FAIR variant made
+  auditable.
+- **Chat agents exist but cannot solve.** Deputy AI (beta, "introductory
+  free") executes existing workflows after confirm and, per Deputy's own
+  docs, cannot handle "four staff, 24-hour coverage"; QGenda's chat
+  assistant has no customer evidence. If we ever add a conversational layer
+  it sits ON TOP of the solver (explain, what-if, apply), never replaces it.
+  Not part of OPTIMUS.
+
+### Engine features competitors have that we should match or beat
+
+| Feature                                          | Who has it                                                                           | Our status                                  | OPTIMUS relevance                                                                             |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Deterministic, reproducible runs                 | Nobody advertises it                                                                 | Non-deterministic today (findings Q1)       | CP-SAT with a surfaced seed makes us the only one who can reproduce a schedule for an auditor |
+| Explain why a nurse was or was not picked        | M7 ("see why preferences were or weren't honored")                                   | Assignment dialog shows rejection reasons   | Keep; extend to "why this variant"                                                            |
+| Open shifts routed only to eligible staff        | M7, QGenda, ShiftWizard                                                              | Have (open-shift board, eligibility filter) | No change                                                                                     |
+| Float pool / central staffing across units       | M7 (strength), In-House "Command Center", QGenda, ShiftWizard                        | Missing; single-unit engine                 | Multi-unit correctness (gaps register item 5) must land before or with OPTIMUS                |
+| Self-scheduling windows with rules               | ShiftWizard (most praised feature), QGenda, ScheduleAnywhere (dates only)            | Missing                                     | Solver can score claimed shifts and fill holes: a natural OPTIMUS phase 2                     |
+| Rotation / fixed pattern templates               | ScheduleAnywhere copy-forward, OnShift 4/2 rotations, Deputy 1/2/4-week agreed hours | Missing (Dr. Tara ask)                      | Model as per-nurse pattern constraints; solver fills around them                              |
+| Credential expiry blocks assignment              | SmartLinx (blocks), Deputy (warns), ScheduleAnywhere (warns)                         | Competency levels, no expiry dates          | Cheap schema add; a hard constraint for the solver                                            |
+| Census/acuity to required staff                  | OnShift Staff Exact, SmartLinx HPPD, ShiftWizard, QGenda EHR feed                    | Census bands + acuity extras                | Adequate; keep as input, not objective                                                        |
+| Overtime projected while building                | SmartLinx, Deputy (beta), ShiftWizard                                                | Have (isOvertime, 60 h rule)                | No change                                                                                     |
+| On-call as standby that converts to worked hours | Nobody documents it                                                                  | Missing (gaps register item 1)              | Only we would model it; do it                                                                 |
+
+### Pricing and packaging facts that constrain the engine
+
+- **Per-user billing punishes PRN pools.** Deputy bills every non-archived
+  person; ScheduleAnywhere bills every employee on the grid. Our roster-size
+  retainer avoids this; keep OPTIMUS compute cost independent of headcount
+  so we never need per-seat metering.
+- **Quote-only is the norm.** Six of eight publish no price; QGenda has 5%/yr
+  escalators, auto-renew and a 5% card surcharge; ShiftWizard escalators are
+  now "standard". Published flat pricing is a stated differentiator; nothing
+  in OPTIMUS may require a services engagement to configure (Deputy sells
+  "AI Labor Optimization" as a paid CSM service; that is the anti-pattern).
+- **Price floor for context:** Humanity $2.75-3.75, NurseGrid Manager $5,
+  ScheduleAnywhere $4.80-6, Deputy $5-9 per user/month. Our $10 tier sits
+  above every generic tool and below every quote-only vendor. That holds
+  only while the rules engine is visibly the reason.
+- **Solver run-time budget.** Deputy exposes "a minute or less / a few
+  minutes / as long as it takes"; M7 claims a first pass "in seconds".
+  Target for OPTIMUS: first feasible solution under 10 s, three variants
+  under 2 min on a 6-week single-unit schedule, with a visible progress bar.
+  Current local search takes 17-115 s on 28-day schedules, already slower
+  than the competition's claims.
+
+### Market movement to watch
+
+- **M7 Health acquired by Ascend Learning (2026-09-21).** Will be bundled
+  with ATI, NHA credentialing and StaffGarden into systems Ascend already
+  sells to. Enterprise-first roadmap likely; careers page empty. Their CAH
+  push (blog 2026-09-09, "onboarding in UT/MS/AL", no named CAH) may stall.
+  Re-check quarterly.
+- **ScheduleAnywhere is being folded into TCP Humanity.** Its base includes
+  the only named CAH reference in the set (Culbertson Memorial, 22 beds). A
+  grid-export importer is a concrete migration play once OPTIMUS makes the
+  generated schedule clearly better than their copy-forward.
+- **HealthStream launched CAH "market bundles" (Q2 2026)** at "a better
+  per-unit price"; unknown whether ShiftWizard is inside. First sign of an
+  incumbent pricing for our segment.
+- **Corrections to our own claims:** a competitor DOES have a CAH reference
+  (ScheduleAnywhere); M7 is not YC-backed; OnShift belongs to ShiftKey, not
+  ShiftMed. Fix the CAH buyer's-guide post and `competitor-lessons.md`.
