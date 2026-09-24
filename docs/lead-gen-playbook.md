@@ -20,6 +20,12 @@ an email-verifier free tier. No list brokers, no Apollo/ZoomInfo, no ads.
 - Scope pass 1: Texas only (~85 CAHs). Columns to keep/derive: hospital
   name, city, county, certified beds, system affiliation (independent vs
   owned — from POS ownership fields / AHA-style directories), website.
+- **Update 2026-09-24:** a merged national universe with financials,
+  fiscal-year end and agency-spend signals now exists at
+  `leads/public-records/cah_master_prospects.csv` (1,377 CAHs; built from
+  Medicare cost reports, IRS 990 XML, CMS ownership and California HCAI).
+  Methodology and caveats: `docs/cah-public-financial-data.md`. Use its
+  agency signal and budget window as scoring inputs in Phase 2.
 - Deliverable: `leads/universe-tx.csv` (a repo `leads/` folder mirrors the
   post's project-folder pattern: `ICP.md`, scoring rubric, outputs —
   context files make every rerun consistent).
