@@ -3,6 +3,7 @@ import { scenario, assignment, exceptionLog } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { logAuditEvent } from "@/lib/audit/logger";
+import { syncScheduleHolidayRows } from "@/lib/holidays/holiday-tracking";
 
 export async function GET(
   _request: Request,
@@ -78,6 +79,11 @@ export async function PUT(
             })
             .run();
         }
+
+        // Rewrite the annual holiday ledger to match the draft just applied —
+        // otherwise Holiday Fairness (Annual) keeps crediting whoever held each
+        // holiday in the previously chosen draft.
+        syncScheduleHolidayRows(scheduleId);
 
         // Mark this scenario as selected, others as rejected
         for (const other of allScenarios) {

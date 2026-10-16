@@ -3,11 +3,11 @@ import {
   assignment,
   scenario,
   generationJob,
-  staffHolidayAssignment,
   exceptionLog,
   schedule,
 } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import { syncScheduleHolidayRows } from "@/lib/holidays/holiday-tracking";
 import {
   generateSchedule,
   buildSchedulerContext,
@@ -28,17 +28,6 @@ import type {
   UnderstaffedShift,
   SchedulerContext,
 } from "./types";
-
-// ─── Holiday grouping (mirrors weekend-holiday-fairness rule) ────────────────
-
-const HOLIDAY_GROUPS: Record<string, string> = {
-  "Christmas Eve": "Christmas",
-  "Christmas Day": "Christmas",
-};
-
-function getLogicalHolidayName(name: string): string {
-  return HOLIDAY_GROUPS[name] ?? name;
-}
 
 // ─── In-memory scoring (for FAIR/COST variants without writing to DB) ────────
 
@@ -189,24 +178,11 @@ function setProgress(jobId: string, progress: number, phase: string) {
 
 // ─── Write BALANCED assignments to the assignment table ───────────────────────
 
-function writeAssignments(
-  drafts: AssignmentDraft[],
-  scheduleId: string,
-  context: SchedulerContext,
-): void {
-  // Build holiday date lookup
-  const holidayDateToName = new Map<string, string>();
-  for (const h of context.publicHolidays) {
-    holidayDateToName.set(h.date, getLogicalHolidayName(h.name));
-  }
-
+function writeAssignments(drafts: AssignmentDraft[], scheduleId: string): void {
   db.transaction(() => {
     for (const draft of drafts) {
-      const id = crypto.randomUUID();
-
       db.insert(assignment)
         .values({
-          id,
           shiftId: draft.shiftId,
           staffId: draft.staffId,
           scheduleId,
@@ -218,27 +194,13 @@ function writeAssignments(
           assignmentSource: "auto_generated",
         })
         .run();
-
-      // Holiday tracking
-      const logicalHoliday = holidayDateToName.get(draft.date);
-      if (logicalHoliday) {
-        const year = new Date(draft.date).getFullYear();
-        // Upsert-style: insert only if this staff/holiday/year doesn't already exist
-        try {
-          db.insert(staffHolidayAssignment)
-            .values({
-              staffId: draft.staffId,
-              holidayName: logicalHoliday,
-              year,
-              shiftId: draft.shiftId,
-              assignmentId: id,
-            })
-            .run();
-        } catch {
-          // Ignore unique constraint violation (staff already has this holiday tracked)
-        }
-      }
     }
+
+    // Annual holiday ledger: rebuilt from the assignments just written, in the
+    // same transaction. (Pre-v1.11.1 this inserted per draft and swallowed the
+    // unique-index error, so a nurse who held a holiday in an earlier
+    // generation kept the credit after regeneration gave it to someone else.)
+    syncScheduleHolidayRows(scheduleId);
   });
 }
 
@@ -297,6 +259,10 @@ export async function runGenerationJob(
           .where(eq(assignment.scheduleId, scheduleId))
           .run();
         db.delete(scenario).where(eq(scenario.scheduleId, scheduleId)).run();
+        // Drop this schedule's holiday-ledger rows with its assignments, so a
+        // failed generation can't leave credit for assignments that no longer
+        // exist. Rewritten from the new assignments in writeAssignments().
+        syncScheduleHolidayRows(scheduleId);
       });
     } finally {
       db.$client.pragma("foreign_keys = ON");
@@ -313,7 +279,7 @@ export async function runGenerationJob(
     );
 
     setProgress(jobId, 38, "Writing Balanced schedule to database");
-    writeAssignments(balancedResult.assignments, scheduleId, context);
+    writeAssignments(balancedResult.assignments, scheduleId);
 
     // Update schedule status to draft
     db.update(schedule)
