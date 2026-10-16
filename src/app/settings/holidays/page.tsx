@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getStandardHolidays } from "@/lib/holidays/standard-holidays";
 
 interface Holiday {
   id: string;
@@ -29,19 +30,6 @@ interface Holiday {
   isActive: boolean;
   createdAt: string;
 }
-
-const standardHolidays = [
-  { name: "New Year's Day", month: 0, day: 1 },
-  { name: "Martin Luther King Jr. Day", month: 0, day: 15 }, // 3rd Monday approx
-  { name: "Presidents' Day", month: 1, day: 19 }, // 3rd Monday approx
-  { name: "Memorial Day", month: 4, day: 27 }, // Last Monday approx
-  { name: "Independence Day", month: 6, day: 4 },
-  { name: "Labor Day", month: 8, day: 2 }, // 1st Monday approx
-  { name: "Thanksgiving", month: 10, day: 28 }, // 4th Thursday approx
-  { name: "Christmas Eve", month: 11, day: 24 },
-  { name: "Christmas Day", month: 11, day: 25 },
-  { name: "New Year's Eve", month: 11, day: 31 },
-];
 
 export default function HolidaysPage() {
   const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -100,13 +88,13 @@ export default function HolidaysPage() {
   }
 
   async function addStandardHolidays(year: number) {
-    for (const h of standardHolidays) {
-      const date = new Date(year, h.month, h.day);
-      const dateStr = date.toISOString().split("T")[0];
+    // Date-only strings computed per year by rule (see standard-holidays.ts);
+    // never via new Date(y, m, d).toISOString(), which is a day early east of UTC.
+    for (const h of getStandardHolidays(year)) {
       await fetch("/api/holidays", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: h.name, date: dateStr }),
+        body: JSON.stringify({ name: h.name, date: h.date, year }),
       });
     }
     fetchData();

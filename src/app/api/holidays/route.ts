@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { publicHoliday } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { yearOfDateString } from "@/lib/holidays/standard-holidays";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -29,7 +30,9 @@ export async function POST(request: Request) {
     .values({
       name: body.name,
       date: body.date,
-      year: body.year ?? new Date(body.date).getFullYear(),
+      // Year from the string: new Date("2027-01-01").getFullYear() is 2026 on
+      // any server west of UTC.
+      year: body.year ?? yearOfDateString(body.date),
     })
     .returning()
     .get();
