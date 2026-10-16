@@ -471,3 +471,297 @@ describe("holiday ledger follows the chosen schedule", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Daily operations (2026-10-16): swaps, callouts, coverage fills, leave
+// approval and manual edits change WHO works a holiday shift after the
+// schedule is chosen. Before this fix none of them touched the ledger, so a
+// nurse swapped off a holiday kept the credit and her replacement got none.
+// Each test drives the real route and asserts the ledger equals the truth
+// computed independently from the assignment table.
+// ---------------------------------------------------------------------------
+
+/** Three full-time Level 4+ ICU RNs, none on leave over the holiday. */
+function fullTimeFixture(sqlite: Sqlite, scheduleId: string) {
+  const nurses = (
+    sqlite
+      .prepare(
+        // Exclude anyone the seed put on leave over the holiday — the seed's
+        // ids are random, so without this the fill route's hard-rule recheck
+        // rejects the replacement on some runs (flaky 422).
+        `SELECT id FROM staff
+          WHERE is_active = 1 AND home_unit = 'ICU' AND employment_type = 'full_time'
+            -- Same role, Level 4+: any two can legally swap (the swap route
+            -- enforces role compatibility and Level 2 supervision).
+            AND role = 'RN' AND icu_competency_level >= 4
+            AND id NOT IN (SELECT staff_id FROM staff_leave
+                            WHERE start_date <= ? AND end_date >= ?)
+          ORDER BY id LIMIT 3`,
+      )
+      .all(PRESIDENTS_DAY, PRESIDENTS_DAY) as { id: string }[]
+  ).map((r) => r.id);
+  expect(nurses).toHaveLength(3);
+  const base = fixture(sqlite, scheduleId);
+  return { ...base, nurses };
+}
+
+function assignmentId(sqlite: Sqlite, shiftId: string, staffId: string) {
+  return (
+    sqlite
+      .prepare("SELECT id FROM assignment WHERE shift_id = ? AND staff_id = ?")
+      .get(shiftId, staffId) as { id: string }
+  ).id;
+}
+
+function req(url: string, method: string, body?: unknown) {
+  return new Request(`http://test${url}`, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+/** Alice holds Presidents' Day; Cara holds another shift. Ledger = Alice. */
+async function holidayHeldByAlice() {
+  const dbMod = await seededDb();
+  const { sqlite, scheduleId } = dbMod;
+  const f = fullTimeFixture(sqlite, scheduleId);
+  const [alice, , cara] = f.nurses;
+  await generate(dbMod, [
+    draft(sqlite, f.holidayShift, alice),
+    draft(sqlite, f.otherShift, cara),
+  ]);
+  expect(allLedgerKeys(sqlite)).toEqual([PD(alice)]);
+  return { dbMod, ...f };
+}
+
+function expectLedgerMatchesTruth(sqlite: Sqlite, scheduleId: string) {
+  expect(ledgerKeys(sqlite, scheduleId)).toEqual(
+    expectedKeys(sqlite, scheduleId),
+  );
+  expect(allLedgerKeys(sqlite)).toEqual(expectedKeys(sqlite, scheduleId));
+}
+
+describe("holiday ledger follows daily operations", () => {
+  it("callout logged then filled moves the credit to the replacement", async () => {
+    const { dbMod, nurses, holidayShift } = await holidayHeldByAlice();
+    const { sqlite, scheduleId } = dbMod;
+    const [alice, bob] = nurses;
+
+    const create = await import("@/app/api/callouts/route");
+    const res1 = await create.POST(
+      req("/api/callouts", "POST", {
+        assignmentId: assignmentId(sqlite, holidayShift, alice),
+        staffId: alice,
+        shiftId: holidayShift,
+        reason: "sick",
+      }),
+    );
+    expect(res1.status).toBeLessThan(300);
+    const calloutId = ((await res1.json()) as { callout: { id: string } })
+      .callout.id;
+    // Called out: Alice no longer works the holiday.
+    expect(allLedgerKeys(sqlite)).toEqual([]);
+    expectLedgerMatchesTruth(sqlite, scheduleId);
+
+    const fill = await import("@/app/api/callouts/[id]/route");
+    const res2 = await fill.PUT(
+      req(`/api/callouts/${calloutId}`, "PUT", {
+        replacementStaffId: bob,
+        replacementSource: "overtime",
+      }),
+      { params: Promise.resolve({ id: calloutId }) },
+    );
+    expect(res2.status).toBe(200);
+    expect(allLedgerKeys(sqlite)).toEqual([PD(bob)]);
+    expectLedgerMatchesTruth(sqlite, scheduleId);
+  });
+
+  it("coverage request fill moves the credit to the nurse who picks it up", async () => {
+    const { dbMod, nurses, holidayShift } = await holidayHeldByAlice();
+    const { sqlite, scheduleId } = dbMod;
+    const [alice, bob] = nurses;
+    const openShiftId = crypto.randomUUID();
+    sqlite
+      .prepare(
+        `INSERT INTO open_shift (id, shift_id, original_staff_id, original_assignment_id, reason, status, priority)
+         VALUES (?, ?, ?, ?, 'schedule_change', 'pending_approval', 'normal')`,
+      )
+      .run(
+        openShiftId,
+        holidayShift,
+        alice,
+        assignmentId(sqlite, holidayShift, alice),
+      );
+
+    const route = await import("@/app/api/open-shifts/[id]/route");
+    const res = await route.PUT(
+      req(`/api/open-shifts/${openShiftId}`, "PUT", {
+        action: "fill",
+        filledByStaffId: bob,
+      }),
+      { params: Promise.resolve({ id: openShiftId }) },
+    );
+    if (res.status !== 200) {
+      throw new Error(`fill rejected: ${JSON.stringify(await res.json())}`);
+    }
+    expect(allLedgerKeys(sqlite)).toEqual([PD(bob)]);
+    expectLedgerMatchesTruth(sqlite, scheduleId);
+  });
+
+  it("approved directed swap moves the credit with the shift", async () => {
+    const { dbMod, nurses, holidayShift, otherShift } =
+      await holidayHeldByAlice();
+    const { sqlite, scheduleId } = dbMod;
+    const [alice, , cara] = nurses;
+    const swapId = crypto.randomUUID();
+    sqlite
+      .prepare(
+        `INSERT INTO shift_swap_request (id, requesting_assignment_id, requesting_staff_id, target_assignment_id, target_staff_id, status)
+         VALUES (?, ?, ?, ?, ?, 'pending')`,
+      )
+      .run(
+        swapId,
+        assignmentId(sqlite, holidayShift, alice),
+        alice,
+        assignmentId(sqlite, otherShift, cara),
+        cara,
+      );
+
+    const route = await import("@/app/api/swap-requests/[id]/route");
+    const res = await route.PUT(
+      req(`/api/swap-requests/${swapId}`, "PUT", {
+        status: "approved",
+        reviewedBy: "nurse_manager",
+      }),
+      { params: Promise.resolve({ id: swapId }) },
+    );
+    if (res.status !== 200) {
+      throw new Error(`swap rejected: ${JSON.stringify(await res.json())}`);
+    }
+    // Cara now works Presidents' Day; Alice does not.
+    expect(allLedgerKeys(sqlite)).toEqual([PD(cara)]);
+    expectLedgerMatchesTruth(sqlite, scheduleId);
+  });
+
+  it("approved open swap removes the credit from the nurse giving it up", async () => {
+    const { dbMod, nurses, holidayShift } = await holidayHeldByAlice();
+    const { sqlite, scheduleId } = dbMod;
+    const [alice] = nurses;
+    const swapId = crypto.randomUUID();
+    sqlite
+      .prepare(
+        `INSERT INTO shift_swap_request (id, requesting_assignment_id, requesting_staff_id, status)
+         VALUES (?, ?, ?, 'pending')`,
+      )
+      .run(swapId, assignmentId(sqlite, holidayShift, alice), alice);
+
+    const route = await import("@/app/api/swap-requests/[id]/route");
+    const res = await route.PUT(
+      req(`/api/swap-requests/${swapId}`, "PUT", {
+        status: "approved",
+        reviewedBy: "nurse_manager",
+      }),
+      { params: Promise.resolve({ id: swapId }) },
+    );
+    expect(res.status).toBe(200);
+    expect(allLedgerKeys(sqlite)).toEqual([]);
+    expectLedgerMatchesTruth(sqlite, scheduleId);
+  });
+
+  it("approved leave over the holiday removes the credit", async () => {
+    const { dbMod, nurses } = await holidayHeldByAlice();
+    const { sqlite, scheduleId } = dbMod;
+    const [alice] = nurses;
+    const leaveId = crypto.randomUUID();
+    sqlite
+      .prepare(
+        `INSERT INTO staff_leave (id, staff_id, leave_type, start_date, end_date, status)
+         VALUES (?, ?, 'vacation', ?, ?, 'pending')`,
+      )
+      .run(leaveId, alice, PRESIDENTS_DAY, PRESIDENTS_DAY);
+
+    const route = await import("@/app/api/staff-leave/[id]/route");
+    const res = await route.PUT(
+      req(`/api/staff-leave/${leaveId}`, "PUT", {
+        status: "approved",
+        approvedBy: "nurse_manager",
+      }),
+      { params: Promise.resolve({ id: leaveId }) },
+    );
+    expect(res.status).toBe(200);
+    expect(allLedgerKeys(sqlite)).toEqual([]);
+    expectLedgerMatchesTruth(sqlite, scheduleId);
+  });
+
+  it("manual add and remove keep Christmas as one credit across Eve and Day", async () => {
+    const dbMod = await seededDb();
+    const { sqlite } = dbMod;
+    const defId = (
+      sqlite.prepare("SELECT id FROM shift_definition LIMIT 1").get() as {
+        id: string;
+      }
+    ).id;
+    const nurse = (
+      sqlite
+        .prepare(
+          "SELECT id FROM staff WHERE is_active = 1 AND employment_type = 'full_time' LIMIT 1",
+        )
+        .get() as { id: string }
+    ).id;
+    sqlite
+      .prepare(
+        "INSERT INTO schedule (id, name, start_date, end_date, unit, status) VALUES ('xmas', 'xmas', '2026-12-20', '2026-12-31', 'ICU', 'draft')",
+      )
+      .run();
+    const eve = crypto.randomUUID();
+    const day = crypto.randomUUID();
+    const ins = sqlite.prepare(
+      "INSERT INTO shift (id, schedule_id, shift_definition_id, date) VALUES (?, 'xmas', ?, ?)",
+    );
+    ins.run(eve, defId, "2026-12-24");
+    ins.run(day, defId, "2026-12-25");
+    // Christmas Eve and Day must be active public holidays for the ledger.
+    const hol = sqlite.prepare(
+      "INSERT OR IGNORE INTO public_holiday (id, name, date, is_active) VALUES (?, ?, ?, 1)",
+    );
+    hol.run(crypto.randomUUID(), "Christmas Eve", "2026-12-24");
+    hol.run(crypto.randomUUID(), "Christmas Day", "2026-12-25");
+
+    const route = await import("@/app/api/schedules/[id]/assignments/route");
+    const add = async (shiftId: string) => {
+      const res = await route.POST(
+        req("/api/schedules/xmas/assignments", "POST", {
+          shiftId,
+          staffId: nurse,
+        }),
+        { params: Promise.resolve({ id: "xmas" }) },
+      );
+      expect(res.status).toBe(201);
+    };
+    const christmas = () =>
+      (
+        sqlite
+          .prepare(
+            "SELECT COUNT(*) AS n FROM staff_holiday_assignment WHERE staff_id = ? AND holiday_name = 'Christmas' AND year = 2026",
+          )
+          .get(nurse) as { n: number }
+      ).n;
+
+    await add(eve);
+    await add(day);
+    expect(christmas()).toBe(1);
+
+    // Remove Eve: she still works Christmas Day, so the credit must stay.
+    // (Pre-fix the DELETE path removed the Christmas row outright.)
+    const res = await route.DELETE(
+      req(
+        `/api/schedules/xmas/assignments?assignmentId=${assignmentId(sqlite, eve, nurse)}`,
+        "DELETE",
+      ),
+    );
+    expect(res.status).toBe(200);
+    expect(christmas()).toBe(1);
+    expectLedgerMatchesTruth(sqlite, "xmas");
+  });
+});

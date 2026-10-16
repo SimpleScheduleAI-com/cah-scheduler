@@ -11,6 +11,13 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// Holiday-ledger sync is covered end-to-end by src/__tests__/holidays/
+// holiday-ledger.test.ts (real scratch DB). Stub it here: this file's mocked
+// db and drizzle-orm do not implement the queries it runs.
+vi.mock("@/lib/holidays/holiday-tracking", () => ({
+  syncHolidayRowsForShifts: vi.fn(),
+}));
+
 // ─── Hoisted variables ────────────────────────────────────────────────────────
 
 const mockSelectGet = vi.hoisted(() => vi.fn());
@@ -50,10 +57,18 @@ vi.mock("@/db/schema", () => ({
   },
   shift: { id: "shift$id", date: "shift$date", scheduleId: "shift$scheduleId" },
   schedule: { id: "sched$id", unit: "sched$unit" },
-  unit: { id: "unit$id", name: "unit$name", calloutThresholdDays: "unit$threshold" },
+  unit: {
+    id: "unit$id",
+    name: "unit$name",
+    calloutThresholdDays: "unit$threshold",
+  },
   openShift: { id: "os$id" },
   callout: { id: "co$id" },
-  staff: { id: "staff$id", firstName: "staff$firstName", lastName: "staff$lastName" },
+  staff: {
+    id: "staff$id",
+    firstName: "staff$firstName",
+    lastName: "staff$lastName",
+  },
   shiftSwapRequest: {
     id: "ssr$id",
     status: "ssr$status",
@@ -99,7 +114,10 @@ vi.mock("@/db", () => {
 });
 
 vi.mock("@/lib/coverage/find-candidates", () => ({
-  findCandidatesForShift: vi.fn(async () => ({ candidates: [], escalationStepsChecked: [] })),
+  findCandidatesForShift: vi.fn(async () => ({
+    candidates: [],
+    escalationStepsChecked: [],
+  })),
 }));
 
 // ─── Import SUT after mocks ───────────────────────────────────────────────────
@@ -156,7 +174,12 @@ describe("PUT /api/staff-leave/[id] — voids pending swaps on cancelled assignm
       ])
       .mockReturnValueOnce([
         // pending swap requests referencing the cancelled assignment
-        { id: "swap-001", status: "pending", requestingAssignmentId: ASSIGN_ID, targetAssignmentId: "assign-other" },
+        {
+          id: "swap-001",
+          status: "pending",
+          requestingAssignmentId: ASSIGN_ID,
+          targetAssignmentId: "assign-other",
+        },
       ])
       .mockReturnValue([]);
   });
@@ -166,10 +189,12 @@ describe("PUT /api/staff-leave/[id] — voids pending swaps on cancelled assignm
       params: Promise.resolve({ id: LEAVE_ID }),
     });
     const denialUpdates = mockUpdateSet.mock.calls.filter(
-      (c) => (c[0] as { status?: string }).status === "denied"
+      (c) => (c[0] as { status?: string }).status === "denied",
     );
     expect(denialUpdates.length).toBe(1);
-    expect((denialUpdates[0][0] as { denialReason?: string }).denialReason).toMatch(/leave/i);
+    expect(
+      (denialUpdates[0][0] as { denialReason?: string }).denialReason,
+    ).toMatch(/leave/i);
   });
 
   it("audit-logs the automatic swap denial", async () => {
@@ -177,9 +202,11 @@ describe("PUT /api/staff-leave/[id] — voids pending swaps on cancelled assignm
       params: Promise.resolve({ id: LEAVE_ID }),
     });
     const swapDenialLogs = mockInsertValues.mock.calls.filter(
-      (c) => (c[0] as { action?: string }).action === "swap_denied"
+      (c) => (c[0] as { action?: string }).action === "swap_denied",
     );
     expect(swapDenialLogs.length).toBe(1);
-    expect((swapDenialLogs[0][0] as { entityType?: string }).entityType).toBe("swap_request");
+    expect((swapDenialLogs[0][0] as { entityType?: string }).entityType).toBe(
+      "swap_request",
+    );
   });
 });

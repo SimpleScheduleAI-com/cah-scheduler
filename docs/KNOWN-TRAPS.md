@@ -122,9 +122,13 @@ never touched it.
 
 **Rule:** any code that bulk-replaces a schedule's assignments must call
 `syncScheduleHolidayRows(scheduleId)` (`src/lib/holidays/holiday-tracking.ts`)
-inside the same transaction. Swap approval and callout/open-shift fills still
-do not maintain the ledger; `scripts/repair-holiday-assignments.ts` reconciles
-it. Related: never build a date with `new Date(y, m, d).toISOString()` — it is
+inside the same transaction. Any code that changes WHO works a shift (status
+to called_out/cancelled/swapped, staffId change, replacement insert, delete,
+restore) must call `syncHolidayRowsForShifts([shiftId, ...])` inside its
+transaction — as of 1.11.2 every such route does (callouts, open shifts, swaps,
+leave approval, manual assignments, practice teardown). A new route that writes
+`assignment` without it reopens the bug; `scripts/repair-holiday-assignments.ts`
+reconciles existing drift. Related: never build a date with `new Date(y, m, d).toISOString()` — it is
 local midnight in UTC, a day early east of UTC; see `standard-holidays.ts`.
 
 ## Sibling agent stashes the orchestrator's uncommitted work (2026-08-15)

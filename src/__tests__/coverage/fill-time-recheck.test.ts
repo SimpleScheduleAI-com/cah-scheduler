@@ -12,6 +12,13 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// Holiday-ledger sync is covered end-to-end by src/__tests__/holidays/
+// holiday-ledger.test.ts (real scratch DB). Stub it here: this file's mocked
+// db and drizzle-orm do not implement the queries it runs.
+vi.mock("@/lib/holidays/holiday-tracking", () => ({
+  syncHolidayRowsForShifts: vi.fn(),
+}));
+
 // ─── Hoisted mocks ───────────────────────────────────────────────────────────
 
 const mockCheckAvailability = vi.hoisted(() => vi.fn());
@@ -48,7 +55,12 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 vi.mock("@/db/schema", () => {
-  const t = (name: string) => ({ _table: name, id: `${name}$id`, date: `${name}$date`, status: `${name}$status` });
+  const t = (name: string) => ({
+    _table: name,
+    id: `${name}$id`,
+    date: `${name}$date`,
+    status: `${name}$status`,
+  });
   return {
     openShift: t("openShift"),
     assignment: t("assignment"),
@@ -73,7 +85,9 @@ vi.mock("@/db", () => {
     chain.where = () => chain;
     chain.get = () => {
       if (joined) return tableGets.joined();
-      const fn = table?._table ? tableGets[table._table as keyof typeof tableGets] : undefined;
+      const fn = table?._table
+        ? tableGets[table._table as keyof typeof tableGets]
+        : undefined;
       return fn ? fn() : undefined;
     };
     chain.all = () => [];
@@ -81,7 +95,9 @@ vi.mock("@/db", () => {
   };
   return {
     db: {
-      select: () => ({ from: (table: { _table?: string }) => makeChain(table) }),
+      select: () => ({
+        from: (table: { _table?: string }) => makeChain(table),
+      }),
       insert: () => ({
         values: () => ({
           run: mockInsertRun,
@@ -104,11 +120,16 @@ vi.mock("@/db", () => {
 
 vi.mock("@/lib/coverage/find-candidates", () => ({
   checkStaffAvailability: mockCheckAvailability,
-  findCandidatesForShift: vi.fn(async () => ({ candidates: [], escalationStepsChecked: [] })),
+  findCandidatesForShift: vi.fn(async () => ({
+    candidates: [],
+    escalationStepsChecked: [],
+  })),
 }));
 
 vi.mock("@/lib/audit/logger", () => ({ logAuditEvent: vi.fn() }));
-vi.mock("@/lib/callout/escalation", () => ({ getEscalationOptions: vi.fn(() => []) }));
+vi.mock("@/lib/callout/escalation", () => ({
+  getEscalationOptions: vi.fn(() => []),
+}));
 
 // ─── Import SUTs after mocks ─────────────────────────────────────────────────
 
@@ -130,7 +151,14 @@ const OPEN_SHIFT = {
   shiftId: "shift-001",
   originalStaffId: "staff-orig",
   status: "pending_approval",
-  recommendations: [{ staffId: "staff-new", staffName: "Jane Doe", source: "float", isOvertime: false }],
+  recommendations: [
+    {
+      staffId: "staff-new",
+      staffName: "Jane Doe",
+      source: "float",
+      isOvertime: false,
+    },
+  ],
   notes: null,
 };
 
@@ -149,7 +177,11 @@ describe("open-shift approve — fill-time availability re-check", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     tableGets.openShift.mockReturnValue(OPEN_SHIFT);
-    tableGets.shift.mockReturnValue({ id: "shift-001", scheduleId: "sched-001", date: "2026-04-01" });
+    tableGets.shift.mockReturnValue({
+      id: "shift-001",
+      scheduleId: "sched-001",
+      date: "2026-04-01",
+    });
     tableGets.joined.mockReturnValue(SHIFT_DETAILS_ROW);
     tableGets.assignment.mockReturnValue({ isChargeNurse: false });
     mockInsertReturningGet.mockReturnValue({ id: "assign-new" });
@@ -167,7 +199,7 @@ describe("open-shift approve — fill-time availability re-check", () => {
         action: "approve",
         selectedStaffId: "staff-new",
       }),
-      { params: Promise.resolve({ id: "os-001" }) }
+      { params: Promise.resolve({ id: "os-001" }) },
     );
     expect((res as { status: number }).status).toBe(422);
     expect(mockInsertReturningGet).not.toHaveBeenCalled();
@@ -184,24 +216,27 @@ describe("open-shift approve — fill-time availability re-check", () => {
         action: "approve",
         selectedStaffId: "staff-new",
       }),
-      { params: Promise.resolve({ id: "os-001" }) }
+      { params: Promise.resolve({ id: "os-001" }) },
     )) as unknown as { _data: { error: string } };
     expect(res._data.error).toMatch(/overlapping/i);
   });
 
   it("proceeds with the fill when availability passes", async () => {
-    mockCheckAvailability.mockResolvedValue({ available: true, hoursThisWeek: 24 });
+    mockCheckAvailability.mockResolvedValue({
+      available: true,
+      hoursThisWeek: 24,
+    });
     const res = await openShiftPUT(
       makeRequest("http://localhost/api/open-shifts/os-001", {
         action: "approve",
         selectedStaffId: "staff-new",
       }),
-      { params: Promise.resolve({ id: "os-001" }) }
+      { params: Promise.resolve({ id: "os-001" }) },
     );
     expect((res as { status: number }).status).toBe(200);
     expect(mockCheckAvailability).toHaveBeenCalledWith(
       "staff-new",
-      expect.objectContaining({ date: "2026-04-01" })
+      expect.objectContaining({ date: "2026-04-01" }),
     );
   });
 });
@@ -218,11 +253,18 @@ describe("callout fill — fill-time availability re-check", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     tableGets.callout.mockReturnValue(CALLOUT);
-    tableGets.shift.mockReturnValue({ scheduleId: "sched-001", date: "2026-04-01" });
+    tableGets.shift.mockReturnValue({
+      scheduleId: "sched-001",
+      date: "2026-04-01",
+    });
     tableGets.joined.mockReturnValue(SHIFT_DETAILS_ROW);
     tableGets.assignment.mockReturnValue({ isChargeNurse: false });
     tableGets.schedule.mockReturnValue({ unit: "ICU" });
-    tableGets.staff.mockReturnValue({ firstName: "Jane", lastName: "Doe", homeUnit: "ICU" });
+    tableGets.staff.mockReturnValue({
+      firstName: "Jane",
+      lastName: "Doe",
+      homeUnit: "ICU",
+    });
     mockUpdateReturningGet.mockReturnValue({ ...CALLOUT, status: "filled" });
   });
 
@@ -237,20 +279,23 @@ describe("callout fill — fill-time availability re-check", () => {
         replacementStaffId: "staff-new",
         replacementSource: "float",
       }),
-      { params: Promise.resolve({ id: "co-001" }) }
+      { params: Promise.resolve({ id: "co-001" }) },
     );
     expect((res as { status: number }).status).toBe(422);
     expect(mockInsertRun).not.toHaveBeenCalled();
   });
 
   it("proceeds with the fill when availability passes", async () => {
-    mockCheckAvailability.mockResolvedValue({ available: true, hoursThisWeek: 24 });
+    mockCheckAvailability.mockResolvedValue({
+      available: true,
+      hoursThisWeek: 24,
+    });
     const res = await calloutPUT(
       makeRequest("http://localhost/api/callouts/co-001", {
         replacementStaffId: "staff-new",
         replacementSource: "float",
       }),
-      { params: Promise.resolve({ id: "co-001" }) }
+      { params: Promise.resolve({ id: "co-001" }) },
     );
     expect((res as { status: number }).status).toBe(200);
   });

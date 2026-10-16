@@ -21,6 +21,7 @@ import {
   desc,
 } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { syncHolidayRowsForShifts } from "@/lib/holidays/holiday-tracking";
 
 /**
  * Practice Examples — the First-Cycle Guide's daily-management tutorial (S6).
@@ -591,6 +592,17 @@ export async function DELETE() {
         )
         .run();
       removed.restoredAssignments += restore.changes ?? 0;
+
+      // Replacements were deleted and originals restored — rebuild the
+      // holiday credit for the shifts involved.
+      syncHolidayRowsForShifts(
+        db
+          .select({ shiftId: assignment.shiftId })
+          .from(assignment)
+          .where(inArray(assignment.id, ids))
+          .all()
+          .map((r) => r.shiftId),
+      );
 
       // 2d. Delete the leave row.
       db.delete(staffLeave).where(eq(staffLeave.id, leave.id)).run();

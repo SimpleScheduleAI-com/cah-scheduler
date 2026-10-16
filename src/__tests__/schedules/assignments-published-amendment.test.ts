@@ -16,6 +16,13 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// Holiday-ledger sync is covered end-to-end by src/__tests__/holidays/
+// holiday-ledger.test.ts (real scratch DB). Stub it here: this file's mocked
+// db and drizzle-orm do not implement the queries it runs.
+vi.mock("@/lib/holidays/holiday-tracking", () => ({
+  syncHolidayRowsForShifts: vi.fn(),
+}));
+
 // ─── Hoisted mocks ───────────────────────────────────────────────────────────
 
 const tableGets = vi.hoisted(() => ({
@@ -137,6 +144,7 @@ vi.mock("@/db", () => {
         set: () => ({ where: () => ({ run: mockUpdateRun }) }),
       }),
       delete: () => ({ where: () => ({ run: mockDeleteRun }) }),
+      transaction: (fn: () => unknown) => fn(),
     },
   };
 });

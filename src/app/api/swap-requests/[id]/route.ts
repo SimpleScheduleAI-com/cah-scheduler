@@ -13,6 +13,7 @@ import {
 import { eq, and, ne, lte, gte } from "drizzle-orm";
 import { weekBounds } from "@/lib/date/week";
 import { NextResponse } from "next/server";
+import { syncHolidayRowsForShifts } from "@/lib/holidays/holiday-tracking";
 import {
   validateSwap,
   type SwapSideParams,
@@ -411,6 +412,8 @@ export async function PUT(
             .set({ status: "swapped", updatedAt: new Date().toISOString() })
             .where(eq(assignment.id, requestingAssignment.id))
             .run();
+          // The requester gives the shift up — and any holiday credit on it.
+          syncHolidayRowsForShifts([requestingAssignment.shiftId]);
 
           // Create an open_shift coverage request so the manager can find a replacement
           db.insert(openShift)
@@ -748,6 +751,12 @@ export async function PUT(
               })
               .where(eq(assignment.id, targetAssignment.id))
               .run();
+
+            // Holiday credit follows the shift to whoever now works it.
+            syncHolidayRowsForShifts([
+              requestingAssignment.shiftId,
+              targetAssignment.shiftId,
+            ]);
 
             db.insert(exceptionLog)
               .values({

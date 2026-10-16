@@ -8,6 +8,7 @@ import {
 } from "@/db/schema";
 import { eq, and, gte, lte, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { syncHolidayRowsForShifts } from "@/lib/holidays/holiday-tracking";
 import { checkStaffAvailability } from "@/lib/coverage/find-candidates";
 import { weekBounds } from "@/lib/date/week";
 
@@ -255,6 +256,9 @@ export async function PUT(
           .run();
       }
 
+      // Holiday credit moves from the original nurse to the one filling it.
+      syncHolidayRowsForShifts([existing.shiftId]);
+
       // Update coverage request as filled
       const updatedRow = db
         .update(openShift)
@@ -382,6 +386,9 @@ export async function PUT(
           )
           .run();
       }
+
+      // Holiday credit moves from the original nurse to the one filling it.
+      syncHolidayRowsForShifts([existing.shiftId]);
 
       // Update coverage request as filled
       const updatedRow = db

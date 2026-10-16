@@ -222,6 +222,52 @@ export function syncScheduleHolidayRows(scheduleId: string): {
   return { removed: oldRows.length, inserted };
 }
 
+/**
+ * Re-sync the ledger for every schedule that owns one of `shiftIds`.
+ *
+ * Daily operations (callouts, coverage fills, swaps, leave approval, manual
+ * edits, practice-mode teardown) change WHO works a shift after the schedule
+ * is chosen. Each of them calls this inside its own transaction, right after
+ * changing the assignment rows, so the ledger commits with them.
+ *
+ * Skips the work entirely when none of the shifts falls on an active public
+ * holiday: a non-holiday shift cannot change anyone's holiday credit, and the
+ * full sync would otherwise also prune rows for holidays that were later
+ * switched off, which is the repair script's job, not a callout's.
+ */
+export function syncHolidayRowsForShifts(
+  shiftIds: (string | null | undefined)[],
+): void {
+  const ids = [...new Set(shiftIds.filter((x): x is string => !!x))];
+  if (ids.length === 0) return;
+  const shifts = db
+    .select({ scheduleId: shift.scheduleId, date: shift.date })
+    .from(shift)
+    .where(inArray(shift.id, ids))
+    .all();
+  if (shifts.length === 0) return;
+  const holidayDates = new Set(
+    db
+      .select({ date: publicHoliday.date })
+      .from(publicHoliday)
+      .where(
+        and(
+          eq(publicHoliday.isActive, true),
+          inArray(
+            publicHoliday.date,
+            shifts.map((s) => s.date),
+          ),
+        ),
+      )
+      .all()
+      .map((h) => h.date),
+  );
+  const scheduleIds = new Set(
+    shifts.filter((s) => holidayDates.has(s.date)).map((s) => s.scheduleId),
+  );
+  for (const scheduleId of scheduleIds) syncScheduleHolidayRows(scheduleId);
+}
+
 export interface LedgerRepairPlan {
   /** Rows to delete: no live holiday assignment backs them. */
   remove: (typeof staffHolidayAssignment.$inferSelect)[];

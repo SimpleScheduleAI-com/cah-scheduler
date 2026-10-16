@@ -6,6 +6,54 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.11.2] - 2026-10-16
+
+Closes the gap left open by 1.11.1: the yearly holiday counts now also follow
+day-to-day changes, not just regeneration and draft switching.
+
+### Fixed
+
+- **Holiday credit moves when a holiday shift changes hands.** After a
+  schedule is chosen, six actions change who works a shift, and none of them
+  updated `staff_holiday_assignment`. So if two nurses swapped Christmas, the
+  original nurse kept the Christmas credit and the nurse who actually worked it
+  got none; the next schedule's "Holiday Fairness (Annual)" then steered
+  holidays the wrong way. Each action now re-syncs the holiday rows for the
+  affected shift inside its own transaction, using the same
+  `syncScheduleHolidayRows()` that regeneration uses (via a new
+  `syncHolidayRowsForShifts()`, which does nothing unless a shift falls on an
+  active holiday):
+  - logging a callout (the called-out nurse loses the credit),
+  - filling a callout (the replacement gains it),
+  - filling or approving a coverage request,
+  - approving a directed swap (credit follows the shift) or an open swap,
+  - approving leave that cancels holiday assignments,
+  - tearing down practice-mode examples (replacements removed, originals
+    restored).
+- **Removing one half of Christmas no longer wipes the Christmas credit.**
+  The manual remove path deleted the nurse's "Christmas" row by name, even if
+  she still worked the other day (Eve vs Day). The manual add and remove paths
+  now use the same re-sync, which recomputes from what is left.
+  (`src/lib/holidays/holiday-tracking.ts`, `src/app/api/callouts/route.ts`,
+  `src/app/api/callouts/[id]/route.ts`, `src/app/api/open-shifts/[id]/route.ts`,
+  `src/app/api/swap-requests/[id]/route.ts`, `src/app/api/staff-leave/[id]/route.ts`,
+  `src/app/api/practice-examples/route.ts`,
+  `src/app/api/schedules/[id]/assignments/route.ts`)
+
+### Tests
+
+- 6 new (785 total), driving the real routes on a scratch database: callout
+  log then fill, coverage fill, directed swap, open swap, leave approval, and
+  manual add/remove across Christmas Eve and Day. All six fail on 1.11.1 and
+  pass now; expected rows are computed with raw SQL from the assignment table,
+  independent of the code under test.
+
+### Docs
+
+- `RULES_SPECIFICATION.md` 1.6.20 (§4.4), `docs/05-scheduling-rules.md`,
+  `docs/KNOWN-TRAPS.md` (rule now covers every action that changes who works a
+  shift).
+
 ## [1.11.1] - 2026-10-16
 
 Three holiday bugs found by a read-only code review on 2026-10-15.

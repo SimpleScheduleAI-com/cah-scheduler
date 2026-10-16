@@ -15,6 +15,7 @@ import {
 } from "@/db/schema";
 import { eq, and, or, gte, lte } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { syncHolidayRowsForShifts } from "@/lib/holidays/holiday-tracking";
 import { findCandidatesForShift } from "@/lib/coverage/find-candidates";
 import {
   insertNotification,
@@ -252,6 +253,8 @@ async function handleLeaveApproval(
         })
         .where(eq(assignment.id, a.assignmentId))
         .run();
+      // On leave = not working the holiday = no holiday credit.
+      syncHolidayRowsForShifts([a.shiftId]);
 
       // Void any pending swap requests referencing the cancelled assignment.
       // Approving such a swap later would mutate a dead assignment — both

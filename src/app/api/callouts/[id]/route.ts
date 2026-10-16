@@ -1,14 +1,22 @@
 import { db } from "@/db";
-import { callout, assignment, shift, shiftDefinition, schedule, staff } from "@/db/schema";
+import {
+  callout,
+  assignment,
+  shift,
+  shiftDefinition,
+  schedule,
+  staff,
+} from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { syncHolidayRowsForShifts } from "@/lib/holidays/holiday-tracking";
 import { logAuditEvent } from "@/lib/audit/logger";
 import { getEscalationOptions } from "@/lib/callout/escalation";
 import { checkStaffAvailability } from "@/lib/coverage/find-candidates";
 
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   const c = db.select().from(callout).where(eq(callout.id, id)).get();
@@ -21,7 +29,8 @@ export async function GET(
   // for an existing open callout without having to re-POST.
   const escalationOptions = getEscalationOptions(c.shiftId, c.staffId);
   const origAssignment = c.assignmentId
-    ? db.select({ isChargeNurse: assignment.isChargeNurse })
+    ? db
+        .select({ isChargeNurse: assignment.isChargeNurse })
         .from(assignment)
         .where(eq(assignment.id, c.assignmentId))
         .get()
@@ -33,7 +42,7 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   const body = await request.json();
@@ -43,7 +52,11 @@ export async function PUT(
   // manager may be stale — the nurse may have gained a conflicting assignment
   // (overlap, rest hours, 60h cap, leave) since the dialog was opened.
   if (body.replacementStaffId) {
-    const existingCallout = db.select().from(callout).where(eq(callout.id, id)).get();
+    const existingCallout = db
+      .select()
+      .from(callout)
+      .where(eq(callout.id, id))
+      .get();
     if (!existingCallout) {
       return NextResponse.json({ error: "Callout not found" }, { status: 404 });
     }
@@ -58,20 +71,26 @@ export async function PUT(
         scheduleId: shift.scheduleId,
       })
       .from(shift)
-      .innerJoin(shiftDefinition, eq(shift.shiftDefinitionId, shiftDefinition.id))
+      .innerJoin(
+        shiftDefinition,
+        eq(shift.shiftDefinitionId, shiftDefinition.id),
+      )
       .where(eq(shift.id, existingCallout.shiftId))
       .get();
     if (details) {
-      const availability = await checkStaffAvailability(body.replacementStaffId, {
-        id: existingCallout.shiftId,
-        ...details,
-      });
+      const availability = await checkStaffAvailability(
+        body.replacementStaffId,
+        {
+          id: existingCallout.shiftId,
+          ...details,
+        },
+      );
       if (!availability.available) {
         return NextResponse.json(
           {
             error: `Cannot fill: staff member no longer passes hard rules — ${availability.reason ?? "unavailable"}.`,
           },
-          { status: 422 }
+          { status: 422 },
         );
       }
     }
@@ -104,7 +123,8 @@ export async function PUT(
     // Also read isChargeNurse before the update so we can inherit it for the replacement.
     let originalWasCharge = false;
     if (updatedCallout.assignmentId) {
-      const orig = db.select({ isChargeNurse: assignment.isChargeNurse })
+      const orig = db
+        .select({ isChargeNurse: assignment.isChargeNurse })
         .from(assignment)
         .where(eq(assignment.id, updatedCallout.assignmentId))
         .get();
@@ -121,8 +141,11 @@ export async function PUT(
     // so the shift doesn't immediately gain a "Charge Nurse Required" hard violation.
     // Look up replacement staff name once for use in audit descriptions
     const replacementStaffRecord = body.replacementStaffId
-      ? db.select({ firstName: staff.firstName, lastName: staff.lastName })
-          .from(staff).where(eq(staff.id, body.replacementStaffId)).get()
+      ? db
+          .select({ firstName: staff.firstName, lastName: staff.lastName })
+          .from(staff)
+          .where(eq(staff.id, body.replacementStaffId))
+          .get()
       : null;
     const replacementName = replacementStaffRecord
       ? `${replacementStaffRecord.firstName} ${replacementStaffRecord.lastName}`
@@ -177,7 +200,10 @@ export async function PUT(
             entityId: body.replacementStaffId,
             action: "manual_assignment",
             description: `Replacement assignment created: ${replacementName} assigned to shift on ${shiftRecord.date}`,
-            newState: { shiftId: updatedCallout.shiftId, assignmentSource: "callout_replacement" },
+            newState: {
+              shiftId: updatedCallout.shiftId,
+              assignmentSource: "callout_replacement",
+            },
           });
         } catch {
           // UNIQUE constraint: replacement already assigned to this shift.
@@ -185,6 +211,9 @@ export async function PUT(
         }
       }
     }
+
+    // Holiday credit moves from the called-out nurse to the replacement.
+    syncHolidayRowsForShifts([updatedCallout.shiftId]);
 
     const sourceLabel = body.replacementSource ?? "unknown";
     logAuditEvent({

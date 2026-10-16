@@ -8,6 +8,7 @@ import {
 } from "@/db/schema";
 import { eq, aliasedTable } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { syncHolidayRowsForShifts } from "@/lib/holidays/holiday-tracking";
 import { logAuditEvent } from "@/lib/audit/logger";
 import { getEscalationOptions } from "@/lib/callout/escalation";
 
@@ -69,11 +70,15 @@ export async function POST(request: Request) {
     );
   }
 
-  // Update the assignment status
-  db.update(assignment)
-    .set({ status: "called_out", updatedAt: new Date().toISOString() })
-    .where(eq(assignment.id, body.assignmentId))
-    .run();
+  // Update the assignment status. A called-out nurse no longer works the
+  // shift, so if it is a holiday her annual holiday credit goes with it.
+  db.transaction(() => {
+    db.update(assignment)
+      .set({ status: "called_out", updatedAt: new Date().toISOString() })
+      .where(eq(assignment.id, body.assignmentId))
+      .run();
+    syncHolidayRowsForShifts([body.shiftId]);
+  });
 
   const newCallout = db
     .insert(callout)

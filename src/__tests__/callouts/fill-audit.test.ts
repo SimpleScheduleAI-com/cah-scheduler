@@ -14,12 +14,19 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// Holiday-ledger sync is covered end-to-end by src/__tests__/holidays/
+// holiday-ledger.test.ts (real scratch DB). Stub it here: this file's mocked
+// db and drizzle-orm do not implement the queries it runs.
+vi.mock("@/lib/holidays/holiday-tracking", () => ({
+  syncHolidayRowsForShifts: vi.fn(),
+}));
+
 // ─── Hoisted variables ────────────────────────────────────────────────────────
 
-const mockUpdateRetGet = vi.hoisted(() => vi.fn());   // update().returning().get()
-const mockUpdateRun    = vi.hoisted(() => vi.fn());   // update().run()
-const mockSelectGet    = vi.hoisted(() => vi.fn());   // select().from().where().get()
-const mockInsertRun    = vi.hoisted(() => vi.fn());   // insert().values().run()
+const mockUpdateRetGet = vi.hoisted(() => vi.fn()); // update().returning().get()
+const mockUpdateRun = vi.hoisted(() => vi.fn()); // update().run()
+const mockSelectGet = vi.hoisted(() => vi.fn()); // select().from().where().get()
+const mockInsertRun = vi.hoisted(() => vi.fn()); // insert().values().run()
 const mockLogAuditEvent = vi.hoisted(() => vi.fn());
 
 // ─── Module mocks ─────────────────────────────────────────────────────────────
@@ -39,12 +46,29 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 vi.mock("@/db/schema", () => ({
-  callout:    { id: "callout$id",    staffId: "callout$staffId" },
-  assignment: { id: "assign$id",     isChargeNurse: "assign$isChargeNurse" },
-  shift:      { id: "shift$id",      scheduleId: "shift$scheduleId", date: "shift$date", shiftDefinitionId: "shift$defId" },
-  shiftDefinition: { id: "def$id",   startTime: "def$startTime", endTime: "def$endTime", durationHours: "def$durationHours", unit: "def$unit", shiftType: "def$shiftType" },
-  schedule:   { id: "sched$id",      unit: "sched$unit" },
-  staff:      { id: "staff$id",      firstName: "staff$firstName", lastName: "staff$lastName", homeUnit: "staff$homeUnit" },
+  callout: { id: "callout$id", staffId: "callout$staffId" },
+  assignment: { id: "assign$id", isChargeNurse: "assign$isChargeNurse" },
+  shift: {
+    id: "shift$id",
+    scheduleId: "shift$scheduleId",
+    date: "shift$date",
+    shiftDefinitionId: "shift$defId",
+  },
+  shiftDefinition: {
+    id: "def$id",
+    startTime: "def$startTime",
+    endTime: "def$endTime",
+    durationHours: "def$durationHours",
+    unit: "def$unit",
+    shiftType: "def$shiftType",
+  },
+  schedule: { id: "sched$id", unit: "sched$unit" },
+  staff: {
+    id: "staff$id",
+    firstName: "staff$firstName",
+    lastName: "staff$lastName",
+    homeUnit: "staff$homeUnit",
+  },
 }));
 
 vi.mock("@/db", () => ({
@@ -71,12 +95,20 @@ vi.mock("@/db", () => ({
 }));
 
 vi.mock("@/lib/audit/logger", () => ({ logAuditEvent: mockLogAuditEvent }));
-vi.mock("@/lib/callout/escalation", () => ({ getEscalationOptions: vi.fn(() => []) }));
+vi.mock("@/lib/callout/escalation", () => ({
+  getEscalationOptions: vi.fn(() => []),
+}));
 // Fill-time availability re-check (v1.7.24): always available in these tests —
 // the audit-trail invariants under test are downstream of the guard.
 vi.mock("@/lib/coverage/find-candidates", () => ({
-  checkStaffAvailability: vi.fn(async () => ({ available: true, hoursThisWeek: 0 })),
-  findCandidatesForShift: vi.fn(async () => ({ candidates: [], escalationStepsChecked: [] })),
+  checkStaffAvailability: vi.fn(async () => ({
+    available: true,
+    hoursThisWeek: 0,
+  })),
+  findCandidatesForShift: vi.fn(async () => ({
+    candidates: [],
+    escalationStepsChecked: [],
+  })),
 }));
 
 // ─── Import SUT after mocks ───────────────────────────────────────────────────
@@ -86,10 +118,10 @@ import { PUT } from "@/app/api/callouts/[id]/route";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const CALLOUT_ID = "callout-001";
-const SHIFT_ID   = "shift-001";
-const ASSIGN_ID  = "assign-001";
-const REP_STAFF  = "staff-rep-001";
-const SCHED_ID   = "sched-001";
+const SHIFT_ID = "shift-001";
+const ASSIGN_ID = "assign-001";
+const REP_STAFF = "staff-rep-001";
+const SCHED_ID = "sched-001";
 
 /** Minimal callout object returned by the first db.update().returning().get() */
 function makeUpdatedCallout(overrides: Record<string, unknown> = {}) {
@@ -132,11 +164,11 @@ function setupSelectQueue() {
       shiftType: "day",
       scheduleId: SCHED_ID,
     })
-    .mockReturnValueOnce({ isChargeNurse: false })                         // 1
-    .mockReturnValueOnce({ firstName: "Bob", lastName: "Smith" })          // 2
-    .mockReturnValueOnce({ scheduleId: SCHED_ID, date: "2026-03-10" })     // 3
-    .mockReturnValueOnce({ unit: "ICU" })                                  // 4
-    .mockReturnValueOnce({ homeUnit: "ICU" });                             // 5
+    .mockReturnValueOnce({ isChargeNurse: false }) // 1
+    .mockReturnValueOnce({ firstName: "Bob", lastName: "Smith" }) // 2
+    .mockReturnValueOnce({ scheduleId: SCHED_ID, date: "2026-03-10" }) // 3
+    .mockReturnValueOnce({ unit: "ICU" }) // 4
+    .mockReturnValueOnce({ homeUnit: "ICU" }); // 5
 }
 
 function makeRequest(body: Record<string, unknown>) {
@@ -164,19 +196,31 @@ describe("PUT /api/callouts/[id] — audit trail guarantee", () => {
   // ── Happy path ────────────────────────────────────────────────────────────
 
   it("writes both manual_assignment and callout_filled when insert succeeds", async () => {
-    await PUT(makeRequest({ replacementStaffId: REP_STAFF, replacementSource: "regular" }), { params: makeParams() });
+    await PUT(
+      makeRequest({
+        replacementStaffId: REP_STAFF,
+        replacementSource: "regular",
+      }),
+      { params: makeParams() },
+    );
 
     expect(mockLogAuditEvent).toHaveBeenCalledTimes(2);
     expect(mockLogAuditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "manual_assignment" })
+      expect.objectContaining({ action: "manual_assignment" }),
     );
     expect(mockLogAuditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "callout_filled" })
+      expect.objectContaining({ action: "callout_filled" }),
     );
   });
 
   it("callout_filled is written last (after manual_assignment)", async () => {
-    await PUT(makeRequest({ replacementStaffId: REP_STAFF, replacementSource: "regular" }), { params: makeParams() });
+    await PUT(
+      makeRequest({
+        replacementStaffId: REP_STAFF,
+        replacementSource: "regular",
+      }),
+      { params: makeParams() },
+    );
 
     const calls = mockLogAuditEvent.mock.calls;
     expect(calls[0][0].action).toBe("manual_assignment");
@@ -187,38 +231,56 @@ describe("PUT /api/callouts/[id] — audit trail guarantee", () => {
 
   it("still writes callout_filled when insert throws UNIQUE constraint", async () => {
     mockInsertRun.mockImplementationOnce(() => {
-      throw new Error("UNIQUE constraint failed: assignment.shiftId, assignment.staffId");
+      throw new Error(
+        "UNIQUE constraint failed: assignment.shiftId, assignment.staffId",
+      );
     });
 
-    await PUT(makeRequest({ replacementStaffId: REP_STAFF, replacementSource: "regular" }), { params: makeParams() });
+    await PUT(
+      makeRequest({
+        replacementStaffId: REP_STAFF,
+        replacementSource: "regular",
+      }),
+      { params: makeParams() },
+    );
 
     // manual_assignment must NOT be written (insert failed before logAuditEvent reached)
     expect(mockLogAuditEvent).not.toHaveBeenCalledWith(
-      expect.objectContaining({ action: "manual_assignment" })
+      expect.objectContaining({ action: "manual_assignment" }),
     );
 
     // callout_filled MUST still be written
     expect(mockLogAuditEvent).toHaveBeenCalledTimes(1);
     expect(mockLogAuditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "callout_filled" })
+      expect.objectContaining({ action: "callout_filled" }),
     );
   });
 
   it("callout_filled includes the correct entityId", async () => {
-    await PUT(makeRequest({ replacementStaffId: REP_STAFF, replacementSource: "regular" }), { params: makeParams() });
+    await PUT(
+      makeRequest({
+        replacementStaffId: REP_STAFF,
+        replacementSource: "regular",
+      }),
+      { params: makeParams() },
+    );
 
     expect(mockLogAuditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ entityType: "callout", entityId: CALLOUT_ID })
+      expect.objectContaining({ entityType: "callout", entityId: CALLOUT_ID }),
     );
   });
 
   it("callout_filled entityType is 'callout'", async () => {
-    mockInsertRun.mockImplementationOnce(() => { throw new Error("UNIQUE"); });
+    mockInsertRun.mockImplementationOnce(() => {
+      throw new Error("UNIQUE");
+    });
 
-    await PUT(makeRequest({ replacementStaffId: REP_STAFF }), { params: makeParams() });
+    await PUT(makeRequest({ replacementStaffId: REP_STAFF }), {
+      params: makeParams(),
+    });
 
     expect(mockLogAuditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ entityType: "callout" })
+      expect.objectContaining({ entityType: "callout" }),
     );
   });
 
@@ -227,18 +289,20 @@ describe("PUT /api/callouts/[id] — audit trail guarantee", () => {
   it("writes only callout_filled (no manual_assignment) when no replacementStaffId", async () => {
     // For this path: no replacement select calls, only the orig assignment select
     vi.clearAllMocks();
-    mockUpdateRetGet.mockReturnValue(makeUpdatedCallout({ replacementStaffId: null }));
+    mockUpdateRetGet.mockReturnValue(
+      makeUpdatedCallout({ replacementStaffId: null }),
+    );
     mockSelectGet.mockReturnValueOnce({ isChargeNurse: false }); // orig assignment only
 
     await PUT(makeRequest({ status: "unfilled" }), { params: makeParams() });
 
     expect(mockLogAuditEvent).toHaveBeenCalledTimes(1);
     expect(mockLogAuditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "callout_filled" })
+      expect.objectContaining({ action: "callout_filled" }),
     );
     // insert never called, so manual_assignment never logged
     expect(mockLogAuditEvent).not.toHaveBeenCalledWith(
-      expect.objectContaining({ action: "manual_assignment" })
+      expect.objectContaining({ action: "manual_assignment" }),
     );
   });
 
@@ -247,7 +311,9 @@ describe("PUT /api/callouts/[id] — audit trail guarantee", () => {
   it("returns 404 and logs nothing when callout not found", async () => {
     mockUpdateRetGet.mockReturnValue(undefined);
 
-    const response = await PUT(makeRequest({ replacementStaffId: REP_STAFF }), { params: makeParams() });
+    const response = await PUT(makeRequest({ replacementStaffId: REP_STAFF }), {
+      params: makeParams(),
+    });
 
     expect((response as { status: number }).status).toBe(404);
     expect(mockLogAuditEvent).not.toHaveBeenCalled();
@@ -256,19 +322,29 @@ describe("PUT /api/callouts/[id] — audit trail guarantee", () => {
   // ── Replacement source label ──────────────────────────────────────────────
 
   it("includes replacementSource in callout_filled description", async () => {
-    await PUT(makeRequest({ replacementStaffId: REP_STAFF, replacementSource: "overtime" }), { params: makeParams() });
+    await PUT(
+      makeRequest({
+        replacementStaffId: REP_STAFF,
+        replacementSource: "overtime",
+      }),
+      { params: makeParams() },
+    );
 
     const filledCall = mockLogAuditEvent.mock.calls.find(
-      (c: unknown[]) => (c[0] as { action: string }).action === "callout_filled"
+      (c: unknown[]) =>
+        (c[0] as { action: string }).action === "callout_filled",
     );
     expect(filledCall?.[0].description).toContain("overtime");
   });
 
   it("defaults replacementSource to 'unknown' when omitted", async () => {
-    await PUT(makeRequest({ replacementStaffId: REP_STAFF }), { params: makeParams() });
+    await PUT(makeRequest({ replacementStaffId: REP_STAFF }), {
+      params: makeParams(),
+    });
 
     const filledCall = mockLogAuditEvent.mock.calls.find(
-      (c: unknown[]) => (c[0] as { action: string }).action === "callout_filled"
+      (c: unknown[]) =>
+        (c[0] as { action: string }).action === "callout_filled",
     );
     expect(filledCall?.[0].description).toContain("unknown");
   });
@@ -279,10 +355,16 @@ describe("PUT /api/callouts/[id] — audit trail guarantee", () => {
     // Note: vi.mock() calls inside test bodies are hoisted and cannot reference
     // local variables, so we verify the code ran correctly via the audit event.
     setupSelectQueue();
-    await PUT(makeRequest({ replacementStaffId: REP_STAFF, replacementSource: "overtime" }), { params: makeParams() });
+    await PUT(
+      makeRequest({
+        replacementStaffId: REP_STAFF,
+        replacementSource: "overtime",
+      }),
+      { params: makeParams() },
+    );
 
     expect(mockLogAuditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "callout_filled" })
+      expect.objectContaining({ action: "callout_filled" }),
     );
   });
 });
