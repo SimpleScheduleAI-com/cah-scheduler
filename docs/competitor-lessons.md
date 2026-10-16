@@ -90,6 +90,12 @@ we adopt it, and when. Facts and citations live in the website repo's
    system-wide, monthly content, hiring sales/CS. They are moving downmarket
    via content into OUR lane while their product proof stays enterprise.
    Re-check monthly (weekly citation check already covers the AEO side).
+   **Update 2026-09-21: acquired by Ascend Learning** (owner of ATI, NHA,
+   StaffGarden, Laudio). Expect M7 to be bundled with education and
+   credentialing into health systems Ascend already sells to; their careers
+   page went to zero openings. The sub-25-bed push may stall — our
+   independence and CAH focus become sharper contrasts. Details:
+   `competitor-pricing-tiers.md` §4.
 
 ## AI landscape — how we use AI vs how they (probably) do
 

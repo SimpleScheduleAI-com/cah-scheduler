@@ -56,9 +56,10 @@ retainer $1,000-1,500 by roster size (see `competitor-lessons.md`).
   ScheduleAnywhere's 2019 AONL case study is a 22-bed CAH (Sarah D. Culbertson
   Memorial Hospital, Rushville IL, 200+ staff, self-scheduling unit). Fix the
   post.
-- `competitor-lessons.md` calls M7 "YC-backed" in the research brief; it is
-  not (First Round, Threshold, 25madison). Update on next touch.
-- OnShift belongs to ShiftKey, not ShiftMed.
+- For the record (no doc change needed): M7 is not YC-backed (First Round,
+  Threshold, 25madison) and OnShift belongs to ShiftKey, not ShiftMed. Both
+  were wrong assumptions in the research brief only; `competitor-lessons.md`
+  never made either claim.
 
 ---
 
