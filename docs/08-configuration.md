@@ -23,6 +23,7 @@ Every hospital is different. The CAH Scheduler lets you customize:
 A **unit** is a distinct area of the hospital with its own staff and patients.
 
 **Examples:**
+
 - ICU (Intensive Care Unit)
 - ER (Emergency Room)
 - Med-Surg (Medical-Surgical Floor)
@@ -31,37 +32,40 @@ A **unit** is a distinct area of the hospital with its own staff and patients.
 ### Why Configure Units?
 
 Each unit may have different rules:
+
 - ICU might require more weekend coverage
 - ER might have different escalation priorities
 - Med-Surg might have different patient ratios
 
 ### Unit Settings Explained
 
-| Setting | What It Controls | Example |
-|---------|------------------|---------|
-| **Name** | Unit identifier | "ICU", "Emergency Room" |
-| **Description** | Friendly description | "12-bed intensive care unit" |
-| **Weekend Rule Type** | How weekend fairness is calculated | "count_per_period" or "alternate_weekends" |
-| **Weekend Shifts Required** | Minimum weekend shifts per person | 3 (per 6-week period) |
-| **Schedule Period Weeks** | Length of scheduling cycle | 6 weeks |
-| **Holiday Shifts Required** | Minimum holidays per person | 1 (per period) |
-| **Escalation Sequence** | Callout coverage order | Float → PRN → OT → Agency |
-| **Min Staff — Day Shift** | Absolute minimum staff for any day shift, regardless of census | 3 |
-| **Min Staff — Night/Evening Shift** | Absolute minimum staff for any night or evening shift, regardless of census | 2 |
-| **Low Census Order** | Who goes home first in low census | Voluntary → OT → PRN → Full-Time |
-| **Callout Threshold Days** | Days before shift to classify as callout vs open shift | 7 days |
-| **OT Approval Threshold** | Hours requiring CNO approval | 4 hours |
-| **Max On-Call Per Week** | On-call shift limit | 1 per week |
-| **Max On-Call Weekends Per Month** | Weekend on-call limit | 1 per month |
-| **Max Consecutive Weekends** | Before penalty applies | 2 |
+| Setting                             | What It Controls                                                            | Example                                    |
+| ----------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------ |
+| **Name**                            | Unit identifier                                                             | "ICU", "Emergency Room"                    |
+| **Description**                     | Friendly description                                                        | "12-bed intensive care unit"               |
+| **Weekend Rule Type**               | How weekend fairness is calculated                                          | "count_per_period" or "alternate_weekends" |
+| **Weekend Shifts Required**         | Minimum weekend shifts per person                                           | 3 (per 6-week period)                      |
+| **Schedule Period Weeks**           | Length of scheduling cycle                                                  | 6 weeks                                    |
+| **Holiday Shifts Required**         | Minimum holidays per person                                                 | 1 (per period)                             |
+| **Escalation Sequence**             | Callout coverage order                                                      | Float → PRN → OT → Agency                  |
+| **Min Staff — Day Shift**           | Absolute minimum staff for any day shift, regardless of census              | 3                                          |
+| **Min Staff — Night/Evening Shift** | Absolute minimum staff for any night or evening shift, regardless of census | 2                                          |
+| **Low Census Order**                | Who goes home first in low census                                           | Voluntary → OT → PRN → Full-Time           |
+| **Callout Threshold Days**          | Days before shift to classify as callout vs open shift                      | 7 days                                     |
+| **OT Approval Threshold**           | Hours requiring CNO approval                                                | 4 hours                                    |
+| **Max On-Call Per Week**            | On-call shift limit                                                         | 1 per week                                 |
+| **Max On-Call Weekends Per Month**  | Weekend on-call limit                                                       | 1 per month                                |
+| **Max Consecutive Weekends**        | Before penalty applies                                                      | 2                                          |
 
 ### Weekend Rule Types
 
 **Count Per Period:**
+
 > "Everyone must work at least 3 weekend shifts in the 6-week schedule."
 > Simple counting - work your share.
 
 **Alternate Weekends:**
+
 > "Work every other weekend."
 > More structured - weekend 1 off, weekend 2 on, weekend 3 off...
 
@@ -111,6 +115,7 @@ If leave is approved and shift is beyond 7 days → Creates Open Shift (for pick
 ### What Are Holidays?
 
 Holidays are special days that:
+
 - Often require extra staffing incentives
 - Need fair distribution among staff
 - May have premium pay
@@ -120,22 +125,23 @@ Holidays are special days that:
 
 The app can auto-populate these:
 
-| Holiday | Typical Date |
-|---------|--------------|
-| New Year's Day | January 1 |
-| MLK Day | 3rd Monday in January |
-| Presidents' Day | 3rd Monday in February |
-| Memorial Day | Last Monday in May |
-| Independence Day | July 4 |
-| Labor Day | 1st Monday in September |
-| Thanksgiving | 4th Thursday in November |
-| Christmas Eve | December 24 |
-| Christmas Day | December 25 |
-| New Year's Eve | December 31 |
+| Holiday          | Typical Date             |
+| ---------------- | ------------------------ |
+| New Year's Day   | January 1                |
+| MLK Day          | 3rd Monday in January    |
+| Presidents' Day  | 3rd Monday in February   |
+| Memorial Day     | Last Monday in May       |
+| Independence Day | July 4                   |
+| Labor Day        | 1st Monday in September  |
+| Thanksgiving     | 4th Thursday in November |
+| Christmas Eve    | December 24              |
+| Christmas Day    | December 25              |
+| New Year's Eve   | December 31              |
 
 ### Adding Holidays
 
 You can:
+
 1. **Add Standard Holidays** - One click to add all US holidays for a year
 2. **Add Custom Holidays** - Add your own (e.g., hospital anniversary)
 3. **Edit Holidays** - Change dates or names
@@ -146,6 +152,7 @@ You can:
 Holidays shift! Thanksgiving 2025 is a different date than Thanksgiving 2026.
 
 The app lets you manage holidays per year, so you can:
+
 - Set up 2025 holidays
 - Set up 2026 holidays
 - Archive past years
@@ -162,24 +169,26 @@ Rules are the constraints and preferences that govern scheduling. (See [Scheduli
 
 On the Rules page, you can:
 
-| Action | What It Does |
-|--------|--------------|
-| **View all rules** | See every rule in the system |
-| **Enable/Disable** | Turn rules on or off |
+| Action                | What It Does                                        |
+| --------------------- | --------------------------------------------------- |
+| **View all rules**    | See every rule in the system                        |
+| **Enable/Disable**    | Turn rules on or off                                |
 | **Adjust parameters** | Change values (e.g., "10 hours rest" to "11 hours") |
-| **Adjust weights** | Change soft rule priorities |
+| **Adjust weights**    | Change soft rule priorities                         |
 
 ### Rule Parameters
 
 Each rule has configurable parameters:
 
 **Example: Minimum Rest Between Shifts**
+
 ```
 Default: 10 hours
 Your setting: 11 hours (more conservative)
 ```
 
 **Example: Maximum Consecutive Days**
+
 ```
 Default: 5 days
 Your setting: 4 days (shorter stretches)
@@ -196,6 +205,7 @@ Weight 0.5 = Half as important
 ```
 
 **Example:**
+
 - If minimizing overtime is more important than preferences, give overtime a higher weight
 - If staff happiness is critical (retention issues), boost preference matching weight
 
@@ -209,21 +219,21 @@ Census bands define how many staff you need for each **census tier**. There are 
 
 ### Census Tiers
 
-| Tier | Color | Meaning |
-|------|-------|---------|
-| **Blue** | 🔵 | Low occupancy — low census protocol (staff may be sent home) |
-| **Green** | 🟢 | Normal census — standard staffing |
-| **Yellow** | 🟡 | Elevated census — extra staff needed |
-| **Red** | 🔴 | Critical census — all hands on deck |
+| Tier       | Color | Meaning                                                      |
+| ---------- | ----- | ------------------------------------------------------------ |
+| **Blue**   | 🔵    | Low occupancy — low census protocol (staff may be sent home) |
+| **Green**  | 🟢    | Normal census — standard staffing                            |
+| **Yellow** | 🟡    | Elevated census — extra staff needed                         |
+| **Red**    | 🔴    | Critical census — all hands on deck                          |
 
 ### Example Census Bands for ICU
 
-| Tier | Patients | RNs | LPNs | CNAs | Charge | Ratio |
-|------|----------|-----|------|------|--------|-------|
-| 🔵 Blue (Low Census) | 1–4 | 2 | 0 | 1 | 1 | 2:1 |
-| 🟢 Green (Normal) | 5–8 | 3 | 1 | 1 | 1 | 2:1 |
-| 🟡 Yellow (High) | 9–10 | 4 | 1 | 2 | 1 | 2:1 |
-| 🔴 Red (Critical) | 11–12 | 5 | 1 | 2 | 1 | 2:1 |
+| Tier                 | Patients | RNs | LPNs | CNAs | Charge | Ratio |
+| -------------------- | -------- | --- | ---- | ---- | ------ | ----- |
+| 🔵 Blue (Low Census) | 1–4      | 2   | 0    | 1    | 1      | 2:1   |
+| 🟢 Green (Normal)    | 5–8      | 3   | 1    | 1    | 1      | 2:1   |
+| 🟡 Yellow (High)     | 9–10     | 4   | 1    | 2    | 1      | 2:1   |
+| 🔴 Red (Critical)    | 11–12    | 5   | 1    | 2    | 1      | 2:1   |
 
 ### How It Works
 
@@ -234,6 +244,7 @@ Census bands define how many staff you need for each **census tier**. There are 
 ### Configuring Census Bands
 
 Go to **Rules → Census Bands** to edit each tier's staffing specification:
+
 - Patient range (min – max)
 - Required RNs, LPNs, CNAs
 - Required Charge Nurses
@@ -249,23 +260,23 @@ Templates for the types of shifts your hospital uses.
 
 ### Example Shift Definitions
 
-| Name | Type | Start | End | Hours | Staff Needed |
-|------|------|-------|-----|-------|--------------|
-| Day Shift | day | 07:00 | 19:00 | 12 | 4 |
-| Night Shift | night | 19:00 | 07:00 | 12 | 3 |
-| Day On-Call | on_call | 07:00 | 19:00 | 12 | 1 |
-| Night On-Call | on_call | 19:00 | 07:00 | 12 | 1 |
+| Name          | Type    | Start | End   | Hours | Staff Needed |
+| ------------- | ------- | ----- | ----- | ----- | ------------ |
+| Day Shift     | day     | 07:00 | 19:00 | 12    | 4            |
+| Night Shift   | night   | 19:00 | 07:00 | 12    | 3            |
+| Day On-Call   | on_call | 07:00 | 19:00 | 12    | 1            |
+| Night On-Call | on_call | 19:00 | 07:00 | 12    | 1            |
 
 ### Shift Properties
 
-| Property | Meaning |
-|----------|---------|
-| **Name** | Display name for the shift |
-| **Type** | Day, Night, Evening, On-Call |
-| **Start/End Time** | When it begins and ends |
-| **Duration** | Total hours |
-| **Required Staff** | Base number of staff needed |
-| **Requires Charge** | Does this shift need a charge nurse? |
+| Property                   | Meaning                                              |
+| -------------------------- | ---------------------------------------------------- |
+| **Name**                   | Display name for the shift                           |
+| **Type**                   | Day, Night, Evening, On-Call                         |
+| **Start/End Time**         | When it begins and ends                              |
+| **Duration**               | Total hours                                          |
+| **Required Staff**         | Base number of staff needed                          |
+| **Requires Charge**        | Does this shift need a charge nurse?                 |
 | **Counts Toward Staffing** | Does this count for patient coverage? (On-call = No) |
 
 ---
@@ -275,6 +286,7 @@ Templates for the types of shifts your hospital uses.
 ### Start With Defaults
 
 The app comes with sensible defaults. Don't change everything at once:
+
 1. Run with defaults for a few cycles
 2. Note what isn't working
 3. Make targeted adjustments
@@ -283,6 +295,7 @@ The app comes with sensible defaults. Don't change everything at once:
 ### Document Changes
 
 When you change configuration:
+
 - Note what you changed
 - Note why you changed it
 - Note when (date)
@@ -291,6 +304,7 @@ When you change configuration:
 ### Test Before Going Live
 
 If possible:
+
 1. Create a test schedule with new settings
 2. Review for problems
 3. Adjust if needed
@@ -299,6 +313,7 @@ If possible:
 ### Involve Stakeholders
 
 Before changing rules:
+
 - Discuss with nursing leadership
 - Get staff feedback (if appropriate)
 - Consider union contracts (if applicable)
@@ -311,10 +326,12 @@ Before changing rules:
 ### Units Page (`/settings/units`)
 
 **What you see:**
+
 - List of all units
 - Current settings for each
 
 **What you can do:**
+
 - Add new units
 - Edit existing units
 - Delete units (careful!)
@@ -322,10 +339,12 @@ Before changing rules:
 ### Holidays Page (`/settings/holidays`)
 
 **What you see:**
+
 - Calendar of holidays by year
 - Day of week for each
 
 **What you can do:**
+
 - Add standard US holidays (one click)
 - Add custom holidays
 - Edit/delete holidays
@@ -334,11 +353,13 @@ Before changing rules:
 ### Rules Page (`/rules`)
 
 **What you see:**
+
 - All hard and soft rules
 - Their parameters and weights
 - Active/inactive status
 
 **What you can do:**
+
 - View rule details
 - Toggle rules on/off
 - Adjust parameters and weights

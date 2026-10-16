@@ -2,7 +2,13 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -170,10 +176,18 @@ export default function UnitsPage() {
                 <div className="flex items-center justify-between">
                   <CardTitle>{unit.name}</CardTitle>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => openEditDialog(unit)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openEditDialog(unit)}
+                    >
                       Edit
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={() => handleDelete(unit.id)}>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDelete(unit.id)}
+                    >
                       Delete
                     </Button>
                   </div>
@@ -194,23 +208,37 @@ export default function UnitsPage() {
                   </div>
                   <div>
                     <p className="text-muted-foreground">Holiday Shifts</p>
-                    <p className="font-medium">{unit.holidayShiftsRequired} per period</p>
+                    <p className="font-medium">
+                      {unit.holidayShiftsRequired} per period
+                    </p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">OT Approval Threshold</p>
-                    <p className="font-medium">{unit.otApprovalThreshold} hours</p>
+                    <p className="text-muted-foreground">
+                      OT Approval Threshold
+                    </p>
+                    <p className="font-medium">
+                      {unit.otApprovalThreshold} hours
+                    </p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Max Consecutive Weekends</p>
+                    <p className="text-muted-foreground">
+                      Max Consecutive Weekends
+                    </p>
                     <p className="font-medium">{unit.maxConsecutiveWeekends}</p>
                   </div>
                   <div className="col-span-2">
-                    <p className="text-muted-foreground">Callout Escalation Order</p>
-                    <p className="font-medium">{unit.escalationSequence.join(" → ")}</p>
+                    <p className="text-muted-foreground">
+                      Callout Escalation Order
+                    </p>
+                    <p className="font-medium">
+                      {unit.escalationSequence.join(" → ")}
+                    </p>
                   </div>
                   <div className="col-span-2">
                     <p className="text-muted-foreground">Low Census Order</p>
-                    <p className="font-medium">{unit.lowCensusOrder.join(" → ")}</p>
+                    <p className="font-medium">
+                      {unit.lowCensusOrder.join(" → ")}
+                    </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Min Staff (Day)</p>
@@ -247,7 +275,9 @@ export default function UnitsPage() {
                 <Label>Description</Label>
                 <Input
                   value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, description: e.target.value })
+                  }
                   placeholder="e.g., Intensive Care Unit"
                 />
               </div>
@@ -261,13 +291,23 @@ export default function UnitsPage() {
                   <Select
                     value={form.weekendRuleType}
                     onValueChange={(v) =>
-                      setForm({ ...form, weekendRuleType: v as "count_per_period" | "alternate_weekends" })
+                      setForm({
+                        ...form,
+                        weekendRuleType: v as
+                          "count_per_period" | "alternate_weekends",
+                      })
                     }
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="count_per_period">Count Per Period</SelectItem>
-                      <SelectItem value="alternate_weekends">Alternate Weekends</SelectItem>
+                      <SelectItem value="count_per_period">
+                        Count Per Period
+                      </SelectItem>
+                      <SelectItem value="alternate_weekends">
+                        Alternate Weekends
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -277,7 +317,12 @@ export default function UnitsPage() {
                     type="number"
                     min={0}
                     value={form.weekendShiftsRequired}
-                    onChange={(e) => setForm({ ...form, weekendShiftsRequired: parseInt(e.target.value) })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        weekendShiftsRequired: parseInt(e.target.value),
+                      })
+                    }
                   />
                 </div>
                 <div>
@@ -286,7 +331,12 @@ export default function UnitsPage() {
                     type="number"
                     min={1}
                     value={form.schedulePeriodWeeks}
-                    onChange={(e) => setForm({ ...form, schedulePeriodWeeks: parseInt(e.target.value) })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        schedulePeriodWeeks: parseInt(e.target.value),
+                      })
+                    }
                   />
                 </div>
               </div>
@@ -301,7 +351,12 @@ export default function UnitsPage() {
                     type="number"
                     min={0}
                     value={form.holidayShiftsRequired}
-                    onChange={(e) => setForm({ ...form, holidayShiftsRequired: parseInt(e.target.value) })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        holidayShiftsRequired: parseInt(e.target.value),
+                      })
+                    }
                   />
                 </div>
                 <div>
@@ -310,7 +365,12 @@ export default function UnitsPage() {
                     type="number"
                     min={0}
                     value={form.maxOnCallPerWeek}
-                    onChange={(e) => setForm({ ...form, maxOnCallPerWeek: parseInt(e.target.value) })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        maxOnCallPerWeek: parseInt(e.target.value),
+                      })
+                    }
                   />
                 </div>
                 <div>
@@ -319,7 +379,12 @@ export default function UnitsPage() {
                     type="number"
                     min={0}
                     value={form.maxOnCallWeekendsPerMonth}
-                    onChange={(e) => setForm({ ...form, maxOnCallWeekendsPerMonth: parseInt(e.target.value) })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        maxOnCallWeekendsPerMonth: parseInt(e.target.value),
+                      })
+                    }
                   />
                 </div>
               </div>
@@ -334,7 +399,12 @@ export default function UnitsPage() {
                     type="number"
                     min={1}
                     value={form.maxConsecutiveWeekends}
-                    onChange={(e) => setForm({ ...form, maxConsecutiveWeekends: parseInt(e.target.value) })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        maxConsecutiveWeekends: parseInt(e.target.value),
+                      })
+                    }
                   />
                 </div>
                 <div>
@@ -343,7 +413,12 @@ export default function UnitsPage() {
                     type="number"
                     min={0}
                     value={form.otApprovalThreshold}
-                    onChange={(e) => setForm({ ...form, otApprovalThreshold: parseInt(e.target.value) })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        otApprovalThreshold: parseInt(e.target.value),
+                      })
+                    }
                   />
                 </div>
               </div>
@@ -352,9 +427,10 @@ export default function UnitsPage() {
             <div className="border-t pt-4">
               <h3 className="font-medium mb-3">Minimum Staffing Floor</h3>
               <p className="text-sm text-muted-foreground mb-3">
-                Absolute minimum staff per shift regardless of census level. The effective
-                requirement will be <strong>max(census-based, this floor)</strong>. Applies
-                as a hard rule — shifts cannot be saved below this count.
+                Absolute minimum staff per shift regardless of census level. The
+                effective requirement will be{" "}
+                <strong>max(census-based, this floor)</strong>. Applies as a
+                hard rule — shifts cannot be saved below this count.
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -363,7 +439,12 @@ export default function UnitsPage() {
                     type="number"
                     min={1}
                     value={form.minStaffDay}
-                    onChange={(e) => setForm({ ...form, minStaffDay: parseInt(e.target.value) })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        minStaffDay: parseInt(e.target.value),
+                      })
+                    }
                   />
                 </div>
                 <div>
@@ -372,17 +453,28 @@ export default function UnitsPage() {
                     type="number"
                     min={1}
                     value={form.minStaffNight}
-                    onChange={(e) => setForm({ ...form, minStaffNight: parseInt(e.target.value) })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        minStaffNight: parseInt(e.target.value),
+                      })
+                    }
                   />
                 </div>
               </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDialogOpen(false)}
+              >
                 Cancel
               </Button>
-              <Button type="submit">{editingUnit ? "Save Changes" : "Create Unit"}</Button>
+              <Button type="submit">
+                {editingUnit ? "Save Changes" : "Create Unit"}
+              </Button>
             </div>
           </form>
         </DialogContent>

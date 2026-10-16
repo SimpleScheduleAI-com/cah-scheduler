@@ -132,7 +132,10 @@ export default function HolidaysPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => addStandardHolidays(selectedYear)}>
+          <Button
+            variant="outline"
+            onClick={() => addStandardHolidays(selectedYear)}
+          >
             Add Standard Holidays ({selectedYear})
           </Button>
           <Button onClick={openNewDialog}>Add Holiday</Button>
@@ -168,7 +171,8 @@ export default function HolidaysPage() {
             <p className="text-muted-foreground">Loading...</p>
           ) : filteredHolidays.length === 0 ? (
             <p className="text-muted-foreground">
-              No holidays configured for {selectedYear}. Click &quot;Add Standard Holidays&quot; to add common US holidays.
+              No holidays configured for {selectedYear}. Click &quot;Add
+              Standard Holidays&quot; to add common US holidays.
             </p>
           ) : (
             <Table>
@@ -183,11 +187,15 @@ export default function HolidaysPage() {
               <TableBody>
                 {filteredHolidays.map((holiday) => {
                   const date = new Date(holiday.date + "T00:00:00");
-                  const dayOfWeek = date.toLocaleDateString("en-US", { weekday: "long" });
+                  const dayOfWeek = date.toLocaleDateString("en-US", {
+                    weekday: "long",
+                  });
                   const isWeekend = date.getDay() === 0 || date.getDay() === 6;
                   return (
                     <TableRow key={holiday.id}>
-                      <TableCell className="font-medium">{holiday.name}</TableCell>
+                      <TableCell className="font-medium">
+                        {holiday.name}
+                      </TableCell>
                       <TableCell>
                         {date.toLocaleDateString("en-US", {
                           month: "long",
@@ -230,7 +238,9 @@ export default function HolidaysPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingHoliday ? "Edit Holiday" : "Add Holiday"}</DialogTitle>
+            <DialogTitle>
+              {editingHoliday ? "Edit Holiday" : "Add Holiday"}
+            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -252,10 +262,16 @@ export default function HolidaysPage() {
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDialogOpen(false)}
+              >
                 Cancel
               </Button>
-              <Button type="submit">{editingHoliday ? "Save Changes" : "Add Holiday"}</Button>
+              <Button type="submit">
+                {editingHoliday ? "Save Changes" : "Add Holiday"}
+              </Button>
             </div>
           </form>
         </DialogContent>

@@ -8,10 +8,26 @@ import {
   schedule,
 } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { generateSchedule, buildSchedulerContext, BALANCED, FAIR, COST_OPTIMIZED } from "./index";
-import { mulberry32, localSearch, overtimeReductionSweep, weekendRedistributionSweep, recomputeOvertimeFlags } from "./local-search";
+import {
+  generateSchedule,
+  buildSchedulerContext,
+  BALANCED,
+  FAIR,
+  COST_OPTIMIZED,
+} from "./index";
+import {
+  mulberry32,
+  localSearch,
+  overtimeReductionSweep,
+  weekendRedistributionSweep,
+  recomputeOvertimeFlags,
+} from "./local-search";
 import { checkForUnexplainedUnderstaffing } from "./validate-output";
-import type { AssignmentDraft, UnderstaffedShift, SchedulerContext } from "./types";
+import type {
+  AssignmentDraft,
+  UnderstaffedShift,
+  SchedulerContext,
+} from "./types";
 
 // ─── Holiday grouping (mirrors weekend-holiday-fairness rule) ────────────────
 
@@ -35,7 +51,10 @@ interface ScoreBreakdown {
   skillMix: number;
 }
 
-function scoreFromDrafts(drafts: AssignmentDraft[], context: SchedulerContext): ScoreBreakdown {
+function scoreFromDrafts(
+  drafts: AssignmentDraft[],
+  context: SchedulerContext,
+): ScoreBreakdown {
   // Coverage: filled / required slots
   let totalSlots = 0;
   let filledSlots = 0;
@@ -47,7 +66,8 @@ function scoreFromDrafts(drafts: AssignmentDraft[], context: SchedulerContext): 
     filledSlots += Math.min(assigned, shift.requiredStaffCount);
     if (shift.requiresChargeNurse) {
       chargeSlots++;
-      if (drafts.some((d) => d.shiftId === shift.id && d.isChargeNurse)) chargesFilled++;
+      if (drafts.some((d) => d.shiftId === shift.id && d.isChargeNurse))
+        chargesFilled++;
     }
   }
   const staffFill = totalSlots > 0 ? filledSlots / totalSlots : 1;
@@ -59,7 +79,8 @@ function scoreFromDrafts(drafts: AssignmentDraft[], context: SchedulerContext): 
   const activeIds = new Set(drafts.map((d) => d.staffId));
   for (const d of drafts) {
     const day = new Date(d.date).getDay();
-    if (day === 0 || day === 6) weekendCounts.set(d.staffId, (weekendCounts.get(d.staffId) ?? 0) + 1);
+    if (day === 0 || day === 6)
+      weekendCounts.set(d.staffId, (weekendCounts.get(d.staffId) ?? 0) + 1);
   }
   for (const id of activeIds) {
     if (!weekendCounts.has(id)) weekendCounts.set(id, 0);
@@ -68,7 +89,8 @@ function scoreFromDrafts(drafts: AssignmentDraft[], context: SchedulerContext): 
   let fairness = 0;
   if (counts.length >= 2) {
     const mean = counts.reduce((a, b) => a + b, 0) / counts.length;
-    const variance = counts.reduce((s, c) => s + (c - mean) ** 2, 0) / counts.length;
+    const variance =
+      counts.reduce((s, c) => s + (c - mean) ** 2, 0) / counts.length;
     fairness = Math.min(Math.sqrt(variance) / 3, 1);
   }
 
@@ -76,11 +98,15 @@ function scoreFromDrafts(drafts: AssignmentDraft[], context: SchedulerContext): 
   // Weighted by real cost premium above base pay so COST_OPTIMIZED (which penalises all three)
   // reliably scores better than BALANCED on this metric.
   const otCount = drafts.filter((d) => d.isOvertime).length;
-  const agencyCount = drafts.filter((d) => context.staffMap.get(d.staffId)?.employmentType === "agency").length;
+  const agencyCount = drafts.filter(
+    (d) => context.staffMap.get(d.staffId)?.employmentType === "agency",
+  ).length;
   const floatCount = drafts.filter((d) => d.isFloat).length;
-  const costPenalty = drafts.length > 0
-    ? (agencyCount * 4.0 + otCount * 1.0 + floatCount * 0.2) / (drafts.length * 4.0)
-    : 0;
+  const costPenalty =
+    drafts.length > 0
+      ? (agencyCount * 4.0 + otCount * 1.0 + floatCount * 0.2) /
+        (drafts.length * 4.0)
+      : 0;
   const cost = Math.min(costPenalty, 1);
 
   // Preference: mismatch ratio
@@ -91,15 +117,21 @@ function scoreFromDrafts(drafts: AssignmentDraft[], context: SchedulerContext): 
     if (!s?.preferences) continue;
     const { preferredShift, preferredDaysOff, avoidWeekends } = s.preferences;
     prefChecks++;
-    if (preferredShift !== "any" && preferredShift !== d.shiftType) mismatches++;
+    if (preferredShift !== "any" && preferredShift !== d.shiftType)
+      mismatches++;
     if (preferredDaysOff.length > 0) {
       prefChecks++;
-      const dayName = new Date(d.date).toLocaleDateString("en-US", { weekday: "long" });
+      const dayName = new Date(d.date).toLocaleDateString("en-US", {
+        weekday: "long",
+      });
       if (preferredDaysOff.includes(dayName)) mismatches++;
     }
     if (avoidWeekends) {
       const day = new Date(d.date).getDay();
-      if (day === 0 || day === 6) { prefChecks++; mismatches++; }
+      if (day === 0 || day === 6) {
+        prefChecks++;
+        mismatches++;
+      }
     }
   }
   const preference = prefChecks > 0 ? mismatches / prefChecks : 0;
@@ -114,18 +146,36 @@ function scoreFromDrafts(drafts: AssignmentDraft[], context: SchedulerContext): 
     const levels = assigned
       .map((d) => context.staffMap.get(d.staffId)?.icuCompetencyLevel ?? 0)
       .filter((l) => l > 0);
-    if (levels.length >= 2 && Math.max(...levels) - Math.min(...levels) === 0) poorMix++;
+    if (levels.length >= 2 && Math.max(...levels) - Math.min(...levels) === 0)
+      poorMix++;
   }
   const skillMix = totalShifts > 0 ? poorMix / totalShifts : 0;
 
-  const weights = { coverage: 3, fairness: 2, cost: 2, preference: 1.5, skillMix: 1 };
+  const weights = {
+    coverage: 3,
+    fairness: 2,
+    cost: 2,
+    preference: 1.5,
+    skillMix: 1,
+  };
   const tw = Object.values(weights).reduce((a, b) => a + b, 0);
   const overall =
-    (coverage * weights.coverage + fairness * weights.fairness + cost * weights.cost +
-      preference * weights.preference + skillMix * weights.skillMix) / tw;
+    (coverage * weights.coverage +
+      fairness * weights.fairness +
+      cost * weights.cost +
+      preference * weights.preference +
+      skillMix * weights.skillMix) /
+    tw;
 
   const r = (n: number) => Math.round(n * 100) / 100;
-  return { overall: r(overall), coverage: r(coverage), fairness: r(fairness), cost: r(cost), preference: r(preference), skillMix: r(skillMix) };
+  return {
+    overall: r(overall),
+    coverage: r(coverage),
+    fairness: r(fairness),
+    cost: r(cost),
+    preference: r(preference),
+    skillMix: r(skillMix),
+  };
 }
 
 // ─── Progress helpers ─────────────────────────────────────────────────────────
@@ -142,7 +192,7 @@ function setProgress(jobId: string, progress: number, phase: string) {
 function writeAssignments(
   drafts: AssignmentDraft[],
   scheduleId: string,
-  context: SchedulerContext
+  context: SchedulerContext,
 ): void {
   // Build holiday date lookup
   const holidayDateToName = new Map<string, string>();
@@ -206,7 +256,10 @@ function writeAssignments(
  *  65–85%  Cost-Optimized variant
  *  85–100% Score, save scenarios, audit log
  */
-export async function runGenerationJob(jobId: string, scheduleId: string): Promise<void> {
+export async function runGenerationJob(
+  jobId: string,
+  scheduleId: string,
+): Promise<void> {
   try {
     db.update(generationJob)
       .set({ status: "running", startedAt: new Date().toISOString() })
@@ -240,7 +293,9 @@ export async function runGenerationJob(jobId: string, scheduleId: string): Promi
     try {
       db.$client.pragma("foreign_keys = OFF");
       db.transaction(() => {
-        db.delete(assignment).where(eq(assignment.scheduleId, scheduleId)).run();
+        db.delete(assignment)
+          .where(eq(assignment.scheduleId, scheduleId))
+          .run();
         db.delete(scenario).where(eq(scenario.scheduleId, scheduleId)).run();
       });
     } finally {
@@ -249,7 +304,13 @@ export async function runGenerationJob(jobId: string, scheduleId: string): Promi
 
     // ── 2. Generate BALANCED variant ──────────────────────────────────────
     setProgress(jobId, 10, "Building Balanced schedule");
-    const balancedResult = generateSchedule(scheduleId, BALANCED, 1500, undefined, balancedSeed);
+    const balancedResult = generateSchedule(
+      scheduleId,
+      BALANCED,
+      1500,
+      undefined,
+      balancedSeed,
+    );
 
     setProgress(jobId, 38, "Writing Balanced schedule to database");
     writeAssignments(balancedResult.assignments, scheduleId, context);
@@ -280,9 +341,16 @@ export async function runGenerationJob(jobId: string, scheduleId: string): Promi
     // handled by the sweep directly. The local-search pass is redundant and removed.
     setProgress(jobId, 45, "Building Fairness-Optimized schedule");
     const fairBase = balancedResult.assignments.map((a) => ({ ...a }));
-    const fairFinalAssignments = weekendRedistributionSweep(fairBase, context, FAIR);
+    const fairFinalAssignments = weekendRedistributionSweep(
+      fairBase,
+      context,
+      FAIR,
+    );
     recomputeOvertimeFlags(fairFinalAssignments);
-    const fairFinalResult = { ...balancedResult, assignments: fairFinalAssignments };
+    const fairFinalResult = {
+      ...balancedResult,
+      assignments: fairFinalAssignments,
+    };
     setProgress(jobId, 62, "Scoring Fairness-Optimized schedule");
     const fairScore = scoreFromDrafts(fairFinalResult.assignments, context);
 
@@ -296,11 +364,22 @@ export async function runGenerationJob(jobId: string, scheduleId: string): Promi
     // depleting low-hour staff early.
     setProgress(jobId, 65, "Building Cost-Optimized schedule");
     const costBase = balancedResult.assignments.map((a) => ({ ...a }));
-    const afterCostOTSweep = overtimeReductionSweep(costBase, context, COST_OPTIMIZED);
+    const afterCostOTSweep = overtimeReductionSweep(
+      costBase,
+      context,
+      COST_OPTIMIZED,
+    );
     recomputeOvertimeFlags(afterCostOTSweep);
-    const costFinalAssignments = weekendRedistributionSweep(afterCostOTSweep, context, COST_OPTIMIZED);
+    const costFinalAssignments = weekendRedistributionSweep(
+      afterCostOTSweep,
+      context,
+      COST_OPTIMIZED,
+    );
     recomputeOvertimeFlags(costFinalAssignments);
-    const costResult = { assignments: costFinalAssignments, understaffed: balancedResult.understaffed };
+    const costResult = {
+      assignments: costFinalAssignments,
+      understaffed: balancedResult.understaffed,
+    };
     setProgress(jobId, 82, "Scoring Cost-Optimized schedule");
     const costScore = scoreFromDrafts(costResult.assignments, context);
 
@@ -390,7 +469,10 @@ export async function runGenerationJob(jobId: string, scheduleId: string): Promi
     // Check for unexplained understaffing in the Balanced result: shifts that are
     // short without any documented hard-rule reason AND despite enough available staff.
     // A non-empty list indicates a scheduler logic bug (not a constraint or shortage issue).
-    const suspicious = checkForUnexplainedUnderstaffing(balancedResult.understaffed, context);
+    const suspicious = checkForUnexplainedUnderstaffing(
+      balancedResult.understaffed,
+      context,
+    );
 
     const now = new Date().toISOString();
 
@@ -399,9 +481,12 @@ export async function runGenerationJob(jobId: string, scheduleId: string): Promi
         entityType: "schedule",
         entityId: scheduleId,
         action: "schedule_auto_generated",
-        description: `Balanced schedule auto-generated: ${balancedResult.assignments.length} assignments, ` +
+        description:
+          `Balanced schedule auto-generated: ${balancedResult.assignments.length} assignments, ` +
           `${balancedResult.understaffed.length} understaffed shifts` +
-          (suspicious.length > 0 ? `, ${suspicious.length} SUSPICIOUS understaffed (possible scheduler bug — check suspiciousUnderstaffing in newState)` : ""),
+          (suspicious.length > 0
+            ? `, ${suspicious.length} SUSPICIOUS understaffed (possible scheduler bug — check suspiciousUnderstaffing in newState)`
+            : ""),
         newState: {
           variant: "balanced",
           assignmentCount: balancedResult.assignments.length,
@@ -460,7 +545,10 @@ export async function runGenerationJob(jobId: string, scheduleId: string): Promi
 
     // ── 7. Mark job complete ──────────────────────────────────────────────
     const allUnderstaffed: UnderstaffedShift[] = [
-      ...balancedResult.understaffed.map((u) => ({ ...u, variant: "balanced" })),
+      ...balancedResult.understaffed.map((u) => ({
+        ...u,
+        variant: "balanced",
+      })),
     ];
 
     db.update(generationJob)
