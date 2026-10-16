@@ -32,7 +32,6 @@ interface UnitConfig {
   weekendRuleType: "count_per_period" | "alternate_weekends";
   weekendShiftsRequired: number;
   schedulePeriodWeeks: number;
-  holidayShiftsRequired: number;
   escalationSequence: string[];
   lowCensusOrder: string[];
   otApprovalThreshold: number;
@@ -50,7 +49,6 @@ interface FormState {
   weekendRuleType: "count_per_period" | "alternate_weekends";
   weekendShiftsRequired: number;
   schedulePeriodWeeks: number;
-  holidayShiftsRequired: number;
   escalationSequence: string[];
   lowCensusOrder: string[];
   otApprovalThreshold: number;
@@ -67,7 +65,6 @@ const defaultForm: FormState = {
   weekendRuleType: "count_per_period",
   weekendShiftsRequired: 3,
   schedulePeriodWeeks: 6,
-  holidayShiftsRequired: 1,
   escalationSequence: ["float", "per_diem", "overtime", "agency"],
   lowCensusOrder: ["voluntary", "overtime", "per_diem", "full_time"],
   otApprovalThreshold: 4,
@@ -110,7 +107,6 @@ export default function UnitsPage() {
       weekendRuleType: unit.weekendRuleType,
       weekendShiftsRequired: unit.weekendShiftsRequired,
       schedulePeriodWeeks: unit.schedulePeriodWeeks,
-      holidayShiftsRequired: unit.holidayShiftsRequired,
       escalationSequence: unit.escalationSequence,
       lowCensusOrder: unit.lowCensusOrder,
       otApprovalThreshold: unit.otApprovalThreshold,
@@ -204,12 +200,6 @@ export default function UnitsPage() {
                       {unit.weekendRuleType === "count_per_period"
                         ? `${unit.weekendShiftsRequired} shifts / ${unit.schedulePeriodWeeks} weeks`
                         : "Alternate weekends"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Holiday Shifts</p>
-                    <p className="font-medium">
-                      {unit.holidayShiftsRequired} per period
                     </p>
                   </div>
                   <div>
@@ -343,22 +333,12 @@ export default function UnitsPage() {
             </div>
 
             <div className="border-t pt-4">
-              <h3 className="font-medium mb-3">Holiday & On-Call</h3>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label>Holiday Shifts Required</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={form.holidayShiftsRequired}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        holidayShiftsRequired: parseInt(e.target.value),
-                      })
-                    }
-                  />
-                </div>
+              {/* "Holiday Shifts Required" was removed here in v1.11.1: no rule reads
+                  unit.holidayShiftsRequired, so the setting did nothing. The DB
+                  column stays (no migration); holiday fairness is annual, via
+                  the Holiday Fairness rule. */}
+              <h3 className="font-medium mb-3">On-Call</h3>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Max On-Call/Week</Label>
                   <Input
