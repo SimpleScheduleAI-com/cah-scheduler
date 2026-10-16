@@ -98,3 +98,21 @@ is already on the phone and a board notice is noise. The two paths remain
 distinct on purpose — a callout has no open-shift row, so the nurse is told
 to contact the manager rather than "raise a hand". Founder: "4-5 days before,
 it makes sense; less than a day away it does not."
+
+## 2026-10-16 — Holiday ledger is derived from the chosen schedule
+
+`staff_holiday_assignment` rows for a schedule are rebuilt from its live
+assignments (status not called_out/cancelled/swapped) whenever the
+assignments are replaced wholesale (generation, scenario apply), rather than
+being patched per assignment. Chosen over deleting the ledger and computing
+holiday history at read time (cleaner, but changes the rule's data source
+and the analytics query — left as a follow-up for the founder). Rows not
+tied to any shift are left alone by the per-schedule sync; the repair
+script, run by hand, removes them.
+
+## 2026-10-16 — Unused unit setting hidden, column kept
+
+`unit.holidayShiftsRequired` (no rule reads it) is removed from the Units
+settings UI but kept in the schema and the Excel import/export, to avoid a
+migration and an Excel template change. Building a real holiday quota is a
+separate founder decision.

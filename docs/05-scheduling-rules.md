@@ -290,6 +290,7 @@ Staff at or below the target have no violation. Shortfall is handled by the sche
 **How it works:**
 
 - System tracks holiday assignments in the `staff_holiday_assignment` table
+- The count always follows the schedule you actually chose: if you regenerate a schedule or switch to the Fairness or Cost draft, the holiday counts are updated to match
 - Compares each person's yearly total against the average
 - Staff below average get priority for non-holiday assignments
 - Staff above average may be assigned holidays to balance out

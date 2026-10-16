@@ -17,6 +17,12 @@ rule is in CLAUDE.md and is not optional.
   appear: kill the dev server AND `rm -rf .next`, then restart.
 - **Prettier repo-wide is forbidden.** It churns unrelated files and the
   founder reverts it. Only ever format the files you changed.
+- **The rtk shell hook rewrites command output.** `git diff`, `grep` and
+  `npx prettier` run through it come back filtered or summarized (an agent
+  stalled on 2026-10-16 because prettier's real file list was hidden). Use
+  `rtk proxy <cmd>` when you need the raw output. Many files on main are not
+  prettier-clean, so touching one means the gate wants it reformatted: put
+  that reformat in its own formatting-only commit before the logic change.
 
 ## Build / deploy (Railway)
 
@@ -102,6 +108,24 @@ rule is in CLAUDE.md and is not optional.
     `git reset --soft`'d them away (twice). Agent contracts now ban history
     rewrites and subagent delegation; the orchestrator serializes all git
     operations.
+
+## Derived ledgers go stale when assignments are replaced wholesale (2026-10-16)
+
+**Symptom:** "Holiday Fairness (Annual)" credited a nurse with a holiday the
+posted schedule gave to someone else.
+
+**Cause:** `staff_holiday_assignment` is derived from assignments, but only the
+manual add/remove route maintained it. Regeneration deleted assignments with
+foreign keys OFF (so even the `set null` link never fired) and the unique
+(nurse, holiday, year) index made the re-insert a silent no-op; scenario apply
+never touched it.
+
+**Rule:** any code that bulk-replaces a schedule's assignments must call
+`syncScheduleHolidayRows(scheduleId)` (`src/lib/holidays/holiday-tracking.ts`)
+inside the same transaction. Swap approval and callout/open-shift fills still
+do not maintain the ledger; `scripts/repair-holiday-assignments.ts` reconciles
+it. Related: never build a date with `new Date(y, m, d).toISOString()` — it is
+local midnight in UTC, a day early east of UTC; see `standard-holidays.ts`.
 
 ## Sibling agent stashes the orchestrator's uncommitted work (2026-08-15)
 

@@ -46,7 +46,6 @@ Each unit may have different rules:
 | **Weekend Rule Type**               | How weekend fairness is calculated                                          | "count_per_period" or "alternate_weekends" |
 | **Weekend Shifts Required**         | Minimum weekend shifts per person                                           | 3 (per 6-week period)                      |
 | **Schedule Period Weeks**           | Length of scheduling cycle                                                  | 6 weeks                                    |
-| **Holiday Shifts Required**         | Minimum holidays per person                                                 | 1 (per period)                             |
 | **Escalation Sequence**             | Callout coverage order                                                      | Float → PRN → OT → Agency                  |
 | **Min Staff — Day Shift**           | Absolute minimum staff for any day shift, regardless of census              | 3                                          |
 | **Min Staff — Night/Evening Shift** | Absolute minimum staff for any night or evening shift, regardless of census | 2                                          |
@@ -142,7 +141,7 @@ The app can auto-populate these:
 
 You can:
 
-1. **Add Standard Holidays** - One click to add all US holidays for a year
+1. **Add Standard Holidays** - One click to add all US holidays for a year. Holidays like Thanksgiving and Labor Day are placed on the correct date for the year you pick (for example, Thanksgiving 2026 is November 26). If you added standard holidays before October 2026, check the floating holidays and fix any that are on the wrong day.
 2. **Add Custom Holidays** - Add your own (e.g., hospital anniversary)
 3. **Edit Holidays** - Change dates or names
 4. **Delete Holidays** - Remove ones that don't apply

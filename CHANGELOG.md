@@ -6,6 +6,56 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.11.1] - 2026-10-16
+
+Three holiday bugs found by a read-only code review on 2026-10-15.
+
+### Fixed
+
+- **"Add Standard Holidays" puts floating holidays on the right date.** The
+  button used fixed approximate days ("Thanksgiving: Nov 28, 4th Thursday
+  approx"), so MLK Day, Presidents' Day, Memorial Day, Labor Day and
+  Thanksgiving were all wrong for 2026 (e.g. Thanksgiving landed on Saturday
+  Nov 28 instead of Thursday Nov 26). Each is now computed per year by rule.
+  Dates were also built as local midnight converted to UTC, which put every
+  holiday one day early in a browser east of UTC (the founder's UTC+5:30
+  machine); they are now date-only YYYY-MM-DD strings built with UTC
+  arithmetic. The holidays API derives `year` from the date string instead of
+  `new Date(date).getFullYear()` (a year early for Jan 1 on hosts west of
+  UTC). Holidays already added with the old button are not changed — check
+  them on /settings/holidays.
+  (`src/lib/holidays/standard-holidays.ts` new, `src/app/settings/holidays/page.tsx`,
+  `src/app/api/holidays/route.ts`, `src/app/api/holidays/[id]/route.ts`)
+- **Yearly holiday counts follow the chosen schedule.** Regenerating a
+  schedule deleted its assignments but kept its `staff_holiday_assignment`
+  rows, and the unique (nurse, holiday, year) index then silently kept the
+  old owner; applying the Fairness or Cost draft never touched those rows at
+  all. "Holiday Fairness (Annual)" could therefore credit a nurse with a
+  holiday the posted schedule gave to someone else. A new
+  `syncScheduleHolidayRows()` rewrites a schedule's rows from its live
+  assignments; it runs when generation clears the schedule, after the
+  Balanced draft is written, and inside the scenario-apply transaction.
+  Existing bad rows: run `scripts/repair-holiday-assignments.ts` (dry run by
+  default, `--apply` to write, idempotent, `DATABASE_PATH` required).
+  (`src/lib/holidays/holiday-tracking.ts` new, `src/lib/engine/scheduler/runner.ts`,
+  `src/app/api/scenarios/[id]/route.ts`, `scripts/repair-holiday-assignments.ts` new)
+
+### Removed
+
+- **"Holiday Shifts Required" is gone from the Units settings page.** No rule
+  reads `unit.holidayShiftsRequired`, so managers were shown a setting that
+  did nothing. The DB column stays (no migration), as does the Excel Units
+  sheet column. (`src/app/settings/units/page.tsx`)
+
+### Tests
+
+- 18 new (779 total): standard-holiday dates for every holiday in 2026 and
+  2027, weekday checks 2024-2035, identical output under five timezones
+  including TZ=Asia/Kolkata; holiday ledger after regeneration and after
+  applying a different draft (scratch DB, real runner and apply route, both
+  fail on the pre-fix code), Christmas split across two schedules, and repair
+  plan idempotence.
+
 ## [1.11.0] - 2026-09-13
 
 Both changes come from the 2026-09-11 demo to Dr. Tara Shajan (CNO, OMH
